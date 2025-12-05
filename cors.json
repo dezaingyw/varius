@@ -1,0 +1,23 @@
+[
+    {
+        "origin": [
+            "http://localhost",
+            "http://127.0.0.1:5500",
+            "http://localhost:3000"
+        ],
+        "method": [
+            "GET",
+            "POST",
+            "PUT",
+            "HEAD",
+            "DELETE",
+            "OPTIONS"
+        ],
+        "responseHeader": [
+            "Content-Type",
+            "x-goog-resumable",
+            "x-goog-api-client"
+        ],
+        "maxAgeSeconds": 3600
+    }
+]
