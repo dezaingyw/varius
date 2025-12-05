@@ -1,18 +1,7 @@
 // assets/js/payment-modal.js
 // Modal de cobro — soporta múltiples métodos y conversión USD/EUR <> Bs
-// Cambios recientes:
-// - Auto-llenado automático del monto en Bs cuando se selecciona Pago Móvil o Efectivo y hay una tasa activa.
-// - Si se marca Pago Móvil, se muestra select de bancos + input de referencia; se oculta al desmarcar.
-// - Si se marcan USD/PayPal y se introducen montos, el campo Pago Móvil/Efectivo se reajusta automáticamente con el faltante (salvo que el usuario haya editado manualmente ese campo).
-// - Se usa un flag `data-user-edited` por campo para respetar ediciones manuales y no sobrescribirlas.
-// - Ahora se guarda en Firestore TODO el contexto de la conversión y del pago:
-//   * snapshot de las tasas (usd_bcv / eur_bcv) y la fuente (API o asignada)
-//   * fecha/tasa usada (conversionRateDate y conversionRateSource)
-//   * para cada método se guarda: currency, amount (original), bsAmount (si aplica), usdEquivalent, conversion metadata
-//   * totales relacionados: totalUSD (orden), totalReceivedUSD, totalReceivedBs, totalInBsAtRate (si hay tasa)
-//   * si pago móvil: banco y referencia quedan guardados
-// - Ajuste: ahora se acepta también la tasa de "mañana" (si la API no devuelve la de hoy pero sí la de mañana),
-//   y se muestra una nota en la UI indicando que la tasa corresponde al día siguiente.
+// Actualizaciones: formateo numérico en inputs ("," separador miles, "." separador decimal).
+// Mantengo la funcionalidad existente y agrego limpieza/format helpers.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -57,15 +46,41 @@ let currentOrder = null;
 let currentUser = null;
 
 let rates = {
-    usd_bcv: null, // Bs per USD for today's date (or tomorrow if API provides it)
-    eur_bcv: null, // Bs per EUR
-    date: null,    // "YYYY-MM-DD" of the fetched rate
+    usd_bcv: null,
+    eur_bcv: null,
+    date: null,
     apiSource: null,
     apiRaw: null,
-    isTomorrow: false // true when the rate corresponds to tomorrow
+    isTomorrow: false
 };
 
 onAuthStateChanged(auth, (u) => { currentUser = u; });
+
+/* ---------------- Helpers de formato ---------------- */
+
+/**
+ * Limpia una cadena numérica quitando separadores de miles (",") y espacios.
+ * Devuelve cadena que puede parsearse con parseFloat.
+ */
+function cleanNumberString(str) {
+    if (str == null) return '';
+    return String(str).replace(/\s+/g, '').replace(/,/g, '');
+}
+
+/**
+ * Formatea un número para mostrar en input con separador de miles "," y separador decimal "."
+ * decimals: número de decimales a mostrar (por defecto 2)
+ */
+function formatNumberForInput(value, decimals = 2) {
+    if (value === null || value === undefined || value === '') return '';
+    const num = Number(value);
+    if (isNaN(num)) return '';
+    // Mostrar con el número de decimales solicitado (si decimals es null, mostrar sin forzar)
+    const fixed = (typeof decimals === 'number') ? num.toFixed(decimals) : String(num);
+    const parts = fixed.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+}
 
 /* ---------------- UI helpers ---------------- */
 function showModal() {
@@ -91,15 +106,20 @@ function cleanup() {
     pmConvInfo.textContent = '';
     pmTotalBs.textContent = '';
     if (pmMobileDetails) pmMobileDetails.style.display = 'none';
-    // reset user-edited flags
+    // reset user-edited flags and format amounts to default 0.00
     document.querySelectorAll('.pm-amount').forEach(inp => {
         delete inp.dataset.userEdited;
+        inp.value = formatNumberForInput(0, 2);
+        inp.disabled = true;
     });
+    if (pmAssignRate) {
+        delete pmAssignRate.dataset.userEdited;
+        pmAssignRate.value = '';
+    }
 }
 
 /* ---------------- Conversion / Rates ---------------- */
 
-// Nueva API única solicitada
 const EXCHANGE_API = 'https://api.dolarvzla.com/public/exchange-rate';
 
 function todayString(offsetDays = 0) {
@@ -145,7 +165,6 @@ async function fetchRates() {
         const eur = Number(current.eur);
 
         if (apiDate === today) {
-            // tasa para hoy -> usarla
             rates.usd_bcv = (usd && !isNaN(usd)) ? usd : null;
             rates.eur_bcv = (eur && !isNaN(eur)) ? eur : null;
             rates.date = apiDate;
@@ -155,7 +174,6 @@ async function fetchRates() {
         }
 
         if (apiDate === tomorrow) {
-            // tasa para mañana -> usarla como fallback cuando hoy no está disponible
             rates.usd_bcv = (usd && !isNaN(usd)) ? usd : null;
             rates.eur_bcv = (eur && !isNaN(eur)) ? eur : null;
             rates.date = apiDate;
@@ -164,7 +182,6 @@ async function fetchRates() {
             return;
         }
 
-        // en cualquier otro caso no usamos la tasa
         console.warn(`fetchRates: tasa API con fecha ${apiDate} no es hoy ni mañana (${today} / ${tomorrow}) — no se usará`);
         rates.usd_bcv = null;
         rates.eur_bcv = null;
@@ -187,7 +204,8 @@ function parseAmountFor(method) {
     const el = document.querySelector(`.pm-amount[data-method="${method}"]`);
     const chk = document.querySelector(`.pm-check[data-method="${method}"]`);
     if (!el || !chk) return 0;
-    const val = Number(el.value || 0);
+    const raw = cleanNumberString(el.value || '0');
+    const val = Number(raw || 0);
     if (!chk.checked) return 0;
     return isNaN(val) ? 0 : val;
 }
@@ -204,7 +222,7 @@ function getActiveRate() {
     if (sel === 'usd_bcv') return rates.usd_bcv || null;
     if (sel === 'eur_bcv') return rates.eur_bcv || null;
     if (sel === 'assign') {
-        const v = Number(pmAssignRate.value || 0);
+        const v = Number(cleanNumberString(pmAssignRate.value || '0'));
         return (v > 0) ? v : null;
     }
     return null;
@@ -218,20 +236,16 @@ function computeTotalsAndUI() {
     pmErrorEl.style.display = 'none';
     pmErrorEl.textContent = '';
 
-    // base total assumed in USD (from order)
     const totalUSD = Number(currentOrder?.total || currentOrder?.amount || currentOrder?.totalAmount || 0);
 
-    // sum USD methods
     const usdAmount = parseAmountFor('usd');
     const paypalAmount = parseAmountFor('paypal');
 
-    // sum Bs methods (cash, mobile, other) and convert to USD using active rate
     const cashBs = parseAmountFor('cash');
     const mobileBs = parseAmountFor('mobile');
     const otherBs = parseAmountFor('other');
     const bsTotal = cashBs + mobileBs + otherBs;
 
-    // Only require conversion if either mobile or cash is selected
     const mobileChecked = Boolean(document.querySelector('.pm-check[data-method="mobile"]')?.checked);
     const cashChecked = Boolean(document.querySelector('.pm-check[data-method="cash"]')?.checked);
 
@@ -258,7 +272,6 @@ function computeTotalsAndUI() {
     const remainingUSD = Number((totalUSD - totalReceivedUSD) || 0);
     pmRemainingEl.textContent = `Resto: $. ${remainingUSD.toFixed(2)}`;
 
-    // show total in Bs only if conversion selected and (mobile or cash selected)
     const sel = getSelectedConversion();
     if ((sel === 'usd_bcv' && rates.usd_bcv) || (sel === 'eur_bcv' && rates.eur_bcv) || sel === 'assign') {
         if (mobileChecked || cashChecked) {
@@ -271,7 +284,7 @@ function computeTotalsAndUI() {
                 pmConvInfo.textContent = `Tasa activa: ${rates.eur_bcv} Bs por EUR (fecha ${rates.date})`;
                 if (rates.isTomorrow) pmConvInfo.textContent += ' — la tasa corresponde al día siguiente.';
             } else if (sel === 'assign') {
-                const v = Number(pmAssignRate.value || 0);
+                const v = Number(cleanNumberString(pmAssignRate.value || '0'));
                 if (v > 0) {
                     pmTotalBs.textContent = `≈ ${formatBs(totalUSD * v)} (tasa asignada ${v} Bs/USD)`;
                     pmConvInfo.textContent = `Tasa asignada: ${v} Bs por USD`;
@@ -298,34 +311,23 @@ function computeTotalsAndUI() {
     return { totalUSD, totalReceivedUSD, remainingUSD, rate, bsTotal, bsBreakdown: { cashBs, mobileBs, otherBs }, rateSnapshot: { usd_bcv: rates.usd_bcv, eur_bcv: rates.eur_bcv, date: rates.date, source: rates.apiSource } };
 }
 
-/**
- * Convierto USD a Bs usando rate (Bs per USD).
- */
 function usdToBs(usd, rate) {
     return Number((usd * rate) || 0);
 }
 
-/**
- * Convierto Bs a USD usando rate (Bs per USD).
- */
 function bsToUsd(bs, rate) {
     return rate ? Number(bs / rate) : NaN;
 }
 
 /* ---------------- Auto-llenado inteligente ---------------- */
 
-/**
- * Intenta auto-llenar el campo Pago Móvil o Efectivo con el resto convertido a Bs.
- * Respeta ediciones manuales: si el usuario editó manualmente un campo (data-user-edited="true") no lo sobrescribe.
- * Preferencia: mobile > cash.
- */
 function autoFillBsIfNeeded() {
     const sel = getSelectedConversion();
     const rate = getActiveRate();
     console.debug('autoFillBsIfNeeded: sel, rate', sel, rate);
     if (!sel || !rate) {
         console.debug('autoFillBsIfNeeded: no hay conversion seleccionada o rate inválida, saliendo');
-        return; // nada que hacer si no hay conversión válida
+        return;
     }
 
     const { remainingUSD } = computeTotalsAndUI();
@@ -342,7 +344,6 @@ function autoFillBsIfNeeded() {
     const mobileSelected = Boolean(mobileChk && mobileChk.checked);
     const cashSelected = Boolean(cashChk && cashChk.checked);
 
-    // nothing to do if neither selected
     if (!mobileSelected && !cashSelected) {
         console.debug('autoFillBsIfNeeded: ni mobile ni cash seleccionados');
         return;
@@ -351,15 +352,12 @@ function autoFillBsIfNeeded() {
     const bsAmount = Number(usdToBs(remainingUSD, rate).toFixed(2));
     console.debug('autoFillBsIfNeeded: remainingUSD, rate, bsAmount', remainingUSD, rate, bsAmount);
 
-    // helpers to check user-edited flag
     const isUserEdited = (inp) => inp && inp.dataset && inp.dataset.userEdited === 'true';
 
-    // Prefer mobile
     if (mobileSelected && mobileInput && !isUserEdited(mobileInput)) {
         mobileChk.checked = true;
         mobileInput.disabled = false;
-        mobileInput.value = bsAmount;
-        // mark as auto-filled (not user edited) so future USD changes may update again
+        mobileInput.value = formatNumberForInput(bsAmount, 2);
         mobileInput.dataset.userEdited = 'false';
         if (pmMobileDetails) pmMobileDetails.style.display = 'block';
         computeTotalsAndUI();
@@ -367,11 +365,10 @@ function autoFillBsIfNeeded() {
         return;
     }
 
-    // If mobile was edited manually, try cash
     if (cashSelected && cashInput && !isUserEdited(cashInput)) {
         cashChk.checked = true;
         cashInput.disabled = false;
-        cashInput.value = bsAmount;
+        cashInput.value = formatNumberForInput(bsAmount, 2);
         cashInput.dataset.userEdited = 'false';
         computeTotalsAndUI();
         console.debug('autoFillBsIfNeeded: rellenado cash con', bsAmount);
@@ -384,36 +381,27 @@ function autoFillBsIfNeeded() {
 /* ---------------- Events ---------------- */
 
 document.addEventListener('change', (e) => {
-    // métodos marcados/amounts
     if (e.target && (e.target.matches(pmChecksSelector) || e.target.matches(pmAmountSelector))) {
-        // enable/disable amount inputs depending on checkbox
         document.querySelectorAll(pmChecksSelector).forEach(chk => {
             const method = chk.dataset.method;
             const amountInput = document.querySelector(`.pm-amount[data-method="${method}"]`);
             if (!amountInput) return;
-            // if the checkbox was toggled on just now, allow auto-fill (mark as not user-edited)
             if (chk === e.target && chk.checked) {
                 amountInput.disabled = false;
-                // allow auto-fill (user hasn't edited yet)
                 amountInput.dataset.userEdited = 'false';
             } else {
                 amountInput.disabled = !chk.checked;
             }
             if (!chk.checked) {
-                amountInput.value = '0';
-                // clear user-edit flag
+                amountInput.value = formatNumberForInput(0, 2);
                 delete amountInput.dataset.userEdited;
             }
         });
 
-        // show/hide mobile details when mobile checkbox changed
         if (e.target && e.target.matches('.pm-check[data-method="mobile"]')) {
             const mobileChk = e.target;
             if (mobileChk.checked) {
                 if (pmMobileDetails) pmMobileDetails.style.display = 'block';
-                // reset bank/ref when newly checked (optional)
-                // pmMobileBank.value = '';
-                // pmMobileRef.value = '';
             } else {
                 if (pmMobileDetails) pmMobileDetails.style.display = 'none';
                 if (pmMobileBank) pmMobileBank.value = '';
@@ -422,27 +410,21 @@ document.addEventListener('change', (e) => {
         }
 
         computeTotalsAndUI();
-        // after recompute try auto-fill if appropriate
         autoFillBsIfNeeded();
     }
 
-    // conversión: asegurar exclusividad y mostrar input asignar
     if (e.target && e.target.matches(convChecksSelector)) {
-        // make them exclusive (only one at a time)
         if (e.target.checked) {
             document.querySelectorAll(convChecksSelector).forEach(c => {
                 if (c !== e.target) c.checked = false;
             });
         }
-        // show/hide assign input
         const sel = getSelectedConversion();
         pmAssignRateWrap.style.display = (sel === 'assign') ? 'block' : 'none';
 
-        // If user selected usd_bcv or eur_bcv attempt to fetch API and use only if date === today or tomorrow
         if ((sel === 'usd_bcv' && !rates.usd_bcv) || (sel === 'eur_bcv' && !rates.eur_bcv) || !rates.date) {
             fetchRates().then(() => {
                 computeTotalsAndUI();
-                // try auto-fill now that we may have a rate
                 autoFillBsIfNeeded();
             }).catch(() => {
                 computeTotalsAndUI();
@@ -454,7 +436,6 @@ document.addEventListener('change', (e) => {
         }
     }
 
-    // assign rate manual edit
     if (e.target && e.target.id === 'pmAssignRate') {
         computeTotalsAndUI();
         autoFillBsIfNeeded();
@@ -480,7 +461,6 @@ if (pmApplyConversion) {
             return;
         }
 
-        // Force fill regardless of user-edited flags (user explicitly clicked el botón)
         const mobileChk = document.querySelector(`.pm-check[data-method="mobile"]`);
         const cashChk = document.querySelector(`.pm-check[data-method="cash"]`);
         const mobileInput = document.querySelector(`.pm-amount[data-method="mobile"]`);
@@ -490,7 +470,7 @@ if (pmApplyConversion) {
         if (mobileChk && mobileChk.checked && mobileInput) {
             mobileChk.checked = true;
             mobileInput.disabled = false;
-            mobileInput.value = bsAmount;
+            mobileInput.value = formatNumberForInput(bsAmount, 2);
             mobileInput.dataset.userEdited = 'false';
             if (pmMobileDetails) pmMobileDetails.style.display = 'block';
             computeTotalsAndUI();
@@ -499,7 +479,7 @@ if (pmApplyConversion) {
         if (cashChk && cashChk.checked && cashInput) {
             cashChk.checked = true;
             cashInput.disabled = false;
-            cashInput.value = bsAmount;
+            cashInput.value = formatNumberForInput(bsAmount, 2);
             cashInput.dataset.userEdited = 'false';
             computeTotalsAndUI();
             return;
@@ -513,12 +493,11 @@ if (pmApplyConversion) {
 // input events: detectar cuando el usuario edita manualmente un campo (para no sobrescribirlo)
 // y recalcular totales; si el usuario cambia USD/paypal, intentar auto-llenar Bs (si el target no fue editado manualmente)
 document.addEventListener('input', (e) => {
-    // si el usuario escribe en un amount, marcar como user-edited
     if (e.target && e.target.matches(pmAmountSelector)) {
         // mark this field as user-edited
         e.target.dataset.userEdited = 'true';
+        // Do not format on each keystroke to avoid caret issues; compute totals
         computeTotalsAndUI();
-        // If this is a USD/paypal field changing, try to auto-fill Bs target (respecting user-edited flags)
         const isUsdField = e.target.matches('.pm-amount[data-method="usd"]') || e.target.matches('.pm-amount[data-method="paypal"]');
         if (isUsdField) {
             autoFillBsIfNeeded();
@@ -531,6 +510,32 @@ document.addEventListener('input', (e) => {
         autoFillBsIfNeeded();
     }
 });
+
+// Formatear inputs al perder foco para mostrar separadores
+document.addEventListener('blur', (e) => {
+    if (e.target && e.target.matches(pmAmountSelector)) {
+        // formatear con 2 decimales
+        const cleaned = cleanNumberString(e.target.value || '0');
+        const num = Number(cleaned || 0);
+        e.target.value = formatNumberForInput(num, 2);
+        computeTotalsAndUI();
+    }
+}, true);
+
+// Formatear tasa asignada al perder foco (2 decimales)
+if (pmAssignRate) {
+    pmAssignRate.addEventListener('blur', (ev) => {
+        const cleaned = cleanNumberString(pmAssignRate.value || '');
+        const num = Number(cleaned || 0);
+        if (num > 0) {
+            pmAssignRate.value = formatNumberForInput(num, 2);
+        } else {
+            pmAssignRate.value = '';
+        }
+        computeTotalsAndUI();
+        autoFillBsIfNeeded();
+    });
+}
 
 /* ---------------- Lógica principal: abrir modal y confirmar cobranza ---------------- */
 
@@ -549,12 +554,10 @@ export async function openPaymentModal(orderObj) {
     pmTotal.textContent = `$. ${Number(total).toFixed(2)}`;
 
     cleanup();
-    // fetch rates in background (will use only today's rate, or tomorrow if available)
     fetchRates().then(() => computeTotalsAndUI()).catch(() => computeTotalsAndUI());
     computeTotalsAndUI();
     showModal();
 
-    // Ensure mobile details visibility according to current mobile checkbox
     const mobileChkInit = document.querySelector(`.pm-check[data-method="mobile"]`);
     if (mobileChkInit) {
         if (mobileChkInit.checked) {
@@ -575,17 +578,15 @@ export async function openPaymentModal(orderObj) {
                 return;
             }
 
-            // ensure at least one method selected and amounts valid
             const methods = [];
             document.querySelectorAll(pmChecksSelector).forEach(chk => {
                 if (!chk.checked) return;
                 const method = chk.dataset.method;
                 const amountInput = document.querySelector(`.pm-amount[data-method="${method}"]`);
-                const amount = Number(amountInput?.value || 0);
+                const raw = cleanNumberString(amountInput?.value || '0');
+                const amount = Number(raw || 0);
                 if (isNaN(amount) || amount <= 0) return;
-                // currency: USD for usd/paypal, Bs for others
                 const currency = (method === 'usd' || method === 'paypal') ? 'USD' : 'Bs';
-                // For mobile include bank/ref if present
                 const extra = {};
                 if (method === 'mobile') {
                     extra.bank = pmMobileBank?.value || '';
@@ -600,10 +601,8 @@ export async function openPaymentModal(orderObj) {
                 return;
             }
 
-            // Recompute totals and validate
             const { totalUSD, totalReceivedUSD } = computeTotalsAndUI();
 
-            // Allow small epsilon
             const EPS = 0.005;
             if (isNaN(totalReceivedUSD)) {
                 pmErrorEl.textContent = 'Hay montos en Bs sin una tasa de conversión válida.';
@@ -616,34 +615,30 @@ export async function openPaymentModal(orderObj) {
                 return;
             }
 
-            // Build payment object with conversion metadata
             const convSelected = getSelectedConversion();
             const effectiveRate = getActiveRate() || null;
             const rateSource = (convSelected === 'assign') ? 'manual' : (rates.apiSource || EXCHANGE_API);
             const rateDate = rates.date || null;
             const rateSnapshot = { usd_bcv: rates.usd_bcv, eur_bcv: rates.eur_bcv, fetchedAt: rates.date, source: rates.apiSource, apiRaw: rates.apiRaw };
 
-            // For Bs payments, compute USD equivalent at effectiveRate
             const detailedMethods = methods.map(m => {
                 if (m.currency === 'Bs') {
                     const usdEquivalent = effectiveRate ? Number((m.amount / effectiveRate).toFixed(6)) : null;
                     return {
                         method: m.method,
                         currency: m.currency,
-                        originalAmount: Number(m.amount), // bs amount
+                        originalAmount: Number(m.amount),
                         bsAmount: Number(m.amount),
                         usdEquivalent: usdEquivalent,
                         conversion: effectiveRate ? { type: convSelected, rate: effectiveRate, rateDate, rateSource } : null,
-                        // preserve bank/ref if mobile
                         bank: m.bank || '',
                         reference: m.reference || ''
                     };
                 } else {
-                    // USD methods
                     return {
                         method: m.method,
                         currency: m.currency,
-                        originalAmount: Number(m.amount), // usd amount
+                        originalAmount: Number(m.amount),
                         bsAmount: effectiveRate ? Number(usdToBs(m.amount, effectiveRate).toFixed(2)) : null,
                         usdEquivalent: Number(m.amount),
                         conversion: effectiveRate ? { type: convSelected, rate: effectiveRate, rateDate, rateSource } : null
@@ -651,7 +646,6 @@ export async function openPaymentModal(orderObj) {
                 }
             });
 
-            // totals for audit
             const totalReceivedBs = detailedMethods.reduce((acc, mm) => {
                 if (mm.currency === 'Bs') return acc + (Number(mm.bsAmount || 0));
                 if (mm.currency === 'USD' && mm.bsAmount) return acc + Number(mm.bsAmount || 0);
@@ -662,10 +656,10 @@ export async function openPaymentModal(orderObj) {
 
             const paymentObj = {
                 methods: detailedMethods,
-                totalUSD: Number(totalUSD.toFixed(6)),               // total expected (from order) in USD (audit)
+                totalUSD: Number(totalUSD.toFixed(6)),
                 totalReceivedUSD: Number(totalReceivedUSD.toFixed(6)),
                 totalReceivedBs: Number(totalReceivedBs.toFixed(2)),
-                totalInBsAtRate: totalInBsAtRate,                    // if a rate existed, snapshot of what the order equals in Bs
+                totalInBsAtRate: totalInBsAtRate,
                 conversionSelected: convSelected,
                 conversionRate: effectiveRate,
                 conversionRateDate: rateDate,
@@ -676,7 +670,6 @@ export async function openPaymentModal(orderObj) {
                 paidAt: serverTimestamp()
             };
 
-            // Update Firestore atomically: read order + product docs first then write
             const orderRef = doc(db, 'orders', currentOrder.id);
 
             try {
@@ -720,7 +713,6 @@ export async function openPaymentModal(orderObj) {
                         });
                     }
 
-                    // update order with payment info (audit-friendly)
                     tx.update(orderRef, {
                         paymentStatus: 'pagado',
                         payment: paymentObj,
@@ -736,7 +728,6 @@ export async function openPaymentModal(orderObj) {
                 return;
             }
 
-            // Emit event so UI can update
             document.dispatchEvent(new CustomEvent('payment:confirmed', { detail: { orderId: currentOrder.id } }));
 
             closeModal();

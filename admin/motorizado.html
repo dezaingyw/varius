@@ -346,7 +346,7 @@
               <input type="checkbox" class="pm-check" data-method="cash">
               <span>Efectivo (Bs.)</span>
             </label>
-            <input type="number" min="0" step="0.01" class="pm-amount" data-method="cash" value="0"
+            <input type="text" inputmode="decimal" class="pm-amount" data-method="cash" value="0"
               style="margin-left:auto; width:140px;" disabled>
           </div>
 
@@ -356,7 +356,7 @@
               <input type="checkbox" class="pm-check" data-method="usd">
               <span>Dólares (USD)</span>
             </label>
-            <input type="number" min="0" step="0.01" class="pm-amount" data-method="usd" value="0"
+            <input type="text" inputmode="decimal" class="pm-amount" data-method="usd" value="0"
               style="margin-left:auto; width:140px;" disabled>
           </div>
 
@@ -366,7 +366,7 @@
               <input type="checkbox" class="pm-check" data-method="mobile">
               <span>Pago Móvil (Bs.)</span>
             </label>
-            <input type="number" min="0" step="0.01" class="pm-amount" data-method="mobile" value="0"
+            <input type="text" inputmode="decimal" class="pm-amount" data-method="mobile" value="0"
               style="margin-left:auto; width:140px;" disabled>
           </div>
 
@@ -399,7 +399,7 @@
               <input type="checkbox" class="pm-check" data-method="paypal">
               <span>PayPal (USD)</span>
             </label>
-            <input type="number" min="0" step="0.01" class="pm-amount" data-method="paypal" value="0"
+            <input type="text" inputmode="decimal" class="pm-amount" data-method="paypal" value="0"
               style="margin-left:auto; width:140px;" disabled>
           </div>
 
@@ -409,7 +409,7 @@
               <input type="checkbox" class="pm-check" data-method="other">
               <span>Otro (Bs.)</span>
             </label>
-            <input type="number" min="0" step="0.01" class="pm-amount" data-method="other" value="0"
+            <input type="text" inputmode="decimal" class="pm-amount" data-method="other" value="0"
               style="margin-left:auto; width:140px;" disabled>
           </div>
 
@@ -438,7 +438,7 @@
               <label for="pmAssignRate"
                 style="font-size:13px; color:var(--muted); display:block; margin-bottom:4px;">Tasa personalizada (Bs por
                 USD)</label>
-              <input id="pmAssignRate" type="number" min="0" step="0.01" placeholder="Ej. 12.34" style="width:160px;">
+              <input id="pmAssignRate" type="text" inputmode="decimal" min="0" step="0.01" placeholder="Ej. 12.34" style="width:160px;">
             </div>
 
             <div id="pmConvInfo" style="margin-top:8px; font-size:13px; color:var(--muted);"></div>
