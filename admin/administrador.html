@@ -95,7 +95,7 @@
 
     <!-- Main content -->
     <main class="main">
-        <!-- KPI cards (kept) -->
+        <!-- KPI cards -->
         <section class="kpis" aria-label="Indicadores rápidos">
             <article id="kpi-lowstock" class="card kpi-card" role="button" tabindex="0" aria-pressed="false">
                 <div class="kpi-info">
@@ -108,16 +108,18 @@
                 </div>
             </article>
 
-            <article class="card kpi-card">
+            <!-- Updated Pedidos hoy KPI: keep id on value for JS, article is clickable and keyboard accessible -->
+            <article id="kpi-orders" class="card kpi-card" role="button" tabindex="0" aria-pressed="false">
                 <div class="kpi-info">
                     <div class="kpi-title">Pedidos hoy</div>
                     <div class="kpi-value" id="kpi-orders-today">—</div>
-                    <div class="kpi-meta muted">Comparado con ayer</div>
+                    <div class="kpi-meta muted">Comparado con la última fecha con pedidos</div>
                 </div>
                 <div class="kpi-icon" aria-hidden="true">
                     <div class="icon-square">📦</div>
                 </div>
             </article>
+
             <article class="card kpi-card">
                 <div class="kpi-info">
                     <div class="kpi-title">Ventas</div>
@@ -169,7 +171,7 @@
             </div>
         </section>
 
-        <!-- Filters + Orders table: aligned with orders-admin.js (same columns/buttons as orders.html) -->
+        <!-- Filters + Orders table -->
         <section class="table-wrap card" style="margin-top:16px;">
             <div class="table-header">
                 <h3>Pedidos</h3>
