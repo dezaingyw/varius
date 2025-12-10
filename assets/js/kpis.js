@@ -1,16 +1,8 @@
 // assets/js/kpis.js
 // KPIs en tiempo real con comparación entre "Pedidos hoy" y la última fecha previa que tuvo pedidos.
 // Adaptado al esquema que mostraste (orderDate ISO string, items array, customerData, shippingStatus, total).
-//
-// Comportamiento:
-// - Muestra en la card "Pedidos hoy" el número de pedidos del día y, debajo, la cantidad de la última fecha anterior
-//   que tuvo pedidos (en rojo y más pequeño).
-// - Al hacer click sobre la card "Pedidos hoy" se abre un modal comparativo (dinámico) que muestra:
-//   - producto más vendido (unidades) hoy vs fecha previa
-//   - pedido más grande (ID y total) hoy vs fecha previa
-//   - clientes únicos hoy vs fecha previa
-//   - entregas hoy vs fecha previa
-//   - ventas totales hoy vs fecha previa
+// Cambio solicitado: el KPI "Ventas" ahora suma únicamente los pedidos cuyo estado de pago sea "pagado".
+// Si un pedido no tiene paymentStatus: "pagado" (o equivalente 'paid'), su total NO se incluirá en el KPI de ventas.
 //
 // Nota de rendimiento: este script hace un onSnapshot que recorre los documentos de 'orders' y agrupa por fecha.
 // Si tienes muchísimos pedidos, considera crear agregados por fecha en backend (Cloud Function) y pedir solo esos agregados.
@@ -159,6 +151,20 @@ function isDelivered(data) {
     return false;
 }
 
+// Heurística para determinar si el pedido está pagado (busca paymentStatus / payment_status / payment.status)
+function isPaymentStatusPaid(data) {
+    if (!data) return false;
+    const ps = (
+        data.paymentStatus ||
+        data.payment_status ||
+        (data.payment && (data.payment.paymentStatus || data.payment.status)) ||
+        (data.payment && data.payment.state) ||
+        ''
+    ).toString().toLowerCase();
+    // Considera 'pagado' (español) y 'paid' (inglés). También aceptamos variantes que contengan 'pagad'.
+    return ps === 'pagado' || ps === 'paid' || ps.includes('pagad') || ps.includes('paid');
+}
+
 // Suscripción realtime para KPIs de pedidos/ventas con comparación a la última fecha con pedidos
 function subscribeKpisRealtime() {
     try {
@@ -178,7 +184,7 @@ function subscribeKpisRealtime() {
                 if (!byDate.has(key)) {
                     byDate.set(key, {
                         count: 0,
-                        sales: 0,
+                        sales: 0,               // ahora acumulamos SOLO ventas pagadas
                         deliveredCount: 0,
                         customers: new Set(),
                         productCounts: new Map(), // productName => units
@@ -188,7 +194,7 @@ function subscribeKpisRealtime() {
                 const bucket = byDate.get(key);
                 bucket.count += 1;
 
-                // total value
+                // total value (heurística)
                 let totalValue = 0;
                 if (typeof data.total === 'number') totalValue = data.total;
                 else if (typeof data.total === 'string' && !isNaN(Number(data.total))) totalValue = Number(data.total);
@@ -201,7 +207,11 @@ function subscribeKpisRealtime() {
                         return acc + (s || 0);
                     }, 0);
                 }
-                bucket.sales += (totalValue || 0);
+
+                // Añadir al total de ventas SOLO si el pedido está marcado como pagado
+                if (isPaymentStatusPaid(data)) {
+                    bucket.sales += (totalValue || 0);
+                }
 
                 // delivered
                 if (isDelivered(data)) bucket.deliveredCount += 1;
@@ -229,7 +239,7 @@ function subscribeKpisRealtime() {
                     });
                 }
 
-                // max order
+                // max order (comparamos por totalValue independientemente de si está pagado)
                 if (totalValue > (bucket.maxOrder.total || 0)) {
                     bucket.maxOrder = { id: docSnap.id, total: totalValue, raw: data };
                 }
@@ -253,15 +263,14 @@ function subscribeKpisRealtime() {
             // Update KPI numbers
             const ordersToday = todayBucket.count || 0;
             if (ordersTodayEl) {
-                // set main number and a small red comparative number (previous)
                 const prevCount = prevBucket.count || 0;
-                // show "X" and below a small red comparative number with date
                 const display = `${escapeHtml(String(ordersToday))}
                     <span class="kpi-compare"><span class="small muted">última fecha: ${prevKey || '—'}</span>
                     <span class="compare-number">${escapeHtml(String(prevCount))}</span></span>`;
                 ordersTodayEl.innerHTML = display;
             }
 
+            // Mostrar en KPI de Ventas SOLO la suma de pedidos pagados (todayBucket.sales)
             if (salesEl) salesEl.textContent = formatMoney(todayBucket.sales);
 
             // store aggregated data for modal usage
@@ -476,7 +485,7 @@ function openOrdersCompareModal() {
         </div>
 
         <div class="compare-card">
-          <div class="muted">Ventas totales</div>
+          <div class="muted">Ventas totales (solo "pagado")</div>
           <div class="stat">$ ${escapeHtml(formatMoney(today.sales || 0))}</div>
           <div class="small">vs $ ${escapeHtml(formatMoney(prev.sales || 0))}</div>
         </div>
