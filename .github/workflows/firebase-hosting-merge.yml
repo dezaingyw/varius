@@ -14,3 +14,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VARIUS_7DE76 }}
           channelId: live
           projectId: varius-7de76
+          only: hosting
