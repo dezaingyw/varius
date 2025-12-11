@@ -7,12 +7,10 @@ import { applyUiRestrictions } from './rbac.js';
 
 import './presence.js';
 
-// init firebase app (re-use if already  initialized)
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
- 
-// Helpers para esperar al sidebar inyectado
+
 function whenReady(selector, timeout = 3000) {
     return new Promise((resolve) => {
         const el = document.querySelector(selector);
@@ -25,13 +23,12 @@ function whenReady(selector, timeout = 3000) {
             }
         });
         obs.observe(document.documentElement, { childList: true, subtree: true });
-        // fallback timeout
         setTimeout(() => {
             obs.disconnect();
             resolve(document.querySelector(selector));
         }, timeout);
     });
-} 
+}
 
 function getInitials(name) {
     if (!name) return '';
@@ -41,42 +38,62 @@ function getInitials(name) {
 }
 
 async function init() {
-    await whenReady('.sidebar');
+    const sidebarEl = await whenReady('aside.sidebar');
+    if (!sidebarEl) {
+        console.warn('sidebar-user: sidebar no encontrada en el DOM');
+        return;
+    }
 
-    // Selectores robustos: toleramos id o solo clase
-    const nameEl = document.querySelector('.sidebar-user .name') || document.getElementById('sidebar-name');
-    const metaEl = document.querySelector('.sidebar-user .email') || document.getElementById('sidebar-email');
-    const avatarEl = document.querySelector('.sidebar-user .avatar') || document.getElementById('sidebar-avatar');
-    const logoutBtn = document.querySelector('.sidebar-user .logout-btn, .sidebar-user #logout, #logout, .logout-btn');
+    const nameEl = sidebarEl.querySelector('.sidebar-user .name') || document.getElementById('sidebar-name');
+    const metaEl = sidebarEl.querySelector('.sidebar-user .email') || document.getElementById('sidebar-email');
+    const avatarEl = sidebarEl.querySelector('.sidebar-user .avatar') || document.getElementById('sidebar-avatar');
+    const logoutBtn = sidebarEl.querySelector('.sidebar-user .logout-btn, .sidebar-user #logout, #logout, .logout-btn');
     const topSearch = document.querySelector('.top-search');
 
-    function getNavItemByHrefFragment(fragment) {
-        const anchor = document.querySelector(`.nav-list a[href$="${fragment}"], .nav-list a[href*="/${fragment}"], .nav-list a[href*="${fragment}"]`);
-        if (!anchor) return null;
-        return anchor.closest('.nav-item') || null;
+    // --- NAV active highlighting ---
+    function currentFileName() {
+        const p = window.location.pathname || '/';
+        let name = p.substring(p.lastIndexOf('/') + 1);
+        if (!name) name = 'index.html';
+        return name;
     }
 
-    function setNavVisibilityByFragment(fragment, visible) {
-        const item = getNavItemByHrefFragment(fragment);
-        if (!item) return;
-        item.style.display = visible ? '' : 'none';
+    function markActiveNav() {
+        const anchors = Array.from(sidebarEl.querySelectorAll('.nav-list a[href]'));
+        const current = currentFileName();
+
+        anchors.forEach(a => {
+            const li = a.closest('.nav-item');
+            if (!li) return;
+            const href = a.getAttribute('href') || '';
+            try {
+                const resolved = new URL(href, window.location.href);
+                let targetName = resolved.pathname.substring(resolved.pathname.lastIndexOf('/') + 1) || 'index.html';
+                if (href === './' || href === '/' || targetName === '') targetName = 'index.html';
+                const isActive = targetName === current ||
+                    current.endsWith(targetName) ||
+                    (resolved.hash && resolved.hash === window.location.hash) ||
+                    (a.dataset && a.dataset.nav && window.location.href.includes(a.dataset.nav));
+                li.classList.toggle('active', Boolean(isActive));
+            } catch (err) {
+                const fallbackName = href.split('/').pop();
+                li.classList.toggle('active', Boolean(fallbackName && current.endsWith(fallbackName)));
+            }
+        });
     }
 
-    function setRestrictedNavVisibility(role) {
-        const isAdmin = role === 'administrador';
-        setNavVisibilityByFragment('usuarios.html', isAdmin);
-        setNavVisibilityByFragment('cxc.html', isAdmin);
-    }
+    markActiveNav();
+    sidebarEl.addEventListener('click', (ev) => {
+        const a = ev.target.closest && ev.target.closest('a[href]');
+        if (!a) return;
+        setTimeout(markActiveNav, 60);
+    });
+    window.addEventListener('popstate', markActiveNav);
+    window.addEventListener('hashchange', markActiveNav);
 
-    function setSidebar(name, role) {
-        if (nameEl) nameEl.textContent = name || 'Invitado';
-        if (metaEl) metaEl.textContent = role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
-        if (avatarEl) avatarEl.textContent = getInitials(name || role || 'U');
-    }
-
+    // --- Presence indicator ---
     function ensurePresenceIndicator() {
         if (!topSearch) return null;
-
         let indicator = topSearch.querySelector('.presence-indicator');
         if (!indicator) {
             indicator = document.createElement('span');
@@ -84,7 +101,6 @@ async function init() {
             indicator.setAttribute('aria-hidden', 'true');
             indicator.setAttribute('title', 'Estado de conexión: offline');
             topSearch.appendChild(indicator);
-
             const label = document.createElement('span');
             label.className = 'presence-label';
             label.textContent = 'offline';
@@ -97,7 +113,6 @@ async function init() {
         const indicator = ensurePresenceIndicator();
         if (!indicator) return;
         const label = topSearch.querySelector('.presence-label');
-
         indicator.classList.remove('online', 'offline', 'error');
         if (state === 'online') {
             indicator.classList.add('online');
@@ -119,15 +134,7 @@ async function init() {
         updatePresenceIndicator(state);
     });
 
-    window.addEventListener('presence:change', (e) => {
-        // e.detail => { uid, state } -- opcional: notificaciones
-    });
-
-    window.addEventListener('presence:list', (e) => {
-        // e.detail.users => array -- opcional: renderizar popup de usuarios activos
-    });
-
-    /* Auth state handling (mantiene funcionalidad anterior) */
+    // --- Auth state handling ---
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
             setSidebar('Invitado', '');
@@ -136,7 +143,6 @@ async function init() {
             updatePresenceIndicator('offline');
             return;
         }
-
         try {
             const userRef = fsDoc(db, 'users', user.uid);
             const userSnap = await getDoc(userRef);
@@ -161,7 +167,6 @@ async function init() {
         }
     });
 
-    /* Bind logout UI in sidebar */
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async (e) => {
             e.preventDefault();
@@ -180,7 +185,157 @@ async function init() {
     } else {
         console.debug('sidebar-user: logout button not found yet');
     }
+
+    // --- Overlay that only dims the rest of the page (not the sidebar) ---
+    function createOverlay() {
+        let ov = document.querySelector('.sidebar-overlay');
+        if (!ov) {
+            ov = document.createElement('div');
+            ov.className = 'sidebar-overlay';
+            ov.setAttribute('aria-hidden', 'true');
+            // base style, we'll position relative to sidebar on open()
+            ov.style.position = 'fixed';
+            ov.style.top = '0';
+            ov.style.bottom = '0';
+            ov.style.right = '0';
+            ov.style.background = 'rgba(0,0,0,0.24)'; // ligero atenuado
+            ov.style.transition = 'opacity 160ms ease, left 160ms ease';
+            ov.style.opacity = '0';
+            ov.style.pointerEvents = 'none';
+            // default z-index lower than sidebar; will adjust on open()
+            ov.style.zIndex = '60';
+            document.body.appendChild(ov);
+        }
+        return ov;
+    }
+
+    const navToggle = document.getElementById('nav-toggle');
+    const hamburgerButtons = Array.from(document.querySelectorAll('.hamburger, .hamburger-box, [data-sidebar-toggle]'));
+    const overlay = createOverlay();
+
+    // Ensure sidebar is above overlay
+    sidebarEl.style.zIndex = sidebarEl.style.zIndex || '80';
+    // If sidebar has no positioning, make it relative so z-index works
+    const sidebarComputed = getComputedStyle(sidebarEl).position;
+    if (sidebarComputed === 'static' || !sidebarComputed) {
+        sidebarEl.style.position = 'relative';
+    }
+
+    // Position overlay to the right of the sidebar so the sidebar area stays visible/clear
+    function positionOverlay() {
+        const rect = sidebarEl.getBoundingClientRect();
+        // If sidebar covers full width (mobile), we want the overlay to cover nothing or cover behind sidebar
+        if (rect.width >= window.innerWidth - 2) {
+            // Fullscreen sidebar (mobile) -> overlay covers whole viewport but stays under sidebar (no darkening of sidebar)
+            overlay.style.left = '0';
+            overlay.style.right = '0';
+            overlay.style.zIndex = '70'; // below sidebar's z (sidebar z 80)
+        } else {
+            // Desktop/tablet: overlay starts at the right edge of the sidebar
+            overlay.style.left = Math.max(rect.right, 0) + 'px';
+            overlay.style.right = '0';
+            overlay.style.zIndex = '70';
+        }
+    }
+
+    function openSidebar() {
+        sidebarEl.classList.add('open');
+        sidebarEl.setAttribute('aria-hidden', 'false');
+        positionOverlay();
+        overlay.style.opacity = '1';
+        overlay.style.pointerEvents = 'auto';
+        overlay.setAttribute('aria-hidden', 'false');
+        if (navToggle && !navToggle.checked) navToggle.checked = true;
+    }
+
+    function closeSidebar() {
+        sidebarEl.classList.remove('open');
+        sidebarEl.setAttribute('aria-hidden', 'true');
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+        if (navToggle && navToggle.checked) navToggle.checked = false;
+    }
+
+    // sync checkbox -> sidebar
+    if (navToggle) {
+        if (navToggle.checked) openSidebar(); else closeSidebar();
+        navToggle.addEventListener('change', () => {
+            if (navToggle.checked) openSidebar(); else closeSidebar();
+        });
+    }
+
+    // hamburger buttons: if no checkbox present, control manually; otherwise allow native label behavior
+    hamburgerButtons.forEach(h => {
+        h.addEventListener('click', (e) => {
+            if (!navToggle) {
+                e.preventDefault();
+                if (sidebarEl.classList.contains('open')) closeSidebar(); else openSidebar();
+            } // else let checkbox handle toggling (change listener will sync overlay)
+        });
+    });
+
+    overlay.addEventListener('click', () => closeSidebar());
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebarEl.classList.contains('open')) {
+            closeSidebar();
+        }
+    });
+
+    // Close menu after clicking a nav link (mobile UX)
+    sidebarEl.addEventListener('click', (ev) => {
+        const a = ev.target.closest && ev.target.closest('a[href]');
+        if (!a) return;
+        setTimeout(() => {
+            if (window.innerWidth <= 900) {
+                closeSidebar();
+            }
+        }, 80);
+    });
+
+    // Recalculate overlay position on resize / orientation change if open
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (sidebarEl.classList.contains('open')) {
+                positionOverlay();
+            }
+        }, 80);
+    });
+
+    // RBAC helpers
+    function getNavItemByHrefFragment(fragment) {
+        const anchor = sidebarEl.querySelector(`.nav-list a[href$="${fragment}"], .nav-list a[href*="/${fragment}"], .nav-list a[href*="${fragment}"]`);
+        if (!anchor) return null;
+        return anchor.closest('.nav-item') || null;
+    }
+
+    function setNavVisibilityByFragment(fragment, visible) {
+        const item = getNavItemByHrefFragment(fragment);
+        if (!item) return;
+        item.style.display = visible ? '' : 'none';
+    }
+
+    function setRestrictedNavVisibility(role) {
+        const isAdmin = role === 'administrador';
+        setNavVisibilityByFragment('usuarios.html', isAdmin);
+        setNavVisibilityByFragment('cxc.html', isAdmin);
+    }
+
+    function setSidebar(name, role) {
+        if (nameEl) nameEl.textContent = name || 'Invitado';
+        if (metaEl) metaEl.textContent = role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
+        if (avatarEl) avatarEl.textContent = getInitials(name || role || 'U');
+    }
+
+    window.__sidebar = {
+        open: openSidebar,
+        close: closeSidebar,
+        toggle: () => sidebarEl.classList.contains('open') ? closeSidebar() : openSidebar()
+    };
+
+    ensurePresenceIndicator();
 }
 
-// Arrancar cuando el módulo sea importado
 init();
