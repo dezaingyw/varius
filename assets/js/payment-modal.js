@@ -82,6 +82,10 @@ function formatNumberForInput(value, decimals = 2) {
     return parts.join('.');
 }
 
+function isBlank(str) {
+    return !str || String(str).trim().length === 0;
+}
+
 /* ---------------- UI helpers ---------------- */
 function showModal() {
     if (!modal) return;
@@ -98,6 +102,23 @@ function closeModal() {
     cleanup();
 }
 
+function setMobileRequired(flag) {
+    if (pmMobileBank) {
+        pmMobileBank.required = !!flag;
+        if (flag) pmMobileBank.setAttribute('aria-required', 'true');
+        else pmMobileBank.removeAttribute('aria-required');
+    }
+    if (pmMobileRef) {
+        pmMobileRef.required = !!flag;
+        if (flag) pmMobileRef.setAttribute('aria-required', 'true');
+        else pmMobileRef.removeAttribute('aria-required');
+    }
+    if (pmMobileDetails) {
+        pmMobileDetails.style.display = flag ? 'block' : 'none';
+        pmMobileDetails.setAttribute('aria-hidden', flag ? 'false' : 'true');
+    }
+}
+
 function cleanup() {
     if (paymentForm) paymentForm.reset();
     if (pmReceivedEl) pmReceivedEl.textContent = '$. 0.00';
@@ -105,7 +126,8 @@ function cleanup() {
     pmAssignRateWrap.style.display = 'none';
     pmConvInfo.textContent = '';
     pmTotalBs.textContent = '';
-    if (pmMobileDetails) pmMobileDetails.style.display = 'none';
+    // ensure mobile details hidden and not required
+    setMobileRequired(false);
     // reset user-edited flags and format amounts to default 0.00
     document.querySelectorAll('.pm-amount').forEach(inp => {
         delete inp.dataset.userEdited;
@@ -359,7 +381,7 @@ function autoFillBsIfNeeded() {
         mobileInput.disabled = false;
         mobileInput.value = formatNumberForInput(bsAmount, 2);
         mobileInput.dataset.userEdited = 'false';
-        if (pmMobileDetails) pmMobileDetails.style.display = 'block';
+        setMobileRequired(true);
         computeTotalsAndUI();
         console.debug('autoFillBsIfNeeded: rellenado mobile con', bsAmount);
         return;
@@ -401,9 +423,11 @@ document.addEventListener('change', (e) => {
         if (e.target && e.target.matches('.pm-check[data-method="mobile"]')) {
             const mobileChk = e.target;
             if (mobileChk.checked) {
-                if (pmMobileDetails) pmMobileDetails.style.display = 'block';
+                // show mobile details and mark fields required
+                setMobileRequired(true);
             } else {
-                if (pmMobileDetails) pmMobileDetails.style.display = 'none';
+                // hide and remove required
+                setMobileRequired(false);
                 if (pmMobileBank) pmMobileBank.value = '';
                 if (pmMobileRef) pmMobileRef.value = '';
             }
@@ -472,7 +496,7 @@ if (pmApplyConversion) {
             mobileInput.disabled = false;
             mobileInput.value = formatNumberForInput(bsAmount, 2);
             mobileInput.dataset.userEdited = 'false';
-            if (pmMobileDetails) pmMobileDetails.style.display = 'block';
+            setMobileRequired(true);
             computeTotalsAndUI();
             return;
         }
@@ -561,9 +585,9 @@ export async function openPaymentModal(orderObj) {
     const mobileChkInit = document.querySelector(`.pm-check[data-method="mobile"]`);
     if (mobileChkInit) {
         if (mobileChkInit.checked) {
-            if (pmMobileDetails) pmMobileDetails.style.display = 'block';
+            setMobileRequired(true);
         } else {
-            if (pmMobileDetails) pmMobileDetails.style.display = 'none';
+            setMobileRequired(false);
         }
     }
 
@@ -576,6 +600,23 @@ export async function openPaymentModal(orderObj) {
                 pmErrorEl.textContent = 'Usuario no autenticado.';
                 pmErrorEl.style.display = 'block';
                 return;
+            }
+
+            // Validate mobile bank/reference if mobile payment is selected
+            const mobileChk = document.querySelector('.pm-check[data-method="mobile"]');
+            if (mobileChk && mobileChk.checked) {
+                if (isBlank(pmMobileBank?.value)) {
+                    pmErrorEl.textContent = 'Selecciona un banco para Pago Móvil.';
+                    pmErrorEl.style.display = 'block';
+                    if (pmMobileBank) pmMobileBank.focus();
+                    return;
+                }
+                if (isBlank(pmMobileRef?.value)) {
+                    pmErrorEl.textContent = 'Ingresa la referencia bancaria.';
+                    pmErrorEl.style.display = 'block';
+                    if (pmMobileRef) pmMobileRef.focus();
+                    return;
+                }
             }
 
             const methods = [];
