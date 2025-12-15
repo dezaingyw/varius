@@ -89,7 +89,6 @@
 
           <div class="form-row narrow">
             <label for="cust_phone">Teléfono <span class="req">*</span></label>
-            <!-- Ahora inicia con "+58" por defecto y permite hasta 15 dígitos después del "+" -->
             <input id="cust_phone" name="phone" type="text" placeholder="+581234567890" required autocomplete="tel"
               inputmode="tel" maxlength="16" value="+58">
             <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
@@ -181,6 +180,17 @@
 
   <script type="module" src="assets/js/pedidos-data.js"></script>
   <script type="module" src="assets/js/ui-animations.js"></script>
+  <script>
+    const ribbon = document.getElementById('productRibbon');
+    if (product && product.onSale) {
+      ribbon.textContent = 'Oferta';
+      ribbon.classList.add('on-sale');
+      ribbon.setAttribute('aria-hidden', 'false');
+    } else {
+      ribbon.classList.remove('on-sale');
+      ribbon.setAttribute('aria-hidden', 'true');
+    }
+  </script>
 </body>
 
 </html>
