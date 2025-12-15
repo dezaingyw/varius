@@ -10,7 +10,9 @@
 
 <body>
   <header class="site-header">
-    <div class="brand">Varius</div>
+    <div class="brand">
+      <img src="admin/assets/img/logo-horizontal.png" width="100rem" alt="Varius">
+    </div>
     <nav class="top-actions">
       <a href="login.html" class="cart-btn" aria-label="Abrir carrito">👤</a>
       <button id="openCartBtn" class="cart-btn" aria-label="Abrir carrito">🛒 <span id="cartCount">0</span></button>
@@ -59,7 +61,7 @@
         </div>
 
         <div class="cart-actions-inline">
-          <button id="continueWithData" class="btn-primary">Continuar con mis datos</button>
+          <button id="continueWithData" class="btn-primary" disabled>Continuar con mis datos</button>
           <button id="clearCartBtn" class="btn-secondary">Vaciar carrito</button>
         </div>
       </aside>
@@ -87,9 +89,9 @@
 
           <div class="form-row narrow">
             <label for="cust_phone">Teléfono <span class="req">*</span></label>
-            <!-- Ahora inicia con "+" por defecto y permite hasta 15 dígitos después del "+" -->
-            <input id="cust_phone" name="phone" type="text" placeholder="+56912345678" required autocomplete="tel"
-              inputmode="tel" maxlength="16" value="+">
+            <!-- Ahora inicia con "+58" por defecto y permite hasta 15 dígitos después del "+" -->
+            <input id="cust_phone" name="phone" type="text" placeholder="+581234567890" required autocomplete="tel"
+              inputmode="tel" maxlength="16" value="+58">
             <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
           </div>
 
@@ -125,6 +127,37 @@
       <div class="confirm-actions">
         <button id="confirmCancel" class="btn-secondary">Cancelar</button>
         <button id="confirmAccept" class="btn-primary">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product modal (slider + detalles) -->
+  <div id="productModal" class="product-modal hidden" role="dialog" aria-modal="true" aria-hidden="true"
+    aria-labelledby="productModalTitle">
+    <div class="product-modal-panel" role="document">
+      <button id="productModalClose" class="product-modal-close" aria-label="Cerrar">✕</button>
+      <div class="product-modal-body">
+        <div class="product-modal-left">
+          <div class="product-modal-slider" id="productModalSlider" aria-live="polite"></div>
+          <div class="product-modal-thumbs" id="productModalThumbs" aria-hidden="false"></div>
+          <button class="product-modal-nav prev" id="productModalPrev" aria-label="Anterior foto">‹</button>
+          <button class="product-modal-nav next" id="productModalNext" aria-label="Siguiente foto">›</button>
+        </div>
+        <div class="product-modal-right">
+          <div id="productRibbon" class="product-ribbon" aria-hidden="true">Oferta</div>
+          <h2 id="productModalTitle"></h2>
+          <div id="productModalCategory" class="product-modal-category"></div>
+          <div id="productModalPrices" class="product-modal-prices"></div>
+          <p id="productModalDescription" class="product-modal-description"></p>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <label style="display:flex;align-items:center;gap:8px">Cantidad:
+              <input id="productModalQty" type="number" min="1" max="999" value="1"
+                style="width:80px;padding:6px;border-radius:8px;border:1px solid #e6eef6">
+            </label>
+            <button id="productModalAdd" class="btn-primary">Agregar</button>
+            <button id="productModalViewFull" class="btn-secondary" style="display:none">Ver página</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
