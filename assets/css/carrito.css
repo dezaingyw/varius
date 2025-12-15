@@ -498,12 +498,82 @@ a.btn-secondary,
   flex-direction: column;
 }
 
-/* modal left & right adapt with fluid widths */
+/* Forzamos el apilamiento vertical dentro de la columna izquierda del modal */
 .product-modal-left {
-  flex: 1 1 100%;
+  /* mantener comportamiento relativo para navs */
   position: relative;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;     /* apilar: slider arriba, thumbs abajo */
+  align-items: center;        /* centrar horizontalmente */
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
 }
+
+/* Alineamos ancho del slider (coherente con lo usado en reglas previas) */
+.product-modal-left .product-modal-slider {
+  width: min(40rem, 60vw);
+  max-width: 100%;
+  height: clamp(14rem, 40vw, 26.25rem);
+  margin: 0 auto;
+  order: 1;
+}
+
+/* Thumbs siempre debajo, centradas y con el mismo ancho máximo que el slider */
+.product-modal-left .product-modal-thumbs {
+  order: 2;
+  width: min(40rem, 60vw);
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Asegurar que las miniaturas no se estiren y mantengan tamaño */
+.product-modal-left .product-modal-thumbs img {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+}
+
+/* Navs: colocarlos sobre el slider (dentro del contenedor centrado) */
+.product-modal-left .product-modal-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 80;
+  background: rgba(255,255,255,0.96);
+  border: 1px solid var(--border);
+  box-shadow: 0 0.25rem 0.75rem rgba(11,15,34,0.06);
+}
+
+/* Posición estándar de las flechas dentro del ancho del slider */
+.product-modal-left .product-modal-nav.prev { left: 0.6rem; }
+.product-modal-left .product-modal-nav.next { right: 0.6rem; }
+
+/* Evitar que reglas antiguas (por ejemplo right: -9.5rem) nos afecten:
+   al estar al final del fichero estas reglas prevalecen. */
+.product-modal-nav.next { right: 0.6rem !important; }
+
+/* En pantallas muy grandes ampliar límite del slider y thumbs ligeramente */
+@media (min-width: 75rem) {
+  .product-modal-left .product-modal-slider,
+  .product-modal-left .product-modal-thumbs {
+    width: min(48rem, 54vw);
+  }
+}
+
+/* Mantener accesibilidad y foco visible en thumbs y navs */
+.product-modal-thumbs img:focus,
+.product-modal-nav:focus {
+  outline: 3px solid rgba(11,99,209,0.12);
+  outline-offset: 4px;
+}
+
 .product-modal-right {
   flex: 1 1 100%;
   min-width: 0;
@@ -512,7 +582,7 @@ a.btn-secondary,
 }
 
 .product-modal-slider {
-  width: 155%;
+  width: 100%;
   height: clamp(15rem, 50vw, 26.25rem);
   border-radius: var(--r-md);
   background: linear-gradient(180deg, #f5f8ff, #ffffff);
