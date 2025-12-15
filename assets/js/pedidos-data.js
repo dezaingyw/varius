@@ -1,11 +1,3 @@
-// pedidos-data.js completo y actualizado
-// - Carrito inline (minimizable), checkout inline
-// - Formulario validado en tiempo real (email, teléfono solo números, requerido)
-// - Mejora en modales y accesibilidad
-// - Eliminado botón "copiar enlace"
-// - Prevención de double submit
-// - Resolución de imágenes desde Firebase Storage y resto de funcionalidades previas
-
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {
@@ -64,7 +56,7 @@ function loadCartFromCookie() {
     CART = c;
     recalcCart();
 }
-function persistCart() { setCookieJSON(CART_COOKIE, CART, 14); renderCartCount(); }
+function persistCart() { setCookieJSON(CART_COOKIE, CART, 14); renderCartCount(); try { renderCartPanel(); } catch (e) { /* ignore if not ready */ } }
 function recalcCart() {
     let total = 0;
     CART.items.forEach(it => { it.subtotal = it.quantity * it.price; total += it.subtotal; });
@@ -287,7 +279,15 @@ function renderCartPanel() {
     const subtotalEl = document.getElementById('cartSubtotalInline');
     const totalEl = document.getElementById('cartTotalInline');
     const checkoutTotalHeader = document.getElementById('checkoutTotalHeader');
+    const continueBtn = document.getElementById('continueWithData');
     if (!selectedEl || !availableEl) return;
+
+    // habilitar/deshabilitar 'Continuar con mis datos' según contenido del carrito
+    const hasItems = CART.items && CART.items.length > 0;
+    if (continueBtn) {
+        continueBtn.disabled = !hasItems;
+        if (!hasItems) continueBtn.setAttribute('aria-disabled', 'true'); else continueBtn.removeAttribute('aria-disabled');
+    }
 
     const items = CART.items.slice().filter(i => i.quantity > 0);
     items.sort((a, b) => {
@@ -385,7 +385,7 @@ function renderCartPanel() {
                     <input class="avail-qty qty-input" data-id="${escapeHtml(p.id)}" type="number" min="0" max="999" value="0" style="width:70px;padding:6px;border-radius:8px;border:1px solid #e6eef6">
                     <button class="qty-incr avail-incr" data-id="${escapeHtml(p.id)}" aria-label="Aumentar">+</button>
                   </div>
-
+                  <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-left:8px">Ver</button>
                 </div>
               </div>
             `;
@@ -425,21 +425,15 @@ function renderCartPanel() {
             });
         });
 
-        // Add button: read qty input (if 0 or empty -> add 1)
-        availableEl.querySelectorAll('.add-avail').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        // view product modal
+        availableEl.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.dataset.id;
-                const input = availableEl.querySelector(`.avail-qty[data-id="${id}"]`);
-                let q = 1;
-                if (input) {
-                    const v = parseInt(input.value, 10);
-                    if (!isNaN(v) && v > 0) q = v;
-                }
-                const added = addToCart(id, q);
-                if (added) {
-                    renderCartPanel();
-                    if (input) input.value = 0;
-                }
+                let p = PRODUCTS_BY_ID.get(id);
+                if (!p) p = await fetchProductByIdOrSlug(id);
+                if (!p) { showToast('Producto no encontrado'); return; }
+                await resolveProductImages(p);
+                openProductModal(p);
             });
         });
     }
@@ -470,7 +464,7 @@ function createProductCardHtml(p, resolvedImages = []) {
         <div class="product-meta">${escapeHtml(p.category || '')}</div>
         <div class="product-price">${priceHtml}</div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-          <a href="product.html?product=${encodeURIComponent(p.id)}" class="btn-secondary" style="margin-right:8px" aria-label="Ver producto ${escapeHtml(p.name)}">Ver</a>
+          <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-right:8px" aria-label="Ver producto ${escapeHtml(p.name)}">Ver</button>
           <button class="btn-primary add-btn" data-id="${escapeHtml(p.id)}" aria-label="Agregar ${escapeHtml(p.name)}">Agregar</button>
         </div>
       </div>
@@ -512,6 +506,18 @@ async function renderProductsGrid() {
             renderCartPanel();
         });
     });
+
+    // view-buttons -> abrir modal
+    el.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.dataset.id;
+            let p = PRODUCTS_BY_ID.get(id);
+            if (!p) p = await fetchProductByIdOrSlug(id);
+            if (!p) { showToast('Producto no encontrado'); return; }
+            await resolveProductImages(p);
+            openProductModal(p);
+        });
+    });
 }
 
 /* Carousel */
@@ -544,7 +550,7 @@ async function setupCarousel() {
             <div class="product-price">${priceHtml}</div>
             <div class="carousel-controls">
               <button class="btn-primary add-btn" data-id="${escapeHtml(s.id)}" aria-label="Agregar ${escapeHtml(s.name)}">Agregar</button>
-              <a class="btn-secondary" href="product.html?product=${encodeURIComponent(s.id)}" aria-label="Ver ${escapeHtml(s.name)}">Ver</a>
+              <button class="btn-secondary view-btn" data-id="${escapeHtml(s.id)}" aria-label="Ver ${escapeHtml(s.name)}">Ver</button>
             </div>
           </div>
         `;
@@ -575,6 +581,18 @@ async function setupCarousel() {
             const id = e.currentTarget.dataset.id;
             addToCart(id, 1);
             renderCartPanel();
+        });
+    });
+
+    // view buttons in carousel -> open modal
+    track.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.dataset.id;
+            let p = PRODUCTS_BY_ID.get(id);
+            if (!p) p = await fetchProductByIdOrSlug(id);
+            if (!p) { showToast('Producto no encontrado'); return; }
+            await resolveProductImages(p);
+            openProductModal(p);
         });
     });
 
@@ -612,6 +630,143 @@ async function setupCarousel() {
     });
 
     update(); startAuto();
+}
+
+/* ----------------------
+   Product modal implementation
+   ---------------------- */
+let _productModalCurrentIndex = 0;
+let _productModalImages = [];
+let _productModalCurrentProduct = null;
+
+function openProductModal(product) {
+    const modal = document.getElementById('productModal');
+    if (!modal) return;
+    const title = document.getElementById('productModalTitle');
+    const category = document.getElementById('productModalCategory');
+    const desc = document.getElementById('productModalDescription');
+    const prices = document.getElementById('productModalPrices');
+    const thumbs = document.getElementById('productModalThumbs');
+    const slider = document.getElementById('productModalSlider');
+    const ribbon = document.getElementById('productRibbon');
+    const addBtn = document.getElementById('productModalAdd');
+    const qtyEl = document.getElementById('productModalQty');
+    const viewFull = document.getElementById('productModalViewFull');
+
+    _productModalImages = product.__resolvedImages && product.__resolvedImages.length ? product.__resolvedImages.slice() : (product.image ? [product.image] : []);
+    _productModalCurrentIndex = 0;
+    _productModalCurrentProduct = product;
+
+    // fill content
+    if (title) title.textContent = product.name || '';
+    if (category) category.textContent = product.category || '';
+    if (desc) desc.textContent = product.description || '';
+    if (ribbon) {
+        if (product.isOnSale || (product.discountPrice && product.discountPrice < product.price)) {
+            ribbon.setAttribute('aria-hidden', 'false');
+            ribbon.style.display = '';
+        } else {
+            ribbon.setAttribute('aria-hidden', 'true');
+            ribbon.style.display = 'none';
+        }
+    }
+    if (prices) {
+        const isOffer = (product.isOnSale || (product.discountPrice && product.discountPrice < product.price));
+        if (isOffer) {
+            prices.innerHTML = `<span class="old">${formatCurrency(product.price)}</span><strong>${formatCurrency(product.discountPrice)}</strong>`;
+        } else {
+            prices.innerHTML = `<strong>${formatCurrency(product.price)}</strong>`;
+        }
+    }
+
+    // build slider images
+    slider.innerHTML = '';
+    thumbs.innerHTML = '';
+    _productModalImages.forEach((u, i) => {
+        const img = document.createElement('img');
+        img.src = u;
+        img.alt = `${product.name} ${i + 1}`;
+        img.dataset.index = String(i);
+        if (i === 0) img.classList.add('active');
+        slider.appendChild(img);
+
+        const t = document.createElement('img');
+        t.src = u;
+        t.alt = `${product.name} thumb ${i + 1}`;
+        t.dataset.index = String(i);
+        if (i === 0) t.classList.add('active');
+        t.addEventListener('click', () => { setProductModalIndex(i); });
+        thumbs.appendChild(t);
+    });
+
+    // add listener to add button
+    addBtn.onclick = () => {
+        const q = Math.max(1, Math.min(999, parseInt(qtyEl.value, 10) || 1));
+        const added = addToCart(product.id, q);
+        if (added) {
+            renderCartPanel();
+            showToast('Producto agregado');
+            closeProductModal();
+        }
+    };
+
+    // view full page (if needed) - keep hidden by default (project kept compatibility)
+    viewFull.style.display = 'none';
+    viewFull.onclick = () => { window.location.href = `product.html?product=${encodeURIComponent(product.id)}`; };
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    // setup nav
+    document.getElementById('productModalPrev')?.addEventListener('click', productModalPrev);
+    document.getElementById('productModalNext')?.addEventListener('click', productModalNext);
+
+    // close handlers
+    document.getElementById('productModalClose')?.addEventListener('click', closeProductModal);
+    modal.addEventListener('click', onProductModalOutsideClick);
+    document.addEventListener('keydown', onProductModalKeydown);
+
+    // focus management
+    const firstFocusable = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (firstFocusable) firstFocusable.focus();
+}
+
+function setProductModalIndex(i) {
+    _productModalCurrentIndex = Math.max(0, Math.min(_productModalImages.length - 1, i));
+    const slider = document.getElementById('productModalSlider');
+    const thumbs = document.getElementById('productModalThumbs');
+    if (!slider) return;
+    Array.from(slider.querySelectorAll('img')).forEach(img => img.classList.remove('active'));
+    Array.from(thumbs.querySelectorAll('img')).forEach(img => img.classList.remove('active'));
+    slider.querySelector(`img[data-index="${_productModalCurrentIndex}"]`)?.classList.add('active');
+    thumbs.querySelector(`img[data-index="${_productModalCurrentIndex}"]`)?.classList.add('active');
+}
+
+function productModalPrev() { setProductModalIndex(_productModalCurrentIndex - 1); }
+function productModalNext() { setProductModalIndex(_productModalCurrentIndex + 1); }
+
+function closeProductModal() {
+    const modal = document.getElementById('productModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    document.getElementById('productModalPrev')?.removeEventListener('click', productModalPrev);
+    document.getElementById('productModalNext')?.removeEventListener('click', productModalNext);
+    modal.removeEventListener('click', onProductModalOutsideClick);
+    document.removeEventListener('keydown', onProductModalKeydown);
+}
+
+function onProductModalOutsideClick(e) {
+    const modal = document.getElementById('productModal');
+    if (!modal) return;
+    if (e.target === modal) closeProductModal();
+}
+function onProductModalKeydown(e) {
+    if (e.key === 'Escape') closeProductModal();
+    if (e.key === 'ArrowLeft') productModalPrev();
+    if (e.key === 'ArrowRight') productModalNext();
 }
 
 /* ----------------------
@@ -786,7 +941,7 @@ function validatePhone() {
 
     // La expresión regular requiere un "+" seguido de 8 a 15 dígitos.
     if (!/^\+\d{8,15}$/.test(v)) {
-        if (err) err.textContent = 'Número inválido. Debe comenzar con "+" y tener entre 8 y 15 dígitos.';
+        if (err) err.textContent = 'Número inválido. Ejemplo: "+584141234567"';
         return false;
     }
 
@@ -819,8 +974,9 @@ function phoneInputHandler(e) {
     // Remove all non-digits
     const digitsOnly = v.replace(/\D/g, '').slice(0, 15); // max 15 digits
     // Ensure we always show a leading '+'
+    // If the user removed the +58 prefix, keep at least '+'
     el.value = '+' + digitsOnly;
-    // If user removed digits and left only '+', keep '+' visible.
+    // If user input was initially empty and we want default +58, ensure handled at boot
     validatePhone();
     validateFormAll();
 }
@@ -871,7 +1027,8 @@ function attachGlobalEvents() {
     });
 
     document.getElementById('continueWithData')?.addEventListener('click', () => {
-        // minimizar carrito visualmente y abrir checkout
+        // minimizar carrito visualmente y abrir checkout (solo si hay items)
+        if (!CART.items || CART.items.length === 0) return;
         const cp = document.getElementById('cartPanel');
         if (cp) cp.classList.add('minimized');
         const checkout = document.getElementById('checkoutPanel');
@@ -906,8 +1063,8 @@ function attachGlobalEvents() {
     if (nameEl) { nameEl.addEventListener('input', () => { validateName(); validateFormAll(); }); nameEl.addEventListener('blur', validateName); }
     if (emailEl) { emailEl.addEventListener('input', () => { validateEmail(); validateFormAll(); }); emailEl.addEventListener('blur', validateEmail); }
     if (phoneEl) {
-        // Asegurar que el campo tenga "+" por defecto si está vacío
-        if (!phoneEl.value) phoneEl.value = '+';
+        // Asegurar que el campo tenga "+58" por defecto si está vacío
+        if (!phoneEl.value || phoneEl.value === '+') phoneEl.value = '+58';
         phoneEl.addEventListener('input', phoneInputHandler);
         phoneEl.addEventListener('blur', validatePhone);
     }
@@ -929,10 +1086,12 @@ function attachGlobalEvents() {
         });
     });
 
-    // ESC to close modals
+    // ESC to close modals (global)
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.confirm-modal, .order-confirm, .modal').forEach(m => { m.classList.add('hidden'); m.setAttribute('aria-hidden', 'true'); });
+            // also close product modal
+            closeProductModal();
         }
     });
 }
