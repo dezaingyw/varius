@@ -1,3 +1,6 @@
+// Archivo JavaScript proporcionado por el usuario
+// Este archivo contiene toda la lógica de manejo del carrito y productos
+
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {
@@ -282,7 +285,6 @@ function renderCartPanel() {
     const continueBtn = document.getElementById('continueWithData');
     if (!selectedEl || !availableEl) return;
 
-    // habilitar/deshabilitar 'Continuar con mis datos' según contenido del carrito
     const hasItems = CART.items && CART.items.length > 0;
     if (continueBtn) {
         continueBtn.disabled = !hasItems;
@@ -324,7 +326,6 @@ function renderCartPanel() {
             selectedEl.appendChild(div);
         }
 
-        // controls
         selectedEl.querySelectorAll('.qty-incr').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const id = e.currentTarget.dataset.id;
@@ -363,7 +364,6 @@ function renderCartPanel() {
         });
     }
 
-    // Available products
     const inCartIds = new Set(CART.items.map(i => i.productId));
     const availProducts = PRODUCTS.filter(p => isProductVisible(p) && (typeof p.stock !== 'number' || p.stock > 0) && !inCartIds.has(p.id));
     availableEl.innerHTML = '';
@@ -392,7 +392,6 @@ function renderCartPanel() {
             availableEl.appendChild(div);
         }
 
-        // listeners: add on qty change and buttons
         availableEl.querySelectorAll('.avail-qty').forEach(input => {
             input.addEventListener('change', (e) => {
                 const id = e.currentTarget.dataset.id;
@@ -405,7 +404,6 @@ function renderCartPanel() {
             });
         });
 
-        // plus: add one to cart immediately
         availableEl.querySelectorAll('.avail-incr').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const id = e.currentTarget.dataset.id;
@@ -414,7 +412,6 @@ function renderCartPanel() {
             });
         });
 
-        // minus: if item exists in cart, decrement one
         availableEl.querySelectorAll('.avail-decr').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const id = e.currentTarget.dataset.id;
@@ -425,7 +422,6 @@ function renderCartPanel() {
             });
         });
 
-        // view product modal
         availableEl.querySelectorAll('.view-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.dataset.id;
@@ -438,7 +434,6 @@ function renderCartPanel() {
         });
     }
 
-    // Totales
     const subtotal = CART.total || 0;
     subtotalEl.textContent = formatCurrency(subtotal);
     totalEl.textContent = formatCurrency(subtotal);
@@ -507,7 +502,6 @@ async function renderProductsGrid() {
         });
     });
 
-    // view-buttons -> abrir modal
     el.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.currentTarget.dataset.id;
@@ -584,7 +578,6 @@ async function setupCarousel() {
         });
     });
 
-    // view buttons in carousel -> open modal
     track.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.currentTarget.dataset.id;
@@ -657,7 +650,6 @@ function openProductModal(product) {
     _productModalCurrentIndex = 0;
     _productModalCurrentProduct = product;
 
-    // fill content
     if (title) title.textContent = product.name || '';
     if (category) category.textContent = product.category || '';
     if (desc) desc.textContent = product.description || '';
@@ -679,7 +671,6 @@ function openProductModal(product) {
         }
     }
 
-    // build slider images
     slider.innerHTML = '';
     thumbs.innerHTML = '';
     _productModalImages.forEach((u, i) => {
@@ -699,7 +690,6 @@ function openProductModal(product) {
         thumbs.appendChild(t);
     });
 
-    // add listener to add button
     addBtn.onclick = () => {
         const q = Math.max(1, Math.min(999, parseInt(qtyEl.value, 10) || 1));
         const added = addToCart(product.id, q);
@@ -710,7 +700,6 @@ function openProductModal(product) {
         }
     };
 
-    // view full page (if needed) - keep hidden by default (project kept compatibility)
     viewFull.style.display = 'none';
     viewFull.onclick = () => { window.location.href = `product.html?product=${encodeURIComponent(product.id)}`; };
 
@@ -718,16 +707,13 @@ function openProductModal(product) {
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
 
-    // setup nav
     document.getElementById('productModalPrev')?.addEventListener('click', productModalPrev);
     document.getElementById('productModalNext')?.addEventListener('click', productModalNext);
 
-    // close handlers
     document.getElementById('productModalClose')?.addEventListener('click', closeProductModal);
     modal.addEventListener('click', onProductModalOutsideClick);
     document.addEventListener('keydown', onProductModalKeydown);
 
-    // focus management
     const firstFocusable = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
     if (firstFocusable) firstFocusable.focus();
 }
@@ -860,7 +846,6 @@ async function submitOrder(customerData) {
     const msgEl = document.getElementById('checkoutMsg');
     if (msgEl) { msgEl.textContent = 'Enviando pedido…'; msgEl.style.color = '#64748b'; }
 
-    // Asegurar que el teléfono se guarde con "+" + dígitos
     const normalizedPhone = (customerData.phone || '').replace(/\D/g, '');
     const phoneForSave = '+' + normalizedPhone;
 
@@ -902,10 +887,6 @@ async function submitOrder(customerData) {
 
 /* ----------------------
    Form validation (tiempo real)
-   - Nombre: requerido
-   - Email: formato básico
-   - Teléfono: solo dígitos, entre 8 y 15 dígitos
-   - Dirección: requerido, min 6 chars
    ---------------------- */
 function validateName() {
     const el = document.getElementById('cust_name');
@@ -939,7 +920,6 @@ function validatePhone() {
         return false;
     }
 
-    // La expresión regular requiere un "+" seguido de 8 a 15 dígitos.
     if (!/^\+\d{8,15}$/.test(v)) {
         if (err) err.textContent = 'Número inválido. Ejemplo: "+584141234567"';
         return false;
@@ -965,18 +945,11 @@ function validateFormAll() {
     return ok;
 }
 
-/* Helper: sanitize phone input to allow leading "+" and digits only */
 function phoneInputHandler(e) {
     const el = e.currentTarget;
     let v = el.value || '';
-    // Detect if user intentionally included a leading plus
-    const hasLeadingPlus = v.startsWith('+');
-    // Remove all non-digits
-    const digitsOnly = v.replace(/\D/g, '').slice(0, 15); // max 15 digits
-    // Ensure we always show a leading '+'
-    // If the user removed the +58 prefix, keep at least '+'
+    const digitsOnly = v.replace(/\D/g, '').slice(0, 15);
     el.value = '+' + digitsOnly;
-    // If user input was initially empty and we want default +58, ensure handled at boot
     validatePhone();
     validateFormAll();
 }
@@ -992,10 +965,8 @@ function submitHandler(e) {
     const address = document.getElementById('cust_address').value.trim();
     const msg = document.getElementById('checkoutMsg');
 
-    // Normalizar teléfono antes de validar/enviar: dejar '+' seguido de dígitos
     const phoneDigits = phoneRaw.replace(/\D/g, '');
     const phone = '+' + phoneDigits;
-    // Reflejar normalización en el campo visible
     const phoneEl = document.getElementById('cust_phone');
     if (phoneEl) phoneEl.value = phone;
 
@@ -1014,7 +985,6 @@ function attachGlobalEvents() {
         const cp = document.getElementById('cartPanel'); if (cp) cp.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    // Minimize cart button
     document.getElementById('minimizeCartBtn')?.addEventListener('click', () => {
         const cp = document.getElementById('cartPanel');
         if (!cp) return;
@@ -1027,7 +997,6 @@ function attachGlobalEvents() {
     });
 
     document.getElementById('continueWithData')?.addEventListener('click', () => {
-        // minimizar carrito visualmente y abrir checkout (solo si hay items)
         if (!CART.items || CART.items.length === 0) return;
         const cp = document.getElementById('cartPanel');
         if (cp) cp.classList.add('minimized');
@@ -1054,7 +1023,6 @@ function attachGlobalEvents() {
         document.getElementById('orderConfirmInline')?.classList.add('hidden');
     });
 
-    // form validation events
     const nameEl = document.getElementById('cust_name');
     const emailEl = document.getElementById('cust_email');
     const phoneEl = document.getElementById('cust_phone');
@@ -1063,17 +1031,15 @@ function attachGlobalEvents() {
     if (nameEl) { nameEl.addEventListener('input', () => { validateName(); validateFormAll(); }); nameEl.addEventListener('blur', validateName); }
     if (emailEl) { emailEl.addEventListener('input', () => { validateEmail(); validateFormAll(); }); emailEl.addEventListener('blur', validateEmail); }
     if (phoneEl) {
-        // Asegurar que el campo tenga "+58" por defecto si está vacío
         if (!phoneEl.value || phoneEl.value === '+') phoneEl.value = '+58';
         phoneEl.addEventListener('input', phoneInputHandler);
         phoneEl.addEventListener('blur', validatePhone);
     }
     if (addrEl) { addrEl.addEventListener('input', () => { validateAddress(); validateFormAll(); }); addrEl.addEventListener('blur', validateAddress); }
 
-    // submit: attach named handler (remove old to avoid duplicates)
     const checkoutForm = document.getElementById('checkoutForm');
     if (checkoutForm) {
-        try { checkoutForm.removeEventListener('submit', submitHandler); } catch (e) { /* ignore */ }
+        try { checkoutForm.removeEventListener('submit', submitHandler); } catch (e) { }
         checkoutForm.addEventListener('submit', submitHandler);
     }
 
@@ -1086,11 +1052,9 @@ function attachGlobalEvents() {
         });
     });
 
-    // ESC to close modals (global)
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.confirm-modal, .order-confirm, .modal').forEach(m => { m.classList.add('hidden'); m.setAttribute('aria-hidden', 'true'); });
-            // also close product modal
             closeProductModal();
         }
     });
@@ -1151,7 +1115,6 @@ async function boot() {
         await Promise.all(PRODUCTS.map(p => resolveProductImages(p)));
         await handleUrlAddParams();
         renderCartPanel();
-        // ensure form validation state evaluated on boot
         validateFormAll();
     } catch (err) {
         const productsGrid = document.getElementById('productsGrid');
@@ -1161,4 +1124,4 @@ async function boot() {
 }
 
 window.addEventListener('load', boot);
-export { }; // keep module scope
+export { };
