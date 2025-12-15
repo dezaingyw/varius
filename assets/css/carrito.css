@@ -1,27 +1,21 @@
 /* =====================================================
-   carrito.css - Versión final ajustada (mobile-first)
-   Objetivos y cambios principales:
-   - Carousel multi-item adaptativo:
-       * Móvil: 2 cards visibles
-       * Tablet (>=768px): 3 cards
-       * Desktop (>=1024px): 4 cards (máx)
-     Las dimensiones se calculan con calc() para que el JS que usa clientWidth + gap
-     siga funcionando correctamente.
-   - Imágenes del carrusel y tarjetas con cajas uniformes (aspect-ratio)
-     y object-fit: cover + object-position: center center para evitar distorsión.
-   - Indicadores (carousel-indicators) reducidos visualmente pero con área táctil
-     suficiente para accesibilidad.
-   - Correcciones: `.hidden { display: none !important }` para que modales no aparezcan
-     por defecto.
-   - Mantengo mobile-first y uso unidades relativas (rem/clamp) cuando es apropiado.
+   CARRITO.CSS - E-COMMERCE RESPONSIVE OPTIMIZADO
+
+   MEJORAS IMPLEMENTADAS:
+   ✓ Sistema responsive mobile-first completo
+   ✓ Breakpoints optimizados (320px, 768px, 1024px, 1200px)
+   ✓ Modal de producto completamente funcional en todos los dispositivos
+   ✓ Carrusel multi-item adaptativo sin distorsión
+   ✓ Botones con área táctil mínima de 44px (WCAG 2.1)
+   ✓ Imágenes con aspect-ratio uniforme y object-fit
+   ✓ Unidades relativas (rem, em, %, vw) para escalabilidad
    ===================================================== */
 
 /* --------------------
-   VARIABLES (responsive / rem-based)
-   Añadí --carousel-aspect para controlar la relación de aspecto de las imágenes.
+   VARIABLES CSS CUSTOM PROPERTIES
    -------------------- */
 :root {
-  /* colores */
+  /* Paleta de colores */
   --bg: #f8fafc;
   --text: #0f172a;
   --muted: #64748b;
@@ -34,15 +28,15 @@
   --discount-pink: #f7c6c6;
   --success-green: #2fa24b;
 
-  /* spacing (rem) */
-  --xs: 0.25rem; /* 4px */
-  --sm: 0.5rem; /* 8px */
-  --md: 0.75rem; /* 12px */
-  --lg: 1rem; /* 16px */
-  --xl: 1.5rem; /* 24px */
-  --2xl: 2rem; /* 32px */
+  /* Sistema de espaciado (8px base) */
+  --xs: 0.25rem;    /* 4px */
+  --sm: 0.5rem;     /* 8px */
+  --md: 0.75rem;    /* 12px */
+  --lg: 1rem;       /* 16px */
+  --xl: 1.5rem;     /* 24px */
+  --2xl: 2rem;      /* 32px */
 
-  /* radii y sombras */
+  /* Bordes y sombras */
   --r-sm: 0.5rem;
   --r-md: 0.625rem;
   --r-lg: 0.75rem;
@@ -50,33 +44,30 @@
   --shadow-2: 0 0.75rem 2.25rem rgba(11, 15, 34, 0.06);
   --shadow-3: 0 1.25rem 2.5rem rgba(2, 6, 23, 0.08);
 
-  /* layout */
-  --container-max: 68.75rem; /* 1100px */
-  --header-h: 3.5rem; /* 56px móvil */
+  /* Layout */
+  --container-max: 68.75rem;
+  --header-h: 3.5rem;
 
-  /* transitions */
+  /* Transiciones suaves */
   --fast: 180ms;
   --med: 280ms;
   --slow: 420ms;
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-bounce: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* typography (fluid) */
-  --font-base: 0.875rem; /* 14px móvil */
-  --title-size: 0.9375rem;
-  --price-size: 0.9375rem;
-  --heading-size: 1.125rem;
+  /* Tipografía responsive con clamp */
+  --font-base: clamp(0.875rem, 2vw, 1rem);
+  --title-size: clamp(0.9375rem, 2.5vw, 1.125rem);
+  --price-size: clamp(1rem, 3vw, 1.25rem);
+  --heading-size: clamp(1.125rem, 4vw, 1.75rem);
 
-  /* carousel/product sizing (adaptativo) */
-  --carousel-gap: 1rem;           /* gap entre slides (usa rem para que JS obtenga gap en px) */
-  --carousel-aspect: 4 / 3;       /* relación de aspecto de las imágenes del carrusel (4:3 recomendado) */
-  --carousel-img-h: 11.25rem;     /* referencia, seguimos usando aspect-ratio en lugar de altura fija */
-  --product-img-h: 10rem;
-  --product-card-pad: 0.75rem;
+  /* Carrusel - configuración adaptativa */
+  --carousel-gap: 1rem;
+  --carousel-aspect: 4 / 3;
 }
 
 /* =====================================================
-   RESET / base (mobile-first)
+   RESET Y BASE STYLES
    ===================================================== */
 *,
 *::before,
@@ -91,8 +82,9 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
 }
+
 body {
-  min-height: 100%;
+  min-height: 100vh;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
@@ -105,7 +97,6 @@ body {
   padding-top: var(--header-h);
 }
 
-/* Make images and media responsive by default */
 img,
 picture,
 video,
@@ -115,7 +106,6 @@ svg {
   display: block;
 }
 
-/* Ensure buttons inherit fonts and have accessible tap targets */
 button {
   font-family: inherit;
 }
@@ -125,13 +115,13 @@ button {
    ===================================================== */
 .container {
   max-width: var(--container-max);
-  margin: calc(var(--lg) + 0.25rem) auto;
-  padding: 0 var(--lg) calc(6.5rem); /* espacio inferior para footer/checkout */
+  margin: var(--lg) auto;
+  padding: 0 var(--lg) 6.5rem;
   width: 100%;
 }
 
 /* =====================================================
-   HEADER (fixed) - mobile first
+   HEADER FIXED - OPTIMIZADO PARA MÓVIL
    ===================================================== */
 .site-header {
   position: fixed;
@@ -156,6 +146,11 @@ button {
   letter-spacing: -0.02em;
 }
 
+.brand img {
+  max-height: 2.5rem;
+  width: auto;
+}
+
 .top-actions {
   display: flex;
   gap: var(--md);
@@ -163,14 +158,15 @@ button {
 }
 
 /* =====================================================
-   BUTTONS (unificado)
+   SISTEMA DE BOTONES UNIFICADO
+   Área táctil mínima: 44px (WCAG 2.1 Level AAA)
    ===================================================== */
 button,
 a.btn-secondary,
 .btn-primary,
 .btn-secondary {
   font-weight: 600;
-  font-size: clamp(0.8125rem, 2vw, 0.875rem);
+  font-size: clamp(0.8125rem, 2vw, 0.9375rem);
   border-radius: var(--r-md);
   cursor: pointer;
   display: inline-flex;
@@ -178,15 +174,18 @@ a.btn-secondary,
   justify-content: center;
   gap: var(--sm);
   transition: transform var(--fast) var(--ease-smooth),
-    box-shadow var(--med) var(--ease-smooth), opacity var(--fast);
+    box-shadow var(--med) var(--ease-smooth),
+    opacity var(--fast);
   user-select: none;
   border: 0;
   text-decoration: none;
   white-space: nowrap;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  min-height: 2.75rem;
-  padding: clamp(0.5rem, 1.5vw, 0.625rem) clamp(0.75rem, 2vw, 1rem);
+  /* MEJORA: Área táctil mínima de 44px */
+  min-height: 2.75rem; /* 44px */
+  min-width: 2.75rem;
+  padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1.25rem);
 }
 
 .btn-primary {
@@ -200,10 +199,12 @@ a.btn-secondary,
   transform: translateY(-0.125rem);
   box-shadow: 0 0.5rem 1.5rem rgba(11, 99, 209, 0.25);
 }
+
 .btn-primary:active:not(:disabled) {
   transform: translateY(0);
   transition-duration: 80ms;
 }
+
 .btn-primary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -214,18 +215,23 @@ a.btn-secondary,
   background: #f5f8fb;
   color: var(--text);
   border: 1px solid var(--border);
-  padding: clamp(0.4375rem, 1.5vw, 0.5625rem) clamp(0.625rem, 2vw, 0.875rem);
 }
 
-/* Header cart button */
+.btn-secondary:hover:not(:disabled) {
+  background: #e8f0f7;
+  transform: translateY(-0.0625rem);
+}
+
+/* Botones especiales del header */
 .cart-btn {
   background: transparent;
   border: 1px solid var(--border);
   padding: var(--sm) var(--md);
   border-radius: var(--r-md);
   font-size: 1rem;
-  min-height: 2.5rem;
+  min-height: 2.75rem; /* 44px área táctil */
 }
+
 .cart-btn span {
   font-weight: 700;
   margin-left: 0.375rem;
@@ -238,14 +244,14 @@ a.btn-secondary,
   text-align: center;
 }
 
-/* Small utility buttons */
 .mini-toggle {
   background: #f5f8fb;
   border: 1px solid var(--border);
-  padding: 0.375rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-radius: var(--r-sm);
-  min-height: 2rem;
+  min-height: 2.75rem; /* 44px */
 }
+
 .mini-toggle:hover {
   background: #e8f0f7;
   color: var(--text);
@@ -257,16 +263,16 @@ a.btn-secondary,
   padding: var(--sm);
   font-size: 1.5rem;
   color: var(--primary-600);
+  min-height: 2.75rem; /* 44px */
 }
+
 .back:hover {
   transform: translateX(-0.1875rem);
 }
 
 /* =====================================================
-   CAROUSEL - MULTI-ITEM RESPONSIVE
-   - Mobile-first: mostramos 2 items por defecto como pediste.
-   - Cálculos con calc() y --carousel-gap para que el JS que usa
-     slideEl.clientWidth + gapPx siga funcionando correctamente.
+   CARRUSEL MULTI-ITEM RESPONSIVE - SIN DISTORSIÓN
+   Mobile: 1-2 items | Tablet: 3 items | Desktop: 4 items
    ===================================================== */
 .carousel-section {
   margin-bottom: var(--xl);
@@ -274,11 +280,11 @@ a.btn-secondary,
 
 .carousel {
   position: relative;
-  overflow: hidden; /* el transform del track se encarga del desplazamiento */
+  overflow: hidden;
   border-radius: var(--r-lg);
   background: var(--surface);
   padding: var(--md);
-  box-shadow: 0 0.5rem 1.75rem rgba(2, 6, 23, 0.04);
+  box-shadow: var(--shadow-2);
 }
 
 .carousel-track {
@@ -286,15 +292,14 @@ a.btn-secondary,
   gap: var(--carousel-gap);
   transition: transform var(--slow) var(--ease-smooth);
   will-change: transform;
-  padding-bottom: 0.5rem; /* espacio para indicadores si los colocas sobre la track */
-  /* no overflow-x: auto aquí; el comportamiento lo controla tu JS (transform) */
+  padding-bottom: 0.5rem;
 }
 
-/* DEFAULT MOBILE FIRST: 2 items visibles por fila */
+/* MEJORA: Carrusel adaptativo sin distorsión */
 .carousel-slide {
-  /* ancho calculado: (100% - gap) / 2 */
-  flex: 0 0 calc((100% - var(--carousel-gap)) / 2);
-  max-width: calc((100% - var(--carousel-gap)) / 2);
+  /* Mobile first: 1 item en pantallas muy pequeñas */
+  flex: 0 0 100%;
+  max-width: 100%;
   background: var(--surface);
   border-radius: var(--r-lg);
   padding: 0.75rem;
@@ -304,13 +309,12 @@ a.btn-secondary,
   box-shadow: var(--shadow-1);
   position: relative;
   min-width: 0;
-  scroll-snap-align: center;
 }
 
-/* Card slider area: usamos aspect-ratio para cajas uniformes */
+/* MEJORA: Caja uniforme para imágenes del carrusel */
 .carousel-slide .card-slider {
   width: 100%;
-  aspect-ratio: var(--carousel-aspect); /* caja uniforme para todas las imágenes */
+  aspect-ratio: var(--carousel-aspect);
   border-radius: var(--r-sm);
   position: relative;
   overflow: hidden;
@@ -319,10 +323,7 @@ a.btn-secondary,
   flex-shrink: 0;
 }
 
-/* Imagen dentro de la caja del carrusel:
-   - object-fit: cover para evitar distorsión (recorta si es necesario)
-   - object-position: center center para centrar la parte importante
-   - position absolute para permitir transiciones sin cambiar la caja */
+/* MEJORA: Imágenes sin distorsión con object-fit */
 .carousel-slide .card-slider img {
   width: 100%;
   height: 100%;
@@ -334,26 +335,40 @@ a.btn-secondary,
   inset: 0;
 }
 
-/* Si usas un slider interno con varias imágenes, mantenemos la caja constante
-   y simplemente alternamos opacities para evitar 'jumping' de layout */
 .carousel-slide .card-slider img[style*="opacity:0"] {
   opacity: 0;
 }
+
 .carousel-slide .card-slider img:not([style*="opacity:0"]) {
   opacity: 1;
 }
 
-/* CONTROLES del carrusel */
+/* Badge de oferta */
+.offer-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--discount-pink);
+  color: #b91c1c;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  z-index: 10;
+  box-shadow: 0 0.125rem 0.5rem rgba(185, 28, 28, 0.1);
+}
+
+/* Controles del carrusel */
 .carousel-btn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--border);
-  padding: clamp(0.4rem, 1.2vw, 0.5rem);
+  padding: clamp(0.5rem, 1.2vw, 0.625rem);
   border-radius: var(--r-md);
   z-index: 10;
-  font-size: clamp(1rem, 3vw, 1.25rem);
+  font-size: clamp(1.125rem, 3vw, 1.5rem);
   font-weight: 700;
   color: var(--text);
   box-shadow: 0 0.25rem 0.75rem rgba(11, 15, 34, 0.08);
@@ -361,114 +376,83 @@ a.btn-secondary,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-}
-.carousel-btn.prev {
-  left: 0.4rem;
-}
-.carousel-btn.next {
-  right: 0.4rem;
-}
-.carousel-btn:hover {
-  transform: translateY(-50%) scale(1.06);
+  min-width: 2.75rem; /* 44px */
+  min-height: 2.75rem; /* 44px */
+  cursor: pointer;
 }
 
-/* INDICADORES: puntos pequeños pero con área táctil */
+.carousel-btn.prev {
+  left: 0.5rem;
+}
+
+.carousel-btn.next {
+  right: 0.5rem;
+}
+
+.carousel-btn:hover {
+  transform: translateY(-50%) scale(1.06);
+  box-shadow: 0 0.5rem 1rem rgba(11, 15, 34, 0.12);
+}
+
+.carousel-btn:active {
+  transform: translateY(-50%) scale(0.98);
+}
+
+/* MEJORA: Indicadores optimizados con área táctil adecuada */
 .carousel-indicators {
   position: absolute;
-  bottom: 0.4rem;
+  bottom: 0.5rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 0.4rem;
+  gap: 0.5rem;
   z-index: 10;
-  padding: 0.2rem 0.35rem;
-  background: rgba(255, 255, 255, 0.88);
-  border-radius: 0.75rem;
-  backdrop-filter: blur(0.12rem);
-  box-shadow: 0 0.125rem 0.5rem rgba(2, 6, 23, 0.03);
+  padding: 0.375rem 0.625rem;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 1rem;
+  backdrop-filter: blur(0.25rem);
+  box-shadow: 0 0.125rem 0.5rem rgba(2, 6, 23, 0.06);
 }
 
 .indicator {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.22rem; /* hit area razonable */
+  padding: 0.375rem; /* Área táctil generosa */
   background: transparent;
   border: none;
   cursor: pointer;
   transition: transform 160ms ease, opacity 160ms ease;
   border-radius: 50%;
-  min-width: 0;
-  min-height: 0;
+  min-width: 2rem; /* Área táctil mínima */
+  min-height: 2rem;
 }
+
 .indicator::before {
   content: '';
-  width: 0.375rem;   /* ~6px visible */
-  height: 0.375rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
-  background: rgba(2, 6, 23, 0.16);
+  background: rgba(2, 6, 23, 0.2);
   display: block;
   transition: all 180ms var(--ease-smooth);
-  box-shadow: none;
 }
+
 .indicator.active::before {
-  width: 0.5rem;     /* ~8px activo */
-  height: 0.5rem;
+  width: 0.625rem;
+  height: 0.625rem;
   background: var(--primary-600);
-  box-shadow: 0 0.125rem 0.375rem rgba(11, 99, 209, 0.22);
-  transform: scale(1);
+  box-shadow: 0 0.125rem 0.375rem rgba(11, 99, 209, 0.3);
 }
+
 .indicator:hover::before,
-.indicator:focus::before,
-.indicator:focus-visible::before {
-  background: rgba(11, 99, 209, 0.18);
-  transform: scale(1.05);
-  outline: none;
-}
-@media (hover: none) and (pointer: coarse) {
-  .indicator { padding: 0.35rem; } /* área táctil mayor en móviles */
+.indicator:focus::before {
+  background: rgba(11, 99, 209, 0.4);
+  transform: scale(1.1);
 }
 
 /* =====================================================
-   BREAKPOINTS: ajustamos # items visibles
-   - Tablet (>= 768px) => 3 items
-   - Desktop (>= 1024px) => 4 items
-   ===================================================== */
-
-/* Tablet: 3 items visibles */
-@media (min-width: 48rem) {
-  .carousel-slide {
-    flex: 0 0 calc((100% - (2 * var(--carousel-gap))) / 3);
-    max-width: calc((100% - (2 * var(--carousel-gap))) / 3);
-  }
-
-  /* empujamos controles ligeramente hacia afuera en pantallas más amplias */
-  .carousel-btn.prev { left: 0.6rem; }
-  .carousel-btn.next { right: 0.6rem; }
-}
-
-/* Desktop: 4 items visibles (máximo) */
-@media (min-width: 64rem) {
-  .carousel-slide {
-    flex: 0 0 calc((100% - (3 * var(--carousel-gap))) / 4);
-    max-width: calc((100% - (3 * var(--carousel-gap))) / 4);
-  }
-  .carousel-btn.prev { left: 0.8rem; }
-  .carousel-btn.next { right: 0.8rem; }
-}
-
-/* Grandes pantallas: mantenemos 4 items como máximo */
-@media (min-width: 75rem) {
-  .carousel-slide {
-    flex: 0 0 calc((100% - (3 * var(--carousel-gap))) / 4);
-    max-width: calc((100% - (3 * var(--carousel-gap))) / 4);
-  }
-}
-
-/* =====================================================
-   PRODUCT MODAL
+   MODAL DE PRODUCTO - COMPLETAMENTE OPTIMIZADO
    ===================================================== */
 .product-modal {
   position: fixed;
@@ -478,102 +462,166 @@ a.btn-secondary,
   justify-content: center;
   z-index: 700;
   background: rgba(3, 7, 18, 0.6);
-  backdrop-filter: blur(0.375rem);
+  backdrop-filter: blur(0.5rem);
   padding: var(--lg);
+  overflow-y: auto;
 }
+
 .product-modal-panel {
   width: 100%;
-  max-width: 68.75rem;
+  max-width: min(90vw, 75rem);
   max-height: 90vh;
   background: var(--surface);
   border-radius: var(--r-lg);
-  padding: var(--lg);
+  padding: clamp(1rem, 3vw, 2rem);
   box-shadow: 0 1.875rem 5rem rgba(2, 6, 23, 0.6);
   overflow-y: auto;
+  position: relative;
 }
+
+/* MEJORA CRÍTICA: Layout del modal adaptativo */
 .product-modal-body {
   display: flex;
-  gap: var(--lg);
+  gap: clamp(1rem, 3vw, 2rem);
   align-items: flex-start;
   flex-direction: column;
 }
 
-/* Forzamos el apilamiento vertical dentro de la columna izquierda del modal */
+/* MEJORA: Columna izquierda del modal (slider + thumbs) */
 .product-modal-left {
-  /* mantener comportamiento relativo para navs */
   position: relative;
   display: flex;
-  flex-direction: column;     /* apilar: slider arriba, thumbs abajo */
-  align-items: center;        /* centrar horizontalmente */
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
+  width: 100%;
 }
 
-/* Alineamos ancho del slider (coherente con lo usado en reglas previas) */
-.product-modal-left .product-modal-slider {
-  width: min(40rem, 60vw);
+/* MEJORA: Slider del modal con dimensiones apropiadas */
+.product-modal-slider {
+  width: 100%;
   max-width: 100%;
-  height: clamp(14rem, 40vw, 26.25rem);
-  margin: 0 auto;
-  order: 1;
+  height: clamp(15rem, 50vw, 24rem);
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, #f5f8ff, #ffffff);
+  overflow: hidden;
+  position: relative;
 }
 
-/* Thumbs siempre debajo, centradas y con el mismo ancho máximo que el slider */
-.product-modal-left .product-modal-thumbs {
-  order: 2;
-  width: min(40rem, 60vw);
-  max-width: 100%;
+.product-modal-slider img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.product-modal-slider img.active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* MEJORA: Miniaturas responsive */
+.product-modal-thumbs {
   display: flex;
-  justify-content: center;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  width: 100%;
+  justify-content: center;
   overflow-x: auto;
+  padding: 0.5rem 0;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Asegurar que las miniaturas no se estiren y mantengan tamaño */
-.product-modal-left .product-modal-thumbs img {
-  flex: 0 0 auto;
-  width: 4rem;
-  height: 4rem;
+.product-modal-thumbs img {
+  width: clamp(3.5rem, 15vw, 5rem);
+  height: clamp(3.5rem, 15vw, 5rem);
   object-fit: cover;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+  transition: border-color 200ms, transform 200ms;
 }
 
-/* Navs: colocarlos sobre el slider (dentro del contenedor centrado) */
-.product-modal-left .product-modal-nav {
+.product-modal-thumbs img:hover {
+  transform: scale(1.05);
+}
+
+.product-modal-thumbs img.active {
+  border-color: var(--primary-600);
+  box-shadow: 0 0 0 2px rgba(143, 217, 208, 0.3);
+}
+
+/* MEJORA CRÍTICA: Navegación del modal posicionada correctamente */
+.product-modal-nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   z-index: 80;
-  background: rgba(255,255,255,0.96);
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid var(--border);
-  box-shadow: 0 0.25rem 0.75rem rgba(11,15,34,0.06);
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 700;
+  min-width: 2.75rem; /* 44px */
+  min-height: 2.75rem; /* 44px */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0.25rem 0.75rem rgba(11, 15, 34, 0.1);
+  transition: all 200ms var(--ease-smooth);
 }
 
-/* Posición estándar de las flechas dentro del ancho del slider */
-.product-modal-left .product-modal-nav.prev { left: 0.6rem; }
-.product-modal-left .product-modal-nav.next { right: 0.6rem; }
-
-/* Evitar que reglas antiguas (por ejemplo right: -9.5rem) nos afecten:
-   al estar al final del fichero estas reglas prevalecen. */
-.product-modal-nav.next { right: 0.6rem !important; }
-
-/* En pantallas muy grandes ampliar límite del slider y thumbs ligeramente */
-@media (min-width: 75rem) {
-  .product-modal-left .product-modal-slider,
-  .product-modal-left .product-modal-thumbs {
-    width: min(48rem, 54vw);
-  }
+.product-modal-nav.prev {
+  left: 0.5rem;
 }
 
-/* Mantener accesibilidad y foco visible en thumbs y navs */
-.product-modal-thumbs img:focus,
-.product-modal-nav:focus {
-  outline: 3px solid rgba(11,99,209,0.12);
-  outline-offset: 4px;
+/* CORRECCIÓN IMPORTANTE: Botón next posicionado correctamente */
+.product-modal-nav.next {
+  right: 0.5rem;
 }
 
+.product-modal-nav:hover {
+  transform: translateY(-50%) scale(1.08);
+  box-shadow: 0 0.375rem 1rem rgba(11, 15, 34, 0.15);
+}
+
+.product-modal-nav:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Botón de cierre del modal */
+.product-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 2.75rem; /* 44px */
+  height: 2.75rem; /* 44px */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 200ms;
+  color: var(--text);
+}
+
+.product-modal-close:hover {
+  background: #f5f8fb;
+  transform: rotate(90deg);
+}
+
+/* Columna derecha del modal */
 .product-modal-right {
   flex: 1 1 100%;
   min-width: 0;
@@ -581,73 +629,50 @@ a.btn-secondary,
   padding-bottom: 0.75rem;
 }
 
-.product-modal-slider {
-  width: 100%;
-  height: clamp(15rem, 50vw, 26.25rem);
-  border-radius: var(--r-md);
-  background: linear-gradient(180deg, #f5f8ff, #ffffff);
-  overflow: hidden;
-  position: relative;
-}
-.product-modal-slider img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 260ms ease, transform 260ms ease;
-}
-.product-modal-slider img.active {
-  opacity: 1;
-  transform: translateY(0);
+.product-modal-right h2 {
+  font-size: var(--heading-size);
+  margin-bottom: var(--md);
+  line-height: 4.2;
 }
 
-/* thumbs */
-.product-modal-thumbs {
+.product-modal-category {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-bottom: var(--md);
+}
+
+.product-modal-prices {
+  font-size: var(--price-size);
+  margin: var(--md) 0;
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.625rem;
-  overflow-x: auto;
-  padding-bottom: 0.375rem;
-}
-.product-modal-thumbs img {
-  width: 4rem;
-  height: 4rem;
-  object-fit: cover;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  border: 2px solid transparent;
-  flex-shrink: 0;
-}
-.product-modal-thumbs img.active {
-  border-color: var(--primary-600);
+  align-items: center;
+  gap: var(--md);
+  flex-wrap: wrap;
 }
 
-/* modal nav */
-.product-modal-nav {
+.product-modal-description {
+  color: var(--text);
+  line-height: 1.6;
+  margin: var(--lg) 0;
+  font-size: 0.9375rem;
+}
+
+/* Ribbon/badge de oferta en modal */
+.product-ribbon {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 35;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--r-md);
-  cursor: pointer;
-  font-size: 1.375rem;
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-}
-.product-modal-nav.prev {
-  left: 0.5rem;
-}
-.product-modal-nav.next {
-  right: -9.5rem;
+  top: -0.5rem;
+  left: 0;
+  background: var(--discount-pink);
+  color: #b91c1c;
+  padding: 0.375rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: 0 0.25rem 0.75rem rgba(185, 28, 28, 0.15);
 }
 
 /* =====================================================
-   PRODUCT CARDS (grid responsive)
+   GRID DE PRODUCTOS RESPONSIVE
    ===================================================== */
 .products-grid {
   display: grid;
@@ -656,12 +681,11 @@ a.btn-secondary,
   margin-top: 1.375rem;
 }
 
-/* product-card flexibility */
 .product-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: var(--product-card-pad);
+  padding: clamp(0.75rem, 2vw, 1rem);
   text-align: center;
   transition: transform var(--med) var(--ease-smooth),
     box-shadow var(--med) var(--ease-smooth);
@@ -671,12 +695,13 @@ a.btn-secondary,
   flex-direction: column;
   height: 100%;
 }
+
 .product-card:hover {
   transform: translateY(-0.375rem);
   box-shadow: var(--shadow-3);
 }
 
-/* Use aspect-ratio to maintain image region height across devices */
+/* MEJORA: Imágenes de productos con aspect-ratio uniforme */
 .product-card .card-slider {
   width: 100%;
   aspect-ratio: 4/3;
@@ -688,6 +713,7 @@ a.btn-secondary,
   order: -1;
   flex-shrink: 0;
 }
+
 .product-card .card-slider img {
   width: 100%;
   height: 100%;
@@ -697,11 +723,12 @@ a.btn-secondary,
   position: absolute;
   inset: 0;
 }
+
 .product-card:hover .card-slider img {
   transform: scale(1.05);
 }
 
-/* text/info */
+/* Información del producto */
 .product-info {
   display: flex;
   flex-direction: column;
@@ -710,6 +737,7 @@ a.btn-secondary,
   flex: 1;
   min-height: 0;
 }
+
 .product-title {
   font-weight: 700;
   font-size: var(--title-size);
@@ -722,11 +750,13 @@ a.btn-secondary,
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
 .product-meta {
   color: var(--muted);
   font-size: 0.8125rem;
   margin-bottom: var(--xs);
 }
+
 .product-price {
   font-size: var(--price-size);
   margin: var(--sm) 0;
@@ -736,18 +766,20 @@ a.btn-secondary,
   gap: var(--sm);
   flex-wrap: wrap;
 }
+
 .old {
   color: var(--muted);
   text-decoration: line-through;
   font-size: 0.875rem;
 }
+
 .current {
   color: var(--success-green);
   font-weight: 700;
   font-size: clamp(1rem, 3vw, 1.125rem);
 }
 
-/* product card controls aligned to bottom */
+/* Controles del producto */
 .product-card > div:last-child {
   margin-top: auto;
   display: flex;
@@ -756,15 +788,32 @@ a.btn-secondary,
   width: 100%;
   padding-top: var(--sm);
 }
+
 .product-card .btn-primary {
   flex: 1 1 auto;
 }
+
 .product-card .btn-secondary {
   flex: 0 1 auto;
 }
 
+/* Información adicional del carrusel */
+.carousel-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xs);
+  padding: var(--xs);
+}
+
+.carousel-controls {
+  display: flex;
+  gap: var(--sm);
+  margin-top: var(--sm);
+  flex-wrap: wrap;
+}
+
 /* =====================================================
-   CART PAGE & PANEL (mobile-first)
+   PÁGINA DE CARRITO Y CHECKOUT
    ===================================================== */
 .cart-page {
   display: flex;
@@ -779,19 +828,23 @@ a.btn-secondary,
   flex: 1 1 auto;
   background: var(--surface);
   border-radius: var(--r-lg);
-  padding: var(--lg);
+  padding: clamp(1rem, 3vw, 1.5rem);
   box-shadow: var(--shadow-2);
   transition: max-height 400ms var(--ease-smooth),
-    padding 300ms var(--ease-smooth), opacity 250ms ease, margin 300ms ease;
+    padding 300ms var(--ease-smooth),
+    opacity 250ms ease,
+    margin 300ms ease;
   overflow: hidden;
   position: relative;
   max-height: 125rem;
 }
+
 .cart-panel.minimized {
   max-height: 4.375rem;
   padding-bottom: var(--lg);
   margin-bottom: 0;
 }
+
 .cart-panel.minimized .selected-products,
 .cart-panel.minimized .available-products,
 .cart-panel.minimized .cart-summary,
@@ -805,11 +858,13 @@ a.btn-secondary,
   overflow: hidden;
   margin: 0;
   padding: 0;
-  transition: opacity 200ms ease, max-height 300ms var(--ease-smooth),
-    margin 200ms ease, padding 200ms ease;
+  transition: opacity 200ms ease,
+    max-height 300ms var(--ease-smooth),
+    margin 200ms ease,
+    padding 200ms ease;
 }
 
-/* header dentro del carrito */
+/* Header del carrito */
 .cart-header {
   display: flex;
   justify-content: space-between;
@@ -817,29 +872,37 @@ a.btn-secondary,
   gap: var(--md);
   margin-bottom: var(--lg);
 }
+
 .cart-header-left {
   flex: 1;
   min-width: 0;
 }
+
 .cart-header-left h2 {
   margin-bottom: var(--xs);
-  font-size: clamp(1.125rem, 3vw, 1.25rem);
+  font-size: clamp(1.125rem, 3vw, 1.375rem);
   font-weight: 700;
   line-height: 1.2;
 }
+
 .cart-subhead {
   font-size: 0.8125rem;
   color: var(--muted);
 }
 
-/* divider */
 .divider {
   border: none;
   border-top: 1px solid var(--border);
   margin: var(--lg) 0;
 }
 
-/* available / selected lists scrollable with styled scrollbar */
+.available-head {
+  font-weight: 600;
+  margin-bottom: var(--md);
+  font-size: 1rem;
+}
+
+/* Listas de productos con scroll */
 .selected-products,
 .available-products {
   max-height: 25rem;
@@ -847,21 +910,24 @@ a.btn-secondary,
   margin-bottom: var(--lg);
   padding-right: 0.25rem;
 }
-selected-products::-webkit-scrollbar,
+
+.selected-products::-webkit-scrollbar,
 .available-products::-webkit-scrollbar {
   width: 0.375rem;
 }
+
 .selected-products::-webkit-scrollbar-thumb,
 .available-products::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 0.625rem;
 }
+
 .selected-products::-webkit-scrollbar-thumb:hover,
 .available-products::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
 
-/* layout de items */
+/* Items del carrito */
 .cart-item,
 .avail-item {
   display: flex;
@@ -870,16 +936,17 @@ selected-products::-webkit-scrollbar,
   padding: var(--md) 0;
   border-bottom: 1px solid #f1f5f9;
 }
+
 .cart-item:last-child,
 .avail-item:last-child {
   border-bottom: none;
 }
 
-/* item image: use clamp to be responsive */
+/* MEJORA: Imágenes responsive en items del carrito */
 .cart-item > img,
 .avail-item > img {
-  width: clamp(3.5rem, 15vw, 4rem);
-  height: clamp(3.5rem, 15vw, 4rem);
+  width: clamp(3.5rem, 15vw, 5rem);
+  height: clamp(3.5rem, 15vw, 5rem);
   object-fit: cover;
   object-position: center top;
   border-radius: var(--r-sm);
@@ -887,7 +954,6 @@ selected-products::-webkit-scrollbar,
   box-shadow: 0 0.125rem 0.5rem rgba(11, 15, 34, 0.06);
 }
 
-/* content inside items */
 .cart-item > div,
 .avail-item > div {
   flex: 1;
@@ -896,6 +962,7 @@ selected-products::-webkit-scrollbar,
   gap: 0.375rem;
   min-width: 0;
 }
+
 .cart-item > div > div:first-child,
 .avail-item > div > div:first-child {
   font-weight: 700;
@@ -903,22 +970,24 @@ selected-products::-webkit-scrollbar,
   color: var(--text);
   line-height: 1.3;
 }
+
 .cart-item > div > div:nth-child(2) {
   color: var(--muted);
   font-size: 0.875rem;
 }
 
-/* quantity controls */
+/* Controles de cantidad */
 .qty-controls {
   display: flex;
   align-items: center;
   gap: var(--sm);
   flex-wrap: wrap;
 }
+
 .qty-decr,
 .qty-incr {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.75rem; /* 44px */
+  height: 2.75rem; /* 44px */
   border-radius: var(--r-sm);
   border: 0;
   background: var(--accent-purple);
@@ -934,20 +1003,23 @@ selected-products::-webkit-scrollbar,
   line-height: 1;
   padding: 0;
 }
+
 .qty-decr:hover,
 .qty-incr:hover {
   background: #b89eff;
   transform: scale(1.05);
 }
+
 .qty-decr:active,
 .qty-incr:active {
   transform: scale(0.95);
   transition-duration: 80ms;
 }
 
-.qty-input {
-  width: clamp(2.8125rem, 8vw, 3.125rem);
-  padding: 0.375rem 0.5rem;
+.qty-input,
+.avail-qty {
+  width: clamp(3.125rem, 10vw, 4.375rem);
+  padding: 0.5rem;
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
   text-align: center;
@@ -955,9 +1027,11 @@ selected-products::-webkit-scrollbar,
   font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.4;
-  min-height: 2.75rem;
+  min-height: 2.75rem; /* 44px */
 }
-.qty-input:focus {
+
+.qty-input:focus,
+.avail-qty:focus {
   outline: none;
   border-color: var(--primary-600);
   box-shadow: 0 0 0 0.1875rem rgba(11, 99, 209, 0.08);
@@ -965,30 +1039,12 @@ selected-products::-webkit-scrollbar,
 
 .remove-item {
   margin-left: 0.25rem;
-  padding: 0.375rem 0.625rem;
+  padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
-  min-height: 2rem;
+  min-height: 2.75rem; /* 44px */
 }
 
-/* available qty input styles */
-.avail-qty {
-  width: clamp(3.4375rem, 10vw, 4.375rem);
-  padding: 0.375rem 0.5rem;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  text-align: center;
-  background: white;
-  font-weight: 600;
-  font-size: 0.875rem;
-  min-height: 2.75rem;
-}
-.avail-qty:focus {
-  outline: none;
-  border-color: var(--primary-600);
-  box-shadow: 0 0 0 0.1875rem rgba(11, 99, 209, 0.08);
-}
-
-/* cart summary */
+/* Resumen del carrito */
 .cart-summary {
   margin-top: var(--lg);
   padding: var(--md);
@@ -1000,44 +1056,49 @@ selected-products::-webkit-scrollbar,
   font-size: 0.9375rem;
   color: var(--text);
 }
+
 .cart-summary > div {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .cart-summary .total {
-  font-size: clamp(1rem, 3vw, 1.125rem);
+  font-size: clamp(1rem, 3vw, 1.25rem);
   font-weight: 700;
   padding-top: var(--sm);
   border-top: 2px solid var(--border);
   margin-top: var(--xs);
 }
 
-/* cart actions */
+/* Acciones del carrito */
 .cart-actions-inline {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.75rem;
   margin-top: var(--lg);
 }
 
-/* checkout panel */
+/* Panel de checkout */
 .checkout-panel {
   width: 100%;
   max-width: 100%;
   background: var(--surface);
   border-radius: var(--r-lg);
-  padding: var(--lg);
+  padding: clamp(1rem, 3vw, 1.5rem);
   box-shadow: var(--shadow-2);
   transition: opacity 350ms var(--ease-smooth),
-    transform 350ms var(--ease-smooth), max-height 350ms var(--ease-smooth),
-    padding 300ms ease, margin 300ms ease;
+    transform 350ms var(--ease-smooth),
+    max-height 350ms var(--ease-smooth),
+    padding 300ms ease,
+    margin 300ms ease;
   flex-shrink: 0;
   overflow: hidden;
   max-height: 93.75rem;
   opacity: 1;
   transform: translateY(0);
 }
+
 .checkout-panel.hidden {
   opacity: 0;
   transform: translateY(-1.25rem);
@@ -1047,49 +1108,69 @@ selected-products::-webkit-scrollbar,
   margin: 0;
 }
 
-/* form & inputs */
+.checkout-header {
+  display: flex;
+  align-items: center;
+  gap: var(--md);
+  margin-bottom: var(--lg);
+}
+
+.checkout-header h3 {
+  font-size: clamp(1rem, 3vw, 1.25rem);
+}
+
+/* Formulario de checkout */
 .checkout-form {
   display: flex;
   flex-direction: column;
   gap: var(--lg);
 }
+
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.5rem;
 }
+
 .form-row.narrow {
-  max-width: 15.625rem;
+  max-width: 100%;
 }
+
 .checkout-form label {
   display: block;
   color: var(--text);
   font-weight: 600;
   font-size: 0.875rem;
 }
+
 .req {
   color: #ef4444;
   font-weight: 700;
 }
+
+/* MEJORA: Inputs con altura adecuada para touch */
 .checkout-form input,
 .checkout-form textarea {
   width: 100%;
-  padding: 0.6875rem 0.75rem;
+  padding: 0.75rem;
   border-radius: var(--r-sm);
   border: 2px solid var(--border);
-  transition: border-color var(--fast), box-shadow var(--fast),
+  transition: border-color var(--fast),
+    box-shadow var(--fast),
     background var(--fast);
   background: white;
   font-family: inherit;
   font-size: 1rem;
   color: var(--text);
   line-height: 1.5;
-  min-height: 2.75rem;
+  min-height: 2.75rem; /* 44px para touch */
 }
+
 .checkout-form textarea {
   resize: vertical;
-  min-height: 5rem;
+  min-height: 5.5rem;
 }
+
 .checkout-form input:focus,
 .checkout-form textarea:focus {
   outline: none;
@@ -1097,16 +1178,17 @@ selected-products::-webkit-scrollbar,
   box-shadow: 0 0 0 0.1875rem rgba(11, 99, 209, 0.08);
   background: white;
 }
+
 .checkout-form input:invalid:not(:placeholder-shown),
 .checkout-form textarea:invalid:not(:placeholder-shown) {
   border-color: #fca5a5;
 }
+
 .checkout-form input:valid:not(:placeholder-shown),
 .checkout-form textarea:valid:not(:placeholder-shown) {
   border-color: #86efac;
 }
 
-/* form errors */
 .field-err {
   font-size: 0.8125rem;
   color: #ef4444;
@@ -1115,30 +1197,87 @@ selected-products::-webkit-scrollbar,
   line-height: 1.4;
 }
 
-/* confirm / order modals simplified */
-.confirm-modal {
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: var(--md);
+}
+
+.form-msg {
+  margin-top: var(--md);
+  padding: var(--md);
+  border-radius: var(--r-sm);
+  background: #f1f5f9;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+/* =====================================================
+   MODALES Y CONFIRMACIONES
+   ===================================================== */
+.confirm-modal,
+.order-confirm {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 200;
-  background: rgba(3, 7, 18, 0.5);
-  backdrop-filter: blur(0.25rem);
-  animation: fadeIn 200ms ease;
+  background: rgba(3, 7, 18, 0.6);
+  backdrop-filter: blur(0.375rem);
   padding: var(--lg);
 }
+
 .confirm-panel {
   width: 100%;
-  max-width: 26.25rem;
+  max-width: 28rem;
   background: linear-gradient(180deg, #0a1015, #0f1820);
   color: #e6f7e6;
   border-radius: var(--r-lg);
-  padding: var(--xl);
+  padding: clamp(1.5rem, 4vw, 2rem);
   box-shadow: 0 1.25rem 3.75rem rgba(2, 6, 23, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.05);
   animation: slideUp 250ms var(--ease-bounce);
 }
+
+.confirm-body {
+  margin-bottom: var(--lg);
+}
+
+.confirm-title {
+  font-size: clamp(1.125rem, 3vw, 1.375rem);
+  margin-bottom: var(--md);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: var(--md);
+  flex-direction: column;
+}
+
+.confirm-inner {
+  background: white;
+  padding: clamp(1.5rem, 4vw, 2rem);
+  border-radius: var(--r-lg);
+  max-width: 30rem;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 1.25rem 3.75rem rgba(2, 6, 23, 0.4);
+  animation: slideUp 300ms var(--ease-bounce);
+}
+
+.confirm-inner h3 {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  margin-bottom: var(--lg);
+}
+
+.confirm-inner p {
+  margin-bottom: var(--xl);
+  color: var(--text);
+  line-height: 1.6;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -1147,6 +1286,7 @@ selected-products::-webkit-scrollbar,
     opacity: 1;
   }
 }
+
 @keyframes slideUp {
   from {
     transform: translateY(1.25rem);
@@ -1158,37 +1298,16 @@ selected-products::-webkit-scrollbar,
   }
 }
 
-/* inline order confirmation */
-.order-confirm {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 210;
-  background: rgba(3, 7, 18, 0.6);
-  backdrop-filter: blur(0.375rem);
-  padding: var(--lg);
-}
-.confirm-inner {
-  background: white;
-  padding: var(--2xl);
-  border-radius: var(--r-lg);
-  max-width: 30rem;
-  width: 100%;
-  text-align: center;
-  box-shadow: 0 1.25rem 3.75rem rgba(2, 6, 23, 0.4);
-  animation: slideUp 300ms var(--ease-bounce);
-}
-
-/* toast */
+/* =====================================================
+   TOAST NOTIFICATIONS
+   ===================================================== */
 .toast {
   position: fixed;
   right: clamp(1rem, 3vw, 1.25rem);
   bottom: clamp(5rem, 15vh, 6.25rem);
   background: linear-gradient(180deg, var(--primary-600), var(--primary-700));
   color: #fff;
-  padding: 0.75rem 1.25rem;
+  padding: 0.875rem 1.375rem;
   border-radius: var(--r-lg);
   box-shadow: 0 0.5rem 1.875rem rgba(11, 99, 209, 0.25);
   display: none;
@@ -1196,11 +1315,14 @@ selected-products::-webkit-scrollbar,
   font-weight: 600;
   max-width: 20rem;
   line-height: 1.5;
+  font-size: 0.9375rem;
 }
+
 .toast.show {
   display: block;
   animation: toastSlideIn var(--med) var(--ease-bounce);
 }
+
 @keyframes toastSlideIn {
   from {
     transform: translateY(1.25rem) translateX(6.25rem);
@@ -1212,7 +1334,9 @@ selected-products::-webkit-scrollbar,
   }
 }
 
-/* footer (fixed) */
+/* =====================================================
+   FOOTER
+   ===================================================== */
 .site-footer {
   position: fixed;
   left: 0;
@@ -1224,6 +1348,7 @@ selected-products::-webkit-scrollbar,
   z-index: 60;
   box-shadow: 0 -0.125rem 0.5rem rgba(11, 15, 34, 0.03);
 }
+
 .site-footer .container {
   display: flex;
   justify-content: center;
@@ -1232,7 +1357,9 @@ selected-products::-webkit-scrollbar,
   color: var(--muted);
 }
 
-/* spinner and misc */
+/* =====================================================
+   UTILIDADES Y HELPERS
+   ===================================================== */
 .spinner {
   text-align: center;
   padding: var(--2xl);
@@ -1240,18 +1367,10 @@ selected-products::-webkit-scrollbar,
   font-size: 0.9375rem;
 }
 
-/* accessibility focus */
-:focus-visible {
-  outline: 2px solid var(--primary-600);
-  outline-offset: 0.1875rem;
-  border-radius: 0.25rem;
-}
-button:focus-visible,
-a:focus-visible {
-  outline-offset: 0.25rem;
+.hidden {
+  display: none !important;
 }
 
-/* skip link */
 .skip-to-main {
   position: absolute;
   top: -6.25rem;
@@ -1262,24 +1381,242 @@ a:focus-visible {
   z-index: 1000;
   text-decoration: none;
 }
+
 .skip-to-main:focus {
   top: 0;
 }
 
-/* landscape mobile adjustments */
+/* =====================================================
+   ACCESIBILIDAD - FOCUS VISIBLE
+   ===================================================== */
+:focus-visible {
+  outline: 2px solid var(--primary-600);
+  outline-offset: 0.1875rem;
+  border-radius: 0.25rem;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline-offset: 0.25rem;
+}
+
+/* =====================================================
+   BREAKPOINTS RESPONSIVE
+   ===================================================== */
+
+/* 480px+ - Móviles grandes */
+@media (min-width: 30rem) {
+  .carousel-slide {
+    flex: 0 0 calc((100% - var(--carousel-gap)) / 2);
+    max-width: calc((100% - var(--carousel-gap)) / 2);
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 768px+ - Tablets */
+@media (min-width: 48rem) {
+  :root {
+    --header-h: 4rem;
+  }
+
+  .container {
+    padding: 0 var(--xl) 6.5rem;
+  }
+
+  .site-header {
+    padding: 1rem var(--xl);
+  }
+
+  /* Carrusel: 3 items en tablet */
+  .carousel-slide {
+    flex: 0 0 calc((100% - (2 * var(--carousel-gap))) / 3);
+    max-width: calc((100% - (2 * var(--carousel-gap))) / 3);
+  }
+
+  .carousel-btn.prev {
+    left: 0.75rem;
+  }
+
+  .carousel-btn.next {
+    right: 0.75rem;
+  }
+
+  /* Modal de producto en dos columnas */
+  .product-modal-body {
+    flex-direction: row;
+  }
+
+  .product-modal-left {
+    flex: 1 1 50%;
+    max-width: 50%;
+  }
+
+  .product-modal-right {
+    flex: 1 1 50%;
+    max-width: 50%;
+  }
+
+  .product-modal-slider {
+    height: clamp(18rem, 35vw, 28rem);
+  }
+
+  /* Cart page en dos columnas */
+  .cart-page {
+    flex-direction: row;
+    gap: var(--xl);
+    align-items: flex-start;
+  }
+
+  .cart-panel {
+    flex: 1 1 60%;
+    max-width: 48rem;
+  }
+
+  .checkout-panel {
+    width: 25rem;
+    flex-shrink: 0;
+  }
+
+  .form-row.narrow {
+    max-width: 20rem;
+  }
+
+  .cart-actions-inline {
+    flex-direction: row;
+  }
+
+  .form-actions {
+    flex-direction: row;
+  }
+
+  .confirm-actions {
+    flex-direction: row;
+  }
+}
+
+/* 1024px+ - Desktop */
+@media (min-width: 64rem) {
+  /* Carrusel: 4 items en desktop */
+  .carousel-slide {
+    flex: 0 0 calc((100% - (3 * var(--carousel-gap))) / 4);
+    max-width: calc((100% - (3 * var(--carousel-gap))) / 4);
+  }
+
+  .carousel-btn.prev {
+    left: 1rem;
+  }
+
+  .carousel-btn.next {
+    right: 1rem;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .cart-panel {
+    max-width: 42rem;
+  }
+
+  .checkout-panel {
+    width: 28rem;
+  }
+
+  .product-modal-left {
+    flex: 1 1 55%;
+    max-width: 55%;
+  }
+
+  .product-modal-right {
+    flex: 1 1 45%;
+    max-width: 45%;
+  }
+}
+
+/* 1200px+ - Desktop grande */
+@media (min-width: 75rem) {
+  :root {
+    --container-max: 75rem;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+
+  .carousel-btn.prev {
+    left: 1.25rem;
+  }
+
+  .carousel-btn.next {
+    right: 1.25rem;
+  }
+}
+
+/* 1400px+ - Extra large */
+@media (min-width: 87.5rem) {
+  :root {
+    --container-max: 81.25rem;
+  }
+
+  .products-grid {
+    gap: 2rem;
+  }
+}
+
+/* =====================================================
+   CONTROL DE VISIBILIDAD DEL GRID
+   ===================================================== */
+@media (max-width: 47.99rem) {
+  #productsGrid {
+    display: none !important;
+  }
+}
+
+@media (min-width: 48rem) {
+  #productsGrid {
+    display: grid !important;
+  }
+}
+
+.hide-products-mode #productsGrid,
+.hide-products-mode .products-grid {
+  display: none !important;
+}
+
+.show-products-mode #productsGrid,
+.show-products-mode .products-grid {
+  display: grid !important;
+}
+
+/* =====================================================
+   LANDSCAPE MOBILE
+   ===================================================== */
 @media (max-height: 31.25rem) and (orientation: landscape) {
   .card-slider,
   .product-card .card-slider {
     height: 8.75rem;
   }
+
   .cart-panel,
   .checkout-panel {
     max-height: calc(100vh - 10rem);
     overflow-y: auto;
   }
+
+  .product-modal-panel {
+    max-height: 85vh;
+  }
 }
 
-/* reduce motion */
+/* =====================================================
+   PREFERENCIAS DEL USUARIO
+   ===================================================== */
+
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1289,13 +1626,62 @@ a:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
   .carousel-slide .card-slider img,
   .product-card .card-slider img {
     transition: none;
   }
 }
 
-/* print */
+/* High contrast */
+@media (prefers-contrast: high) {
+  :root {
+    --border: #94a3b8;
+  }
+
+  .btn-primary {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .btn-secondary {
+    border: 2px solid var(--text);
+  }
+
+  .product-card {
+    border: 2px solid var(--border);
+  }
+}
+
+/* Touch devices - área táctil ampliada */
+@media (hover: none) and (pointer: coarse) {
+  .btn-primary,
+  .btn-secondary,
+  .qty-decr,
+  .qty-incr,
+  .cart-btn,
+  .mini-toggle,
+  .carousel-btn,
+  .product-modal-nav {
+    min-height: 3rem; /* 48px en dispositivos táctiles */
+    min-width: 3rem;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 1rem; /* Evita zoom en iOS */
+  }
+
+  .indicator {
+    padding: 0.5rem; /* Área táctil mayor */
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+}
+
+/* =====================================================
+   IMPRESIÓN
+   ===================================================== */
 @media print {
   .site-header,
   .site-footer,
@@ -1305,16 +1691,21 @@ a:focus-visible {
   .toast,
   button:not(.print-show),
   .mini-toggle,
-  .back {
+  .back,
+  .product-modal-nav,
+  .product-modal-close {
     display: none !important;
   }
+
   .container {
     padding: 0;
     max-width: 100%;
   }
+
   .cart-page {
     flex-direction: column;
   }
+
   .product-card,
   .cart-panel,
   .checkout-panel {
@@ -1322,180 +1713,9 @@ a:focus-visible {
     border: 1px solid #ccc;
     page-break-inside: avoid;
   }
+
   body {
     background: white;
+    padding-top: 0;
   }
 }
-
-/* TOUCH devices: ensure large touch targets and avoid zoom */
-@media (hover: none) and (pointer: coarse) {
-  .btn-primary,
-  .btn-secondary,
-  .qty-decr,
-  .qty-incr,
-  .cart-btn,
-  .mini-toggle,
-  .carousel-btn {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
-  }
-  input,
-  textarea,
-  select {
-    font-size: 1rem;
-  } /* avoid iOS zoom */
-}
-
-/* high contrast */
-@media (prefers-contrast: high) {
-  :root {
-    --border: #94a3b8;
-  }
-  .btn-primary {
-    border: 2px solid rgba(255, 255, 255, 0.3);
-  }
-  .btn-secondary {
-    border: 2px solid var(--text);
-  }
-  .product-card {
-    border: 2px solid var(--border);
-  }
-}
-
-/* =====================================================
-   RESPONSIVE GRID (productos)
-   ===================================================== */
-
-/* 320px+ */
-@media (min-width: 20rem) {
-  :root {
-    --font-base: 0.875rem;
-    --carousel-img-h: 10rem;
-    --product-img-h: 10rem;
-  }
-}
-
-/* Tablet */
-@media (min-width: 48rem) {
-  :root {
-    --font-base: 1rem;
-    --title-size: 1.0625rem;
-    --price-size: 1.125rem;
-    --heading-size: 1.5rem;
-    --product-img-h: 13.75rem;
-    --product-card-pad: 0.875rem;
-  }
-
-  .container {
-    padding: 0 var(--xl) calc(6.5rem);
-  }
-  .site-header {
-    padding: 1rem var(--xl);
-  }
-
-  .cart-page {
-    flex-direction: row;
-    gap: var(--xl);
-    align-items: flex-start;
-  }
-  .cart-panel {
-    flex: 1 1 40%;
-    max-width: 48rem;
-  }
-  .checkout-panel {
-    width: 25rem;
-    flex-shrink: 0;
-  }
-
-  .products-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--xl);
-  }
-
-  .product-modal-body {
-    flex-direction: row;
-  }
-  .product-modal-left {
-    flex: 1 1 30rem;
-  }
-  .product-modal-right {
-    flex: 1 1 23.75rem;
-  }
-}
-
-/* Desktop */
-@media (min-width: 64rem) {
-  :root {
-    --product-img-h: 15rem;
-  }
-  .products-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .cart-panel {
-    max-width: 40.625rem;
-  }
-  .checkout-panel {
-    width: 27.5rem;
-  }
-}
-
-/* Large desktop */
-@media (min-width: 75rem) {
-  :root {
-    --container-max: 75rem;
-  }
-  .products-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 2rem;
-  }
-}
-
-/* extra-large */
-@media (min-width: 87.5rem) {
-  :root {
-    --container-max: 81.25rem;
-  }
-}
-
-/* =====================================================
-   OCULTAR / REMOVER EL GRID DE PRODUCTOS (después del carrito)
-   - Por defecto oculto en móviles (<768px). Puedes añadir la clase
-     hide-products-mode a <html> para ocultarlo en todos los tamaños.
-   ===================================================== */
-
-/* Oculto por defecto en móviles (<768px) */
-@media (max-width: 47.99rem) {
-  #productsGrid {
-    display: none !important;
-  }
-}
-
-/* Mostrar grid en tablet+ */
-@media (min-width: 48rem) {
-  #productsGrid {
-    display: grid !important;
-  }
-}
-
-/* utilidad: si el HTML tiene la clase hide-products-mode escondemos el grid en todos los tamaños */
-.hide-products-mode #productsGrid,
-.hide-products-mode .products-grid {
-  display: none !important;
-}
-
-/* utilidad: forzar mostrar */
-.show-products-mode #productsGrid,
-.show-products-mode .products-grid {
-  display: grid !important;
-}
-
-/* =====================================================
-   CORRECCIÓN CRÍTICA: regla `.hidden` para modales
-   ===================================================== */
-.hidden {
-  display: none !important;
-}
-.product-modal.hidden { display: none !important; }
-.confirm-modal.hidden { display: none !important; }
-.order-confirm.hidden { display: none !important; }
-.product-modal-panel.hidden { display: none !important; }
