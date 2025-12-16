@@ -385,7 +385,12 @@ function renderCartPanel() {
                     <input class="avail-qty qty-input" data-id="${escapeHtml(p.id)}" type="number" min="0" max="999" value="0" style="width:70px;padding:6px;border-radius:8px;border:1px solid #e6eef6">
                     <button class="qty-incr avail-incr" data-id="${escapeHtml(p.id)}" aria-label="Aumentar">+</button>
                   </div>
-                  <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-left:8px">Ver</button>
+                  <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-left:8px">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
+                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
             `;
@@ -459,7 +464,12 @@ function createProductCardHtml(p, resolvedImages = []) {
         <div class="product-meta">${escapeHtml(p.category || '')}</div>
         <div class="product-price">${priceHtml}</div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-          <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-right:8px" aria-label="Ver producto ${escapeHtml(p.name)}">Ver</button>
+          <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-right:8px" aria-label="Ver producto ${escapeHtml(p.name)}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
+                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+            </svg>
+          </button>
           <button class="btn-primary add-btn" data-id="${escapeHtml(p.id)}" aria-label="Agregar ${escapeHtml(p.name)}">Agregar</button>
         </div>
       </div>
@@ -529,7 +539,7 @@ async function setupCarousel() {
     slides.forEach((s, idx) => {
         const imgUrl = (s.__resolvedImages && s.__resolvedImages[0]) || s.image || '';
         const isOffer = !!(s.isOnSale || (s.discountPrice && s.discountPrice < s.price));
-        const priceHtml = isOffer ? `<span class="old">${formatCurrency(s.price)}</span><span class="current">${formatCurrency(s.discountPrice)}</span>` : `<span class="current">${formatCurrency(s.price)}</span>`;
+        const priceHtml = isOffer ? `<span class="price-old">${formatCurrency(s.price)}</span><span class="price-pill">${formatCurrency(s.discountPrice)}</span>` : `<span class="price-pill">${formatCurrency(s.price)}</span>`;
         const slide = document.createElement('div');
         slide.className = 'carousel-slide';
         slide.innerHTML = `
@@ -544,7 +554,12 @@ async function setupCarousel() {
             <div class="product-price">${priceHtml}</div>
             <div class="carousel-controls">
               <button class="btn-primary add-btn" data-id="${escapeHtml(s.id)}" aria-label="Agregar ${escapeHtml(s.name)}">Agregar</button>
-              <button class="btn-secondary view-btn" data-id="${escapeHtml(s.id)}" aria-label="Ver ${escapeHtml(s.name)}">Ver</button>
+              <button class="btn-secondary view-btn" data-id="${escapeHtml(s.id)}" aria-label="Ver ${escapeHtml(s.name)}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
+                    <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                    <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+                </svg>
+              </button>
             </div>
           </div>
         `;
@@ -1078,7 +1093,7 @@ async function renderProductPage() {
         <img src="${escapeHtml(prod.image)}" alt="${escapeHtml(prod.name)}" style="width:300px;height:300px;object-fit:cover;border-radius:8px">
         <div style="flex:1">
           <h2 style="margin-bottom:8px">${escapeHtml(prod.name)}</h2>
-          <div style="margin-bottom:12px">${prod.discountPrice ? `<span class="old">${formatCurrency(prod.price)}</span> <strong>${formatCurrency(prod.discountPrice)}</strong>` : `<strong>${formatCurrency(prod.price)}</strong>`}</div>
+          <div style="margin-bottom:12px">${prod.discountPrice ? `<span class="price-old">${formatCurrency(prod.price)}</span> <strong>${formatCurrency(prod.discountPrice)}</strong>` : `<strong>${formatCurrency(prod.price)}</strong>`}</div>
           <p style="margin-bottom:12px;color:#334155">${escapeHtml(prod.description)}</p>
           <div style="display:flex;gap:8px;align-items:center">
             <label style="display:flex;align-items:center;gap:8px">Cantidad: <input id="productQty" type="number" min="1" max="999" value="1" style="width:80px;padding:6px;border-radius:8px;border:1px solid #e6eef6"></label>
