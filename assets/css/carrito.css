@@ -790,9 +790,6 @@ a.btn-secondary,
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.75rem;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
   font-weight: 800;
   font-size: clamp(0.95rem, 2.2vw, 1.05rem);
   color: var(--text);
@@ -858,7 +855,7 @@ a.btn-secondary,
   }
   .price-pill,
   .price-discount {
-    font-size: 1rem;
+    font-size: 1.35rem;
   }
   .product-card .btn-primary.buy-now {
     font-size: 1rem;
@@ -1064,8 +1061,8 @@ a.btn-secondary,
 
 .qty-decr,
 .qty-incr {
-  width: 2.75rem; /* 44px */
-  height: 2.75rem; /* 44px */
+  width: 1.75rem; /* 44px */
+  height: 1.75rem; /* 44px */
   border-radius: var(--r-sm);
   border: 0;
   background: var(--accent-purple);
@@ -1737,8 +1734,8 @@ a:focus-visible {
   .mini-toggle,
   .carousel-btn,
   .product-modal-nav {
-    min-height: 3rem; /* 48px en dispositivos táctiles */
-    min-width: 3rem;
+    min-height: 2rem; /* 48px en dispositivos táctiles */
+    min-width: 2rem;
   }
 
   input,
