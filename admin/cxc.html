@@ -8,6 +8,7 @@
 
     <!-- Reuse global styles, then module-specific -->
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="assets/css/cierre.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
 
@@ -24,14 +25,19 @@
             </label>
             <a class="brand" href="./" aria-label="Dashboard">
                 <img src="assets/img/logo.png" alt="Varius" width="14%">
-
                 <span class="brand-text">VARIUS</span>
             </a>
         </div>
 
         <div class="top-search">
             <label for="q" class="sr-only">Buscar</label>
-            <input id="q" type="search" placeholder="Search orders..." aria-label="Buscar" />
+            <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
+
+            <!-- dentro de .topbar, a la derecha del contenido -->
+            <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
+                <span class="dot"></span>
+                <span class="label">Desconectado</span>
+            </div>
         </div>
     </header>
 

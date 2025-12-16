@@ -1,11 +1,9 @@
 // assets/js/product-admin.js
-// Versión completa revisada:
-// - Render con badges de estado y oferta (colores).
-// - Columna Imagen muestra mini-slider (rotador separado).
-// - "Eliminar" marca status = 'suspendido' (soft-delete) y sólo admin ve suspendidos.
-// - CRUD y subida de imágenes (usa optimizarImagen, sube a products/{productId}/...).
-// - Validaciones de rol (applyUiRestrictions debe ocultar .admin-only).
-// - Incluye funciones necesarias: renderProducts, add/update (with image upload), openEdit, soft delete.
+// Versión completa revisada con validaciones inline y precio > 0
+// - Campos obligatorios (inline errors): nombre, descripción, precio (>0), categoría, estado, stock (entero >=0), y al menos 1 foto al crear.
+// - Precio mostrado con miles y decimales (ej. 9,014.66). El input se fuerza a `type="text"` y `inputmode="decimal"` en runtime.
+// - Validaciones muestran mensajes junto al campo (no toasts). Toasts se siguen usando para éxito/errores no-validación.
+// - Conserva funcionalidades previas: render, mini-rotator, optimizar imágenes, subir, soft-delete, RBAC, etc.
 // Requiere: image-utils.js, rbac.js y storage.rules apropiadas.
 
 import { firebaseConfig } from './firebase-config.js';
@@ -98,12 +96,23 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '=': '&#x3D;', '`': '&#x60;' }[c]));
 }
 
-function formatPrice(num) {
-    if (num === undefined || num === null || num === '') return '-';
-    return Number(num).toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+function formatPriceDisplay(num) {
+    // Format number with thousands comma and dot decimals: 9,014.66
+    if (num === undefined || num === null || num === '') return '';
+    const n = Number(num);
+    if (Number.isNaN(n)) return '';
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+function parseFormattedPrice(str) {
+    if (str === undefined || str === null) return NaN;
+    // Accept "9,014.66" or "9014.66" or "9014"
+    const cleaned = String(str).trim().replace(/\s+/g, '').replace(/,/g, '');
+    const v = parseFloat(cleaned);
+    return Number.isNaN(v) ? NaN : v;
 }
 function calculateOfferPrice(price, discount) {
-    if (!price || !discount) return null;
+    if (price === undefined || price === null) return null;
+    if (discount === undefined || discount === null) return null;
     return Math.round(Number(price) * (1 - Number(discount) / 100));
 }
 function generateSKUForCategory(category) {
@@ -113,9 +122,39 @@ function generateSKUForCategory(category) {
     return `${prefix}-${timePortion}${rnd}`;
 }
 
+/* ---------------- Inline field error helpers ---------------- */
+function setFieldError(fieldOrId, message) {
+    const el = typeof fieldOrId === 'string' ? document.getElementById(fieldOrId) : fieldOrId;
+    if (!el) return;
+    clearFieldError(el);
+    el.classList.add('input-error');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field-error';
+    wrapper.style.color = '#dc2626';
+    wrapper.style.fontSize = '13px';
+    wrapper.style.marginTop = '6px';
+    wrapper.textContent = message;
+    const parentRow = el.closest('.form-row') || el.parentNode;
+    parentRow.appendChild(wrapper);
+}
+
+function clearFieldError(fieldOrId) {
+    const el = typeof fieldOrId === 'string' ? document.getElementById(fieldOrId) : fieldOrId;
+    if (!el) return;
+    el.classList.remove('input-error');
+    const parentRow = el.closest('.form-row') || el.parentNode;
+    const prev = parentRow.querySelector('.field-error');
+    if (prev) parentRow.removeChild(prev);
+}
+
+function clearAllFieldErrors(formEl) {
+    const els = (formEl || document).querySelectorAll('.field-error');
+    els.forEach(e => e.remove());
+    (formEl || document).querySelectorAll('.input-error').forEach(i => i.classList.remove('input-error'));
+}
+
 /* ---------------- Render products ----------------
    uses badges: state-active, state-inactive, state-suspended
-   offer badges: offer-yes, offer-no
 */
 function renderProducts(list) {
     productsBody.innerHTML = '';
@@ -175,7 +214,7 @@ function renderProducts(list) {
         tr.appendChild(tdName);
 
         // Price
-        const tdPrice = document.createElement('td'); tdPrice.textContent = formatPrice(prod.price); tr.appendChild(tdPrice);
+        const tdPrice = document.createElement('td'); tdPrice.textContent = formatPriceDisplay(prod.price); tr.appendChild(tdPrice);
 
         // Offer badge
         const tdOffer = document.createElement('td');
@@ -194,7 +233,7 @@ function renderProducts(list) {
         // Offer price
         const tdOfferPrice = document.createElement('td');
         const op = prod.onOffer ? calculateOfferPrice(prod.price, prod.discount) : null;
-        tdOfferPrice.textContent = op ? formatPrice(op) : '-';
+        tdOfferPrice.textContent = op !== null ? formatPriceDisplay(op) : '-';
         tr.appendChild(tdOfferPrice);
 
         // Stock
@@ -339,10 +378,11 @@ function clearModalPreviews() {
     slideTrack.innerHTML = '';
     imagePreviewSlider.classList.add('hidden');
     imagePreviewSlider.setAttribute('aria-hidden', 'true');
+    clearAllFieldErrors(productForm);
 }
 
 function openAddModal() {
-    if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
+    if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
     isEditing = false;
     editingId = null;
     currentSavedImageObjs = [];
@@ -352,6 +392,8 @@ function openAddModal() {
     productIdField.value = '';
     skuField.value = '';
     skuField.placeholder = 'Se generará al seleccionar categoría';
+    // ensure price input accepts formatted value
+    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
     productModal.classList.remove('hidden');
     productModal.setAttribute('aria-hidden', 'false');
 }
@@ -361,14 +403,14 @@ async function openEditProduct(id) {
         const snap = await getDoc(doc(db, 'product', id));
         if (!snap.exists()) { showToast('Producto no encontrado'); return; }
         const prod = { id: snap.id, ...snap.data() };
-        if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
+        if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
         isEditing = true;
         editingId = id;
         modalTitle.textContent = 'Editar Producto';
         productIdField.value = id;
         nameField.value = prod.name || '';
         descriptionField.value = prod.description || '';
-        priceField.value = prod.price || 0;
+        priceField.value = prod.price !== undefined && prod.price !== null ? formatPriceDisplay(prod.price) : '';
         categoryField.value = prod.category || '';
         statusField.value = prod.status || 'Activo';
         onOfferField.checked = !!prod.onOffer;
@@ -388,6 +430,8 @@ async function openEditProduct(id) {
         currentPreviewFiles = [];
         currentPreviewUrls = [];
         showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
+        // ensure price input accepts formatted value
+        if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
         productModal.classList.remove('hidden');
         productModal.setAttribute('aria-hidden', 'false');
     } catch (err) {
@@ -439,6 +483,34 @@ imageDropZone.addEventListener('drop', (e) => {
     const urls = dtFiles.map(f => URL.createObjectURL(f));
     currentPreviewUrls = currentPreviewUrls.concat(urls);
     showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
+});
+
+/* ---------- Price input formatting behavior ---------- */
+// Force price input to text to allow formatted display even if HTML has type=number
+if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
+
+priceField?.addEventListener('focus', () => {
+    // remove formatting for editing
+    const raw = priceField.value;
+    if (!raw) { priceField.value = ''; return; }
+    const n = parseFormattedPrice(raw);
+    if (!Number.isNaN(n)) {
+        priceField.value = n.toString();
+    }
+    clearFieldError(priceField);
+});
+priceField?.addEventListener('blur', () => {
+    const raw = priceField.value;
+    if (raw === '' || raw === null) {
+        priceField.value = '';
+        return;
+    }
+    const n = parseFormattedPrice(String(raw));
+    if (!Number.isNaN(n)) {
+        priceField.value = formatPriceDisplay(n);
+    } else {
+        setFieldError(priceField, 'Precio inválido');
+    }
 });
 
 /* ---------- Upload images helper with optimization & resumable progress ---------- */
@@ -494,12 +566,25 @@ async function uploadImagesToProductFolder(productId, files = [], baseName = 'pr
 async function addProduct(data, files) {
     if (!currentUser) { showToast('No autenticado'); return; }
     if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
-    const minImages = 4;
+
+    clearAllFieldErrors(productForm);
+
+    // Validation: required fields (inline)
+    if (!data.name || !data.name.trim()) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
+    if (!data.description || !data.description.trim()) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
+    const priceParsed = parseFormattedPrice(String(data.price));
+    if (Number.isNaN(priceParsed) || priceParsed <= 0) { setFieldError(priceField, 'Precio inválido (debe ser mayor que 0)'); priceField.focus(); return; }
+    if (!data.category) { setFieldError(categoryField, 'La categoría es requerida'); categoryField.focus(); return; }
+    if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
+    if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
+
+    const minImages = 1;
     const filesCount = (files && files.length) ? files.length : 0;
     if (filesCount < minImages) {
-        showToast(`Se requieren al menos ${minImages} imágenes (seleccionadas: ${filesCount})`, 5000);
+        setFieldError(imageFileField, `Se requiere al menos ${minImages} imagen(es) (seleccionadas: ${filesCount})`);
         return;
     }
+
     try {
         const slug = (data.name || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         const newDoc = {
@@ -507,7 +592,7 @@ async function addProduct(data, files) {
             name_lower: data.name.toLowerCase(),
             slug,
             description: data.description || '',
-            price: Number(data.price) || 0,
+            price: priceParsed,
             currency: 'CLP',
             category: data.category || '',
             status: data.status || 'Activo',
@@ -534,6 +619,8 @@ async function addProduct(data, files) {
         const paths = uploaded.map(x => x.path);
 
         await updateDoc(doc(db, 'product', productId), { imageUrls: urls, imagePaths: paths, updatedAt: serverTimestamp() });
+
+        clearAllFieldErrors(productForm);
         showToast('Producto agregado con éxito');
     } catch (err) {
         removeModalProgressUI();
@@ -545,6 +632,18 @@ async function addProduct(data, files) {
 async function updateProduct(id, data, newFiles = []) {
     if (!currentUser) { showToast('No autenticado'); return; }
     if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
+
+    clearAllFieldErrors(productForm);
+
+    // Validation: required fields (inline)
+    if (!data.name || !data.name.trim()) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
+    if (!data.description || !data.description.trim()) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
+    const priceParsed = parseFormattedPrice(String(data.price));
+    if (Number.isNaN(priceParsed) || priceParsed <= 0) { setFieldError(priceField, 'Precio inválido (debe ser mayor que 0)'); priceField.focus(); return; }
+    if (!data.category) { setFieldError(categoryField, 'La categoría es requerida'); categoryField.focus(); return; }
+    if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
+    if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
+
     try {
         const prodRef = doc(db, 'product', id);
         const snap = await getDoc(prodRef);
@@ -578,13 +677,19 @@ async function updateProduct(id, data, newFiles = []) {
             pendingDeletePaths = [];
         }
 
+        // Ensure at least one image remains (either saved or newly uploaded)
+        if ((!imageUrls || !imageUrls.length)) {
+            setFieldError(imageFileField, 'Debe tener al menos una imagen asociada al producto');
+            return;
+        }
+
         const slug = (data.name || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         await updateDoc(prodRef, {
             name: data.name,
             name_lower: data.name.toLowerCase(),
             slug,
             description: data.description || '',
-            price: Number(data.price) || 0,
+            price: priceParsed,
             category: data.category || '',
             status: data.status || 'Activo',
             onOffer: !!data.onOffer,
@@ -595,6 +700,8 @@ async function updateProduct(id, data, newFiles = []) {
             sku: data.sku || '',
             updatedAt: serverTimestamp()
         });
+
+        clearAllFieldErrors(productForm);
         showToast('Producto actualizado');
     } catch (err) {
         removeModalProgressUI();
@@ -690,33 +797,65 @@ searchInput.addEventListener('input', applyFilters);
 stateFilter.addEventListener('change', applyFilters);
 offerFilter.addEventListener('change', applyFilters);
 
+// Clear field errors on input
+[nameField, descriptionField, priceField, categoryField, statusField, discountField, stockField, imageFileField].forEach(el => {
+    if (!el) return;
+    el.addEventListener('input', () => clearFieldError(el));
+});
+
+/* ---------- Form submit ---------- */
 productForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = nameField.value.trim();
-    const price = priceField.value;
+    clearAllFieldErrors(productForm);
+
+    const name = (nameField.value || '').trim();
+    const priceRaw = priceField.value;
     const category = categoryField.value;
-    if (!name) { showToast('El nombre es requerido'); return; }
-    if (!category) { showToast('La categoría es requerida'); return; }
-    if (price === '' || Number(price) < 0) { showToast('Precio inválido'); return; }
+    const description = (descriptionField.value || '').trim();
+    const status = statusField.value;
+    const stockVal = stockField.value;
+
+    // Basic validation (inline)
+    if (!name) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
+    if (!description) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
+    const priceParsed = parseFormattedPrice(String(priceRaw));
+    if (Number.isNaN(priceParsed) || priceParsed <= 0) { setFieldError(priceField, 'Precio inválido (debe ser mayor que 0)'); priceField.focus(); return; }
+    if (!category) { setFieldError(categoryField, 'La categoría es requerida'); categoryField.focus(); return; }
+    if (!status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
+    if (stockVal === '' || Number.isNaN(Number(stockVal)) || Number(stockVal) < 0 || !Number.isInteger(Number(stockVal))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
 
     if (!isEditing && !skuField.value) skuField.value = generateSKUForCategory(category);
 
     const data = {
         name,
-        description: descriptionField.value.trim(),
-        price: Number(price),
+        description,
+        price: priceParsed,
         category,
-        status: statusField.value,
+        status,
         onOffer: onOfferField.checked,
         discount: Number(discountField.value) || 0,
         stock: Number(stockField.value) || 0,
         sku: skuField.value || ''
     };
 
+    // Determine files to upload: for adding must have at least one preview file; for editing accept existing saved images
     const filesToUpload = currentPreviewFiles.slice();
 
-    if (isEditing && editingId) await updateProduct(editingId, data, filesToUpload);
-    else await addProduct(data, filesToUpload);
+    if (isEditing && editingId) {
+        // if editing and no saved images and no new files -> error
+        const hasSaved = currentSavedImageObjs && currentSavedImageObjs.length;
+        if (!hasSaved && (!filesToUpload || !filesToUpload.length)) {
+            setFieldError(imageFileField, 'Debe agregar al menos una imagen');
+            return;
+        }
+        await updateProduct(editingId, data, filesToUpload);
+    } else {
+        if (!filesToUpload || !filesToUpload.length) {
+            setFieldError(imageFileField, 'Se requiere al menos 1 imagen');
+            return;
+        }
+        await addProduct(data, filesToUpload);
+    }
 
     productModal.classList.add('hidden');
     productModal.setAttribute('aria-hidden', 'true');

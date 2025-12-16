@@ -94,27 +94,10 @@ table#ordersTable {
   align-items: center;
 }
 
-/* Modal overrides */
-.modal {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.35);
-  z-index: 60;
-}
 .hidden {
   display: none;
 }
-.modal-content {
-  width: 820px;
-  max-width: 96%;
-  background: white;
-  border-radius: 10px;
-  padding: 0 18px 18px;
-  border: 1px solid var(--border);
-}
+
 .modal-header {
   display: flex;
   align-items: center;

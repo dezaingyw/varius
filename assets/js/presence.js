@@ -16,7 +16,7 @@
  *
  * Eventos custom emitidos:
  * - window.dispatchEvent(new CustomEvent('presence:me', { detail: { uid, state } }))
- *     -> cuando cambia el estado del usuario autenticado (online|offline)
+ *     -> cuando cambia el estado del usuario autenticado (online|offline|error)
  *
  * - window.dispatchEvent(new CustomEvent('presence:list', { detail: { users: [{uid, state, last_changed}, ...] } }))
  *     -> envía la lista completa de estados leída desde Realtime Database (útil para ver "lista de usuarios activos")
@@ -117,6 +117,8 @@ async function startPresenceForUser(user) {
 
             } catch (err) {
                 console.error('Error setting presence online:', err);
+                // Notify UI of error so it can reflect problem
+                emitEvent('presence:me', { uid, state: 'error' });
             }
         } else {
             // Not connected: set local UI to offline (onDisconnect will handle server-side change)
@@ -183,9 +185,21 @@ onAuthStateChanged(auth, (user) => {
 });
 
 /* Expose a small API on window so other modules can set user offline before signOut */
-window.__presence = {
-    setUserOfflineImmediately
-};
+window.__presence = window.__presence || {};
+window.__presence.setUserOfflineImmediately = setUserOfflineImmediately;
+
+/* Integración UI:
+   Import dinámico del módulo presence-ui.js para crear/actualizar la "pill" visual.
+   Usamos import() dinámico para evitar problemas con orden de carga en distintos bundlers/entornos.
+*/
+(async () => {
+    try {
+        await import('./presence-ui.js');
+    } catch (err) {
+        // No crítico: si no existe el UI, la app sigue emitiendo eventos y otros módulos pueden escucharlos.
+        console.debug('No se pudo cargar presence-ui.js (opcional):', err);
+    }
+})();
 
 export {
     startPresenceForUser,

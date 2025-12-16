@@ -32,7 +32,8 @@ function whenReady(selector, timeout = 3000) {
 
 function getInitials(name) {
     if (!name) return '';
-    const parts = name.trim().split(/\s+/);
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '';
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
@@ -91,7 +92,7 @@ async function init() {
     window.addEventListener('popstate', markActiveNav);
     window.addEventListener('hashchange', markActiveNav);
 
-    // --- Presence indicator ---
+    // --- Presence indicator (re-use topSearch .presence-indicator or create if missing) ---
     function ensurePresenceIndicator() {
         if (!topSearch) return null;
         let indicator = topSearch.querySelector('.presence-indicator');
@@ -101,6 +102,7 @@ async function init() {
             indicator.setAttribute('aria-hidden', 'true');
             indicator.setAttribute('title', 'Estado de conexión: offline');
             topSearch.appendChild(indicator);
+
             const label = document.createElement('span');
             label.className = 'presence-label';
             label.textContent = 'offline';
@@ -186,55 +188,48 @@ async function init() {
         console.debug('sidebar-user: logout button not found yet');
     }
 
-    // --- Overlay that only dims the rest of the page (not the sidebar) ---
-    function createOverlay() {
-        let ov = document.querySelector('.sidebar-overlay');
-        if (!ov) {
-            ov = document.createElement('div');
-            ov.className = 'sidebar-overlay';
-            ov.setAttribute('aria-hidden', 'true');
-            // base style, we'll position relative to sidebar on open()
-            ov.style.position = 'fixed';
-            ov.style.top = '0';
-            ov.style.bottom = '0';
-            ov.style.right = '0';
-            ov.style.background = 'rgba(0,0,0,0.24)'; // ligero atenuado
-            ov.style.transition = 'opacity 160ms ease, left 160ms ease';
-            ov.style.opacity = '0';
-            ov.style.pointerEvents = 'none';
-            // default z-index lower than sidebar; will adjust on open()
-            ov.style.zIndex = '60';
-            document.body.appendChild(ov);
-        }
+    // Overlay handling: reuse existing .overlay (created by loader) when possible
+    function getOverlayElement() {
+        // prefer the global overlay injected by the loader (sibling of nav-toggle)
+        let ov = document.querySelector('.overlay');
+        if (ov) return ov;
+        // fallback: create a lightweight overlay (keeps behavior)
+        ov = document.createElement('div');
+        ov.className = 'overlay';
+        ov.setAttribute('aria-hidden', 'true');
+        ov.style.position = 'fixed';
+        ov.style.inset = '0';
+        ov.style.background = 'rgba(0,0,0,0.24)';
+        ov.style.display = 'none';
+        ov.style.opacity = '0';
+        ov.style.pointerEvents = 'none';
+        ov.style.zIndex = '70';
+        document.body.appendChild(ov);
         return ov;
     }
 
+    const overlay = getOverlayElement();
     const navToggle = document.getElementById('nav-toggle');
     const hamburgerButtons = Array.from(document.querySelectorAll('.hamburger, .hamburger-box, [data-sidebar-toggle]'));
-    const overlay = createOverlay();
 
-    // Ensure sidebar is above overlay
-    sidebarEl.style.zIndex = sidebarEl.style.zIndex || '80';
-    // If sidebar has no positioning, make it relative so z-index works
+    // Ensure sidebar z-index is above overlay
+    const desiredSidebarZ = 80;
+    sidebarEl.style.zIndex = sidebarEl.style.zIndex || String(desiredSidebarZ);
     const sidebarComputed = getComputedStyle(sidebarEl).position;
-    if (sidebarComputed === 'static' || !sidebarComputed) {
+    if (!sidebarComputed || sidebarComputed === 'static') {
         sidebarEl.style.position = 'relative';
     }
 
-    // Position overlay to the right of the sidebar so the sidebar area stays visible/clear
     function positionOverlay() {
         const rect = sidebarEl.getBoundingClientRect();
-        // If sidebar covers full width (mobile), we want the overlay to cover nothing or cover behind sidebar
         if (rect.width >= window.innerWidth - 2) {
-            // Fullscreen sidebar (mobile) -> overlay covers whole viewport but stays under sidebar (no darkening of sidebar)
             overlay.style.left = '0';
             overlay.style.right = '0';
-            overlay.style.zIndex = '70'; // below sidebar's z (sidebar z 80)
+            overlay.style.zIndex = String(desiredSidebarZ - 10);
         } else {
-            // Desktop/tablet: overlay starts at the right edge of the sidebar
             overlay.style.left = Math.max(rect.right, 0) + 'px';
             overlay.style.right = '0';
-            overlay.style.zIndex = '70';
+            overlay.style.zIndex = String(desiredSidebarZ - 10);
         }
     }
 
@@ -242,9 +237,9 @@ async function init() {
         sidebarEl.classList.add('open');
         sidebarEl.setAttribute('aria-hidden', 'false');
         positionOverlay();
-        overlay.style.opacity = '1';
-        overlay.style.pointerEvents = 'auto';
-        overlay.setAttribute('aria-hidden', 'false');
+        overlay.style.display = '';
+        // allow fade-in via CSS transition if present
+        requestAnimationFrame(() => { overlay.style.opacity = '1'; overlay.style.pointerEvents = 'auto'; overlay.setAttribute('aria-hidden', 'false'); });
         if (navToggle && !navToggle.checked) navToggle.checked = true;
     }
 
@@ -255,6 +250,8 @@ async function init() {
         overlay.style.pointerEvents = 'none';
         overlay.setAttribute('aria-hidden', 'true');
         if (navToggle && navToggle.checked) navToggle.checked = false;
+        // hide after transition
+        setTimeout(() => { if (!navToggle || !navToggle.checked) overlay.style.display = 'none'; }, 220);
     }
 
     // sync checkbox -> sidebar
@@ -265,13 +262,13 @@ async function init() {
         });
     }
 
-    // hamburger buttons: if no checkbox present, control manually; otherwise allow native label behavior
+    // hamburger fallback for pages without checkbox
     hamburgerButtons.forEach(h => {
         h.addEventListener('click', (e) => {
             if (!navToggle) {
                 e.preventDefault();
                 if (sidebarEl.classList.contains('open')) closeSidebar(); else openSidebar();
-            } // else let checkbox handle toggling (change listener will sync overlay)
+            } // else allow checkbox to handle it
         });
     });
 
@@ -325,7 +322,7 @@ async function init() {
 
     function setSidebar(name, role) {
         if (nameEl) nameEl.textContent = name || 'Invitado';
-        if (metaEl) metaEl.textContent = role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
+        if (metaEl) metaEl.textContent = role ? (role.charAt(0).toUpperCase() + role.slice(1)) : '';
         if (avatarEl) avatarEl.textContent = getInitials(name || role || 'U');
     }
 

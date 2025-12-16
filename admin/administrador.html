@@ -4,8 +4,11 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Dashboard — Pedidos (Administración)</title>
+    <title>Dashboard — Administración</title>
+
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+
     <link rel="stylesheet" href="assets/css/orders.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
 </head>
@@ -29,6 +32,12 @@
         <div class="top-search">
             <label for="q" class="sr-only">Buscar</label>
             <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
+
+            <!-- dentro de .topbar, a la derecha del contenido -->
+            <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
+                <span class="dot"></span>
+                <span class="label">Desconectado</span>
+            </div>
         </div>
     </header>
 
@@ -394,8 +403,8 @@
     <!-- Toast container -->
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-        <script type="module" src="../assets/js/sidebar-loader.js"></script>
-
+    <script type="module" src="../assets/js/sidebar-loader.js"></script>
+    <script type="module" src="../assets/js/admin-product-quick.js"></script>
     <script type="module">
         import { logout } from '../assets/js/auth.js';
         const logoutBtn = document.getElementById('logout');
