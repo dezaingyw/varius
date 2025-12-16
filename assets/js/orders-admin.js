@@ -350,6 +350,7 @@ function subscribeOrders() {
 
 /* ---------------- Render page (client-side pagination) ---------------- */
 function renderPage() {
+  // ------- Tabla tradicional para escritorio -------
   const perPageVal = perPageSelect ? perPageSelect.value : '10';
   const per = perPageVal === 'all' ? ordersCache.length || 1e9 : parseInt(perPageVal, 10) || 10;
   const total = ordersCache.length;
@@ -366,30 +367,44 @@ function renderPage() {
 
     // ID
     const tdId = document.createElement('td');
+    tdId.setAttribute('data-label', 'ID');
     tdId.textContent = o.id;
     tr.appendChild(tdId);
 
     // Cliente
     const tdCust = document.createElement('td');
+    tdCust.setAttribute('data-label', 'Cliente');
     const name = o.customerData && (o.customerData.name || o.customerData.Customname || o.customerData.email || '');
     const email = o.customerData && (o.customerData.email || '');
     const phone = o.customerData && (o.customerData.phone || '');
     tdCust.innerHTML = `<div style="font-weight:600">${escapeHtml(name || email || '—')}</div><div style="color:#6b7280;font-size:12px">${escapeHtml(email || phone || '')}</div>`;
     tr.appendChild(tdCust);
 
-    // Items
+    // Producto
     const tdItems = document.createElement('td');
+    tdItems.setAttribute('data-label', 'Producto');
     const itemsCount = Array.isArray(o.items) ? o.items.length : 0;
     tdItems.textContent = `${itemsCount} item(s)`;
     tr.appendChild(tdItems);
 
+    // Fecha
+    const tdDate = document.createElement('td');
+    tdDate.setAttribute('data-label', 'Fecha');
+    if (o.orderDate) {
+      const d = o.orderDate.toDate ? o.orderDate.toDate() : new Date(o.orderDate);
+      tdDate.textContent = d.toLocaleString();
+    } else tdDate.textContent = '—';
+    tr.appendChild(tdDate);
+
     // Total
     const tdTotal = document.createElement('td');
+    tdTotal.setAttribute('data-label', 'Total');
     tdTotal.textContent = o.total ? formatCurrency(o.total, o.currency || 'USD') : '—';
     tr.appendChild(tdTotal);
 
-    // Pago
+    // Estado Pago
     const tdPay = document.createElement('td');
+    tdPay.setAttribute('data-label', 'Pago');
     const payStatus = o.paymentStatus || 'pending';
     const payBadge = document.createElement('span');
     payBadge.className = `badge ${payStatus === 'paid' || payStatus === 'pagado' ? 'paid' : 'pending'}`;
@@ -397,8 +412,9 @@ function renderPage() {
     tdPay.appendChild(payBadge);
     tr.appendChild(tdPay);
 
-    // Envío
+    // Estado Envío
     const tdShip = document.createElement('td');
+    tdShip.setAttribute('data-label', 'Envío');
     const shipStatus = o.shippingStatus || 'pending';
     const shipBadge = document.createElement('span');
     shipBadge.className = `badge ${shipStatus === 'delivered' || shipStatus === 'entregado' ? 'delivered' : shipStatus === 'in_transit' || shipStatus === 'enviado' ? 'in_transit' : ''}`;
@@ -408,61 +424,42 @@ function renderPage() {
 
     // Vendedor
     const tdSeller = document.createElement('td');
+    tdSeller.setAttribute('data-label', 'Vendedor');
     tdSeller.textContent = (o.assignedSellerName || o.assignedSeller || '—');
     tr.appendChild(tdSeller);
 
     // Motorizado
     const tdMotor = document.createElement('td');
+    tdMotor.setAttribute('data-label', 'Motorizado');
     tdMotor.textContent = (o.assignedMotorName || o.assignedMotor || '—');
     tr.appendChild(tdMotor);
 
-    // Fecha
-    const tdDate = document.createElement('td');
-    if (o.orderDate) {
-      const d = o.orderDate.toDate ? o.orderDate.toDate() : new Date(o.orderDate);
-      tdDate.textContent = d.toLocaleString();
-    } else tdDate.textContent = '—';
-    tr.appendChild(tdDate);
-
     // Acciones
     const tdActions = document.createElement('td');
+    tdActions.setAttribute('data-label', 'Acciones');
     tdActions.className = 'actions';
 
-    // View
+    // Botón Ver
     const viewBtn = document.createElement('button');
     viewBtn.className = 'btn-small btn-view';
     viewBtn.setAttribute('aria-label', 'Ver pedido');
-    viewBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
-                          <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
-                          <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
-                        </svg>`;
+    viewBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#24784a" stroke-width="2"
+      viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8Z" stroke="#24784a"/><circle cx="8" cy="8" r="3" stroke="#24784a"/></svg>`;
     viewBtn.addEventListener('click', () => openOrderModal(o));
     tdActions.appendChild(viewBtn);
 
-    // Assign (admin, vendedor)
+    // Botón Asignar
     if (currentUserRole === 'administrador' || currentUserRole === 'vendedor') {
       const assignBtn = document.createElement('button');
       assignBtn.className = 'btn-small btn-assign';
-      assignBtn.setAttribute('aria-label', 'Asignar');
-      assignBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-add" viewBox="0 0 16 16">
-                              <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/>
-                              <path d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918Q8.844 9.002 8 9c-5 0-6 3-6 4s1 1 1 1z"/>
-                            </svg>`;
+      assignBtn.setAttribute('aria-label', 'Asignar pedido');
+      assignBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#2477b8" stroke-width="2"
+      viewBox="0 0 16 16"><circle cx="8" cy="5" r="3"/><path d="M8 13c3 0 5.5-1.5 5.5-3v-1A1.5 1.5 0 0 0 12 7.5H4A1.5 1.5 0 0 0 1.5 9V10c0 1.5 2.5 3 5.5 3Z"/></svg>`;
       assignBtn.addEventListener('click', () => openOrderModal(o, { openAssign: true }));
       tdActions.appendChild(assignBtn);
     }
 
-    // Confirm delivery (motorizado)
-    if (currentUserRole === 'motorizado' && (o.assignedMotor === currentUser.uid || o.assignedMotorName === currentUser.email) && o.shippingStatus !== 'delivered' && o.shippingStatus !== 'entregado') {
-      const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'btn-small btn-confirm';
-      confirmBtn.setAttribute('aria-label', 'Confirmar entrega');
-      confirmBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.929a1 1 0 0 1 1.415 0l.171.171a1 1 0 0 1 0 1.415l-8 8a1 1 0 0 1-1.414 0L4.5 11.414l1.415-1.415 1.758 1.758 7.812-7.828z"/></svg>`;
-      confirmBtn.addEventListener('click', () => openOrderModal(o, { delivery: true }));
-      tdActions.appendChild(confirmBtn);
-    }
-
-    // History button (icon instead of text)
+    // Botón historial de cliente
     const custId = (o.customerData && (o.customerData.uid || o.customerId || o.customerData.customerId)) || '';
     const custName = (o.customerData && (o.customerData.name || o.customerData.Customname || '')) || '';
     const custPhone = (o.customerData && (o.customerData.phone || '')) || '';
@@ -470,9 +467,8 @@ function renderPage() {
     histBtn.className = 'btn-small btn-history';
     histBtn.setAttribute('title', 'Historial del cliente');
     histBtn.setAttribute('aria-label', 'Historial del cliente');
-    histBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-folder2-open" viewBox="0 0 16 16">
-                            <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v.64c.57.265.94.876.856 1.546l-.64 5.124A2.5 2.5 0 0 1 12.733 15H3.266a2.5 2.5 0 0 1-2.481-2.19l-.64-5.124A1.5 1.5 0 0 1 1 6.14zM2 6h12v-.5a.5.5 0 0 0-.5-.5H9c-.964 0-1.71-.629-2.174-1.154C6.374 3.334 5.82 3 5.264 3H2.5a.5.5 0 0 0-.5.5zm-.367 1a.5.5 0 0 0-.496.562l.64 5.124A1.5 1.5 0 0 0 3.266 14h9.468a1.5 1.5 0 0 0 1.489-1.314l.64-5.124A.5.5 0 0 0 14.367 7z"/>
-                        </svg>`;
+    histBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#7a4b3b" stroke-width="2"
+      viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 7h12"/></svg>`;
     histBtn.addEventListener('click', () => {
       const params = new URLSearchParams();
       if (custId) params.set('customerId', custId);
@@ -489,6 +485,97 @@ function renderPage() {
   pageInfo.textContent = `${currentPage} / ${Math.max(1, Math.ceil(ordersCache.length / (perPageSelect.value === 'all' ? ordersCache.length : parseInt(perPageSelect.value, 10) || 10)))} (${ordersCache.length} pedidos)`;
   prevPageBtn.disabled = currentPage <= 1;
   nextPageBtn.disabled = currentPage >= Math.ceil(ordersCache.length / (perPageSelect.value === 'all' ? ordersCache.length : parseInt(perPageSelect.value, 10) || 10));
+
+  // ------- Cards para mobile -------
+  const ordersCards = document.getElementById('ordersCards');
+  if (ordersCards) {
+    ordersCards.innerHTML = '';
+    pageItems.forEach(order => {
+      const customer = order.customerData || {};
+      const avatarUrl = "assets/img/user-default.png";
+      const itemsList =
+        (order.items || [])
+          .map(it => `<li>• ${escapeHtml(it.name)} x${it.quantity || 1}</li>`).join('');
+      const isDelivered =
+        (order.shippingStatus === 'delivered' || order.shippingStatus === 'entregado');
+      const isPaid =
+        (order.paymentStatus === 'paid' || order.paymentStatus === 'pagado');
+
+      const card = document.createElement('div');
+      card.className = 'order-card';
+
+      card.innerHTML = `
+        <div class="order-card-header">
+          <div class="order-card-avatar">
+            <img src="${avatarUrl}" alt="">
+          </div>
+          <div class="order-card-cust">
+            <div class="order-card-cust-name">${escapeHtml(customer.name || customer.Customname || customer.email || '—')}</div>
+            <div class="order-card-cust-address">${escapeHtml(customer.address || customer.addressLine1 || '')}</div>
+          </div>
+          <div class="order-card-info">
+            <div class="order-card-total">$${formatCurrency(order.total || 0, order.currency || 'USD')}</div>
+            <div class="order-card-code">#${order.id}</div>
+          </div>
+        </div>
+        <div class="order-card-prod">
+          <div><b>Productos:</b></div>
+          <div class="order-card-prod-list">
+            <div style="text-align:right;">${order.items?.length || 0} items</div>
+            <ul>${itemsList}</ul>
+          </div>
+        </div>
+        <div class="order-card-status">
+          <span>Envío:</span>
+          <span class="badge ${isDelivered ? 'badge-ok' : 'badge-pending'}">${capitalize(order.shippingStatus || 'Pendiente')}</span>
+          <span>Pago:</span>
+          <span class="badge ${isPaid ? 'badge-ok' : 'badge-pending'}">${capitalize(order.paymentStatus || 'Pendiente')}</span>
+        </div>
+        <div class="order-card-actions"></div>
+      `;
+      ordersCards.appendChild(card);
+
+      // --------- Botones mobile (idénticos visualmente a los de la tabla) ---------
+      const actionsDiv = card.querySelector('.order-card-actions');
+      actionsDiv.innerHTML = generateOrderCardButtonsMobile(order);
+      // Listeners
+      actionsDiv.querySelector('.btn-view').onclick = () => openOrderModal(order);
+      const assignBtn = actionsDiv.querySelector('.btn-assign');
+      if (assignBtn) assignBtn.onclick = () => openOrderModal(order, { openAssign: true });
+      actionsDiv.querySelector('.btn-history').onclick = () => {
+        const params = new URLSearchParams();
+        const custId = (customer.uid || order.customerId || customer.customerId) || '';
+        const custName = (customer.name || customer.Customname || '') || '';
+        const custPhone = (customer.phone || '') || '';
+        if (custId) params.set('customerId', custId);
+        if (custName) params.set('name', custName);
+        if (custPhone) params.set('phone', custPhone);
+        window.location.href = `history.html?${params.toString()}`;
+      };
+    });
+  }
+}
+
+// ----- Botones para los cards en mobile -----
+function generateOrderCardButtonsMobile(order) {
+  let buttons = '';
+  buttons += `<button class="btn-small btn-view" aria-label="Ver pedido" type="button" style="width:10%;margin-bottom:7px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#24784a" stroke-width="2"
+      viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8Z" stroke="#24784a"/><circle cx="8" cy="8" r="3" stroke="#24784a"/></svg>
+  </button>`;
+
+  if (currentUserRole === 'administrador' || currentUserRole === 'vendedor') {
+    buttons += `<button class="btn-small btn-assign" aria-label="Asignar pedido" type="button" style="width:10%;margin-bottom:7px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#2477b8" stroke-width="2"
+        viewBox="0 0 16 16"><circle cx="8" cy="5" r="3"/><path d="M8 13c3 0 5.5-1.5 5.5-3v-1A1.5 1.5 0 0 0 12 7.5H4A1.5 1.5 0 0 0 1.5 9V10c0 1.5 2.5 3 5.5 3Z"/></svg>
+    </button>`;
+  }
+
+  buttons += `<button class="btn-small btn-history" aria-label="Historial del cliente" type="button" style="width:10%;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#7a4b3b" stroke-width="2"
+      viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 7h12"/></svg>
+  </button>`;
+  return buttons;
 }
 
 /* ---------------- Ownership helper ---------------- */
@@ -502,7 +589,6 @@ function isOrderOwnedByCurrentUser(order) {
   if (order.assignedSellerName && order.assignedSellerName === currentUser.email) return true;
   return false;
 }
-
 /* ---------------- Modal: open / close / assign / confirm delivery ---------------- */
 // openOrderModal ahora es async para resolver imágenes antes de renderizar
 async function openOrderModal(order, opts = {}) {
