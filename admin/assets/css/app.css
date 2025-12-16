@@ -1,3 +1,14 @@
+/* app.css — Consolidated stylesheet (REPLACEMENT)
+   - Este archivo reemplaza y unifica reglas de app.css, style.css y orders.css
+   - Incluye correcciones responsive para KPI cards, filtros, quick-actions y botones.
+   - Sustituye las múltiples hojas que usabas; carga sólo esta en administrador.html:
+       <link rel="stylesheet" href="../assets/css/app.css">
+   - Mantiene compatibilidad con las clases existentes.
+*/
+
+/* =========================
+   0. VARIABLES & RESET
+   ========================= */
 :root {
   --bg: #f6f7f8;
   --card-bg: #ffffff;
@@ -1119,6 +1130,92 @@ table#ordersTable tbody td {
   }
 }
 
+/* Responsive armonía y compacto en modales para móviles "423px" */
+@media (max-width: 430px) {
+
+  .modal-content {
+    padding: 8px !important;
+    border-radius: 9px !important;
+    font-size: 13px !important;
+    width: 98vw !important;
+    max-width: 98vw !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+  .modal-header, .modal-footer {
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+  }
+  .modal-header h2, 
+  .modal-header h3,
+  .modal-body h3 {
+    font-size: 14px !important;
+    margin-bottom: 8px !important;
+    margin-top: 0 !important;
+    line-height: 1.2;
+  }
+  .modal-body, .modal-footer {
+    padding: 4px 0 !important;
+  }
+  .modal-body label {
+    font-size: 12px !important;
+    margin-bottom: 2px !important;
+    margin-top: 5px !important;
+  }
+  .modal-body input,
+  .modal-body select,
+  .modal-body textarea {
+    font-size: 13px !important;
+    padding: 7px 7px !important;
+    border-radius: 7px !important;
+    margin-bottom: 5px !important;
+  }
+  #orderDetails,
+  #lowStockList {
+    font-size: 13px !important;
+  }
+
+  /* Ajustar tabla dentro de modales para evitar scroll vertical */
+  .modal-body table {
+    font-size: 12px !important;
+    margin: 4px 0;
+  }
+  .modal-body th, .modal-body td {
+    padding: 5px 6px !important;
+    font-size: 12px !important;
+    line-height: 1.1;
+  }
+  .modal-body .product-mini img {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+  }
+
+  /* Centrar boton y hacerlo compacto */
+  .modal-body button.btn-apply,
+  .modal-body .btn-primary,
+  #saveAssignBtn {
+    width: 100% !important;
+    padding: 9px 0 !important;
+    font-size: 13px !important;
+    border-radius: 7px !important;
+    margin-top: 6px !important;
+  }
+  /* Compactar selects */
+  .modal-body select {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  /* Para evitar scroll lateral en tablas, permitiendo scroll-x */
+  .modal-body .table-card,
+  .modal-body table {
+    overflow-x: auto !important;
+    display: block !important;
+  }
+}
+
 /* =========================
    12. ORDERS PAGE SPECIFICS & POLISH
    ========================= */
@@ -1272,3 +1369,11 @@ table#ordersTable tbody td {
 .card {
   box-sizing: border-box;
 }
+
+/* ====================================================
+   NOTES & USAGE
+   - Replace previous app.css / style.css / orders.css with this single file.
+   - Keep presence.css separate only if you prefer; this file includes presence styles.
+   - If you used specific overrides in other files, remove them to avoid duplication.
+   - If any page relied on very specific CSS selectors from old files, they should still work.
+   ==================================================== */
