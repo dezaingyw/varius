@@ -559,19 +559,19 @@ function renderPage() {
 // ----- Botones para los cards en mobile -----
 function generateOrderCardButtonsMobile(order) {
   let buttons = '';
-  buttons += `<button class="btn-small btn-view" aria-label="Ver pedido" type="button" style="width:10%;margin-bottom:7px;">
+  buttons += `<button class="btn-small btn-view" aria-label="Ver pedido" type="button" style="height:15%; width:10%;margin-bottom:7px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#24784a" stroke-width="2"
       viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8Z" stroke="#24784a"/><circle cx="8" cy="8" r="3" stroke="#24784a"/></svg>
   </button>`;
 
   if (currentUserRole === 'administrador' || currentUserRole === 'vendedor') {
-    buttons += `<button class="btn-small btn-assign" aria-label="Asignar pedido" type="button" style="width:10%;margin-bottom:7px;">
+    buttons += `<button class="btn-small btn-assign" aria-label="Asignar pedido" type="button" style="height:15%; width:10%;margin-bottom:7px;">
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#2477b8" stroke-width="2"
         viewBox="0 0 16 16"><circle cx="8" cy="5" r="3"/><path d="M8 13c3 0 5.5-1.5 5.5-3v-1A1.5 1.5 0 0 0 12 7.5H4A1.5 1.5 0 0 0 1.5 9V10c0 1.5 2.5 3 5.5 3Z"/></svg>
     </button>`;
   }
 
-  buttons += `<button class="btn-small btn-history" aria-label="Historial del cliente" type="button" style="width:10%;">
+  buttons += `<button class="btn-small btn-history" aria-label="Historial del cliente" type="button" style="height:15%; width:10%; margin-bottom:7px;">
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#7a4b3b" stroke-width="2"
       viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 7h12"/></svg>
   </button>`;
