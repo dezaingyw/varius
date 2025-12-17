@@ -849,14 +849,29 @@ function geoClearError() {
     const geoErr = document.getElementById('geo_error');
     if (geoErr) { geoErr.textContent = ''; geoErr.style.display = 'none'; }
 }
+function hideGeoButton() {
+    const geoBtn = document.getElementById('btnGeoLocation');
+    if (geoBtn) geoBtn.style.display = 'none';
+}
+
+function showGeoButton() {
+    const geoBtn = document.getElementById('btnGeoLocation');
+    if (geoBtn) geoBtn.style.display = '';
+}
 function geoSetFields(address, lat, lng) {
     const addr = document.getElementById('cust_address');
     const latf = document.getElementById('cust_lat');
     const lngf = document.getElementById('cust_lng');
-    if (addr) { addr.value = address; addr.disabled = true; }
+    if (addr) {
+        addr.value = address;
+        // No disables! addr.disabled = true; 
+        // Dispatch input event for validation:
+        addr.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     if (latf) latf.value = lat || '';
     if (lngf) lngf.value = lng || '';
     geoClearError();
+    hideGeoButton();
 }
 function geoEnableManual() {
     const addr = document.getElementById('cust_address');
@@ -868,13 +883,6 @@ function setupGeolocationButton() {
     const geoBtn = document.getElementById('btnGeoLocation');
     if (!geoBtn) return;
     geoBtn.addEventListener('click', async () => {
-        const addr = document.getElementById('cust_address');
-        // Alterna a manual si estaba deshabilitado
-        if (addr && addr.disabled) {
-            geoEnableManual();
-            geoBtn.textContent = '📍 Ubicación';
-            return;
-        }
         if (!navigator.geolocation) {
             geoError('Tu navegador no soporta geolocalización');
             return;
@@ -886,21 +894,20 @@ function setupGeolocationButton() {
                 navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy:true, timeout: 15000, maximumAge:0 });
             });
             const { latitude, longitude } = position.coords;
-            // Consulta a Google
             const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}&language=es`;
             const resp = await fetch(url);
             const data = await resp.json();
             if (data.status === "OK" && data.results[0]) {
                 geoSetFields(data.results[0].formatted_address, latitude, longitude);
-                geoBtn.textContent = '✏️ Manual';
+                // Oculta el botón de ubicación
+                hideGeoButton();
             } else {
                 geoError('No se pudo traducir tu ubicación a dirección.');
-                geoBtn.textContent = '📍 Ubicación';
             }
         } catch (e) {
             geoError('No se pudo obtener ubicación. Puedes ingresar la dirección manualmente.');
-            geoBtn.textContent = '📍 Ubicación';
         }
+        geoBtn.textContent = '📍 Ubicación';
         geoBtn.disabled = false;
     });
 }
@@ -966,6 +973,16 @@ function validateAddress() {
     if (v.length < 6) { if (err) err.textContent = 'Describe la dirección con más detalle.'; return false; }
     if (err) err.textContent = '';
     return true;
+}
+const addressInput = document.getElementById('cust_address');
+if (addressInput) {
+    addressInput.addEventListener('input', function() {
+        if (!addressInput.value.trim()) {
+            showGeoButton();
+        }
+        // Validar de nuevo para que reaccione el botón de confirmar pedido
+        validateFormAll();
+    });
 }
 function validateFormAll() {
     const ok = validateName() && validatePhone() && validateAddress() && validateEmail() && validateAge();
