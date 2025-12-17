@@ -306,26 +306,37 @@ function renderCartPanel() {
             const div = document.createElement('div');
             div.className = 'cart-item';
             div.innerHTML = `
-              <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}">
-              <div style="flex:1">
-                <div style="font-weight:700">${escapeHtml(it.name)}</div>
-                <div style="color:#94a3b8">${formatCurrency(it.price)} x ${it.quantity} = <strong>${formatCurrency(it.subtotal)}</strong></div>
-                <div style="margin-top:8px" class="qty-controls">
-                  <button class="qty-decr" data-id="${it.productId}" aria-label="Disminuir">−</button>
-                  <input class="qty-input" data-id="${it.productId}" type="number" min="0" max="999" value="${it.quantity}" style="width:60px;padding:6px;border-radius:8px;border:1px solid #e6eef6">
-                  <button class="qty-incr" data-id="${it.productId}" aria-label="Aumentar">+</button>
-                  <button class="btn-secondary remove-item" data-id="${it.productId}" style="margin-left:8px">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            `;
+          <div class="cart-item-product" style="width:100%;text-align:left;">
+            <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" style="display:block;margin:0 0 1rem 0;width:100%;max-width:400px;height:140px;object-fit:cover;border-radius:18px;box-shadow:0 8px 24px #0001;">
+            <div style="font-weight:800;font-size:1.3rem;margin-top:0.6rem;text-align:left;">${escapeHtml(it.name)}</div>
+            <div style="color:#8c99a6;font-size:1.05rem;margin:4px 0 8px 0;text-align:left;">
+              ${formatCurrency(it.price)} x ${it.quantity} = <strong style="color:#222">${formatCurrency(it.subtotal)}</strong>
+            </div>
+            <div class="qty-controls" style="justify-content:flex-start;gap:0.35rem;margin:0.1rem 0 0 0;">
+              <button class="qty-decr" data-id="${it.productId}" aria-label="Disminuir" style="background:#cdb4ff;color:#222;font-weight:700;">−</button>
+              <input class="qty-input" data-id="${it.productId}" type="number" min="0" max="999" value="${it.quantity}" style="width:56px;border-radius:10px;padding:8px 0 8px 0;text-align:center;">
+              <button class="qty-incr" data-id="${it.productId}" aria-label="Aumentar" style="background:#cdb4ff;color:#222;font-weight:700;">+</button>
+              <button class="btn-secondary remove-item" data-id="${it.productId}" style="margin-left:18px;border-radius:9px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+                class="bi bi-trash" viewBox="0 0 16 16">
+                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                </svg>
+              </button>
+              <button class="btn-secondary view-btn" data-id="${it.productId}" style="margin-left:10px;border-radius:9px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+                class="bi bi-eye" viewBox="0 0 16 16">
+                  <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                  <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        `;
             selectedEl.appendChild(div);
         }
 
+        // Eventos controles cantidad
         selectedEl.querySelectorAll('.qty-incr').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const id = e.currentTarget.dataset.id;
@@ -360,6 +371,17 @@ function renderCartPanel() {
                 if (!ok) return;
                 removeItem(id);
                 renderCartPanel();
+            });
+        });
+        // Evento para botón de ver (modal)
+        selectedEl.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const id = e.currentTarget.dataset.id;
+                let p = PRODUCTS_BY_ID.get(id);
+                if (!p) p = await fetchProductByIdOrSlug(id);
+                if (!p) { showToast('Producto no encontrado'); return; }
+                await resolveProductImages(p);
+                openProductModal(p);
             });
         });
     }
@@ -916,14 +938,28 @@ function validateName() {
 function validateEmail() {
     const el = document.getElementById('cust_email');
     const err = document.getElementById('cust_email_err');
-    if (!el) return false;
+    if (!el) return true; // no obligatorio
     const v = el.value.trim();
+    if (!v) { if (err) err.textContent = ''; return true; } // vacío permitido
     const re = /^\S+@\S+\.\S+$/;
-    if (!v) { if (err) err.textContent = 'El correo es obligatorio.'; return false; }
     if (!re.test(v)) { if (err) err.textContent = 'Formato de correo inválido (ejemplo@ejemplo.com).'; return false; }
     if (err) err.textContent = '';
     return true;
 }
+
+function validateAge() {
+    const el = document.getElementById('cust_age');
+    const err = document.getElementById('cust_age_err');
+    if (!el) return true;
+    const v = el.value.trim();
+    if (v && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > 120)) {
+        if (err) err.textContent = 'Edad inválida.';
+        return false;
+    }
+    if (err) err.textContent = '';
+    return true;
+}
+
 function validatePhone() {
     const el = document.getElementById('cust_phone');
     const err = document.getElementById('cust_phone_err');
@@ -954,7 +990,7 @@ function validateAddress() {
     return true;
 }
 function validateFormAll() {
-    const ok = validateName() && validateEmail() && validatePhone() && validateAddress();
+    const ok = validateName() && validatePhone() && validateAddress() && validateEmail() && validateAge();
     const submitBtn = document.getElementById('checkoutSubmitBtn');
     if (submitBtn) submitBtn.disabled = !ok;
     return ok;
@@ -977,6 +1013,7 @@ function submitHandler(e) {
     const name = document.getElementById('cust_name').value.trim();
     const email = document.getElementById('cust_email').value.trim();
     const phoneRaw = document.getElementById('cust_phone').value.trim();
+    const age = document.getElementById('cust_age')?.value.trim() || "";
     const address = document.getElementById('cust_address').value.trim();
     const msg = document.getElementById('checkoutMsg');
 
@@ -989,8 +1026,9 @@ function submitHandler(e) {
         if (msg) { msg.textContent = 'Corrige los campos indicados antes de enviar.'; msg.style.color = '#ef4444'; }
         return;
     }
-    submitOrder({ name, email, phone, address });
+    submitOrder({ name, email, phone, age, address });
 }
+
 
 /* ----------------------
    Global events & interactions
