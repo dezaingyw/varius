@@ -79,24 +79,39 @@
             <div id="cust_name_err" class="field-err" aria-live="polite"></div>
           </div>
 
+
+          <div class="form-row narrow" style="display:flex;gap:10px;">
+            <div style="flex:2">
+              <label for="cust_phone">Teléfono <span class="req">*</span></label>
+              <input id="cust_phone" name="phone" type="text" placeholder="Ej: 04121234567" required autocomplete="tel"
+                inputmode="tel" maxlength="16">
+              <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
+            </div>
+            <div style="flex:1;">
+              <label for="cust_age">Edad</label>
+              <input id="cust_age" name="age" type="number" min="0" max="120" placeholder="Edad">
+              <div id="cust_age_err" class="field-err" aria-live="polite"></div>
+            </div>
+          </div>
+
           <div class="form-row">
-            <label for="cust_email">Correo electrónico <span class="req">*</span></label>
-            <input id="cust_email" name="email" type="email" placeholder="ejemplo@correo.com" required
-              autocomplete="email" inputmode="email">
+            <label for="cust_email">Correo electrónico</label>
+            <input id="cust_email" name="email" type="email" placeholder="ejemplo@correo.com" autocomplete="email"
+              inputmode="email">
             <div id="cust_email_err" class="field-err" aria-live="polite"></div>
           </div>
 
-          <div class="form-row narrow">
-            <label for="cust_phone">Teléfono <span class="req">*</span></label>
-            <input id="cust_phone" name="phone" type="text" placeholder="+581234567890" required autocomplete="tel"
-              inputmode="tel" maxlength="16" value="+58">
-            <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
-          </div>
-
-          <div class="form-row">
+          <div class="form-row" style="position:relative;">
             <label for="cust_address">Dirección completa <span class="req">*</span></label>
+            <button type="button" id="btnGeoLocation" class="btn-secondary"
+              style="margin-bottom:8px;width: fit-content;align-self: flex-start;">
+              📍 Ubicación
+            </button>
             <textarea id="cust_address" name="address" placeholder="Calle, número, colonia, ciudad" required></textarea>
-            <div id="cust_address_err" class="field-err" aria-live="polite"></div>
+            <div id="geo_error" class="field-err" aria-live="polite" style="margin-top:3px;"></div>
+            <!-- Campos ocultos -->
+            <input type="hidden" id="cust_lat" name="lat">
+            <input type="hidden" id="cust_lng" name="lng">
           </div>
 
           <div class="form-actions">
