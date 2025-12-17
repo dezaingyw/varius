@@ -1015,6 +1015,11 @@ function openConfirmInline(msg) {
     ORDER_CONFIRM_SHOWN = true;
 }
 
+// Solución: cerrar modal pedido enviado con el botón
+document.getElementById('closeConfirm')?.addEventListener('click', function() {
+  document.getElementById('orderConfirmInline').classList.add('hidden');
+});
+
 async function submitOrder(customerData) {
     if (!CART.items.length) { showToast('El carrito está vacío'); return; }
     if (IS_SUBMITTING) { console.warn('Intento de envío duplicado bloqueado'); return; }
