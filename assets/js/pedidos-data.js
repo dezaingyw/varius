@@ -295,7 +295,7 @@ function renderCartPanel() {
             div.className = 'cart-item';
             div.innerHTML = `
           <div class="cart-item-product" style="width:100%;text-align:left;">
-            <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" style="display:block;margin:0 0 1rem 0;width:100%;max-width:400px;height:140px;object-fit:cover;border-radius:18px;box-shadow:0 8px 24px #0001;">
+            <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" style="display:block;margin:0 0 1rem 0;width:100%;max-width:400px;height:140px;object-fit:contain;border-radius:18px;box-shadow:0 8px 24px #0001;">
             <div style="font-weight:700;font-size:1.1rem;margin-top:0.6rem;text-align:left;">${escapeHtml(it.name)}</div>
             <div style="color:#8c99a6;font-size:1.05rem;margin:4px 0 8px 0;text-align:left;">
               ${formatCurrency(it.price)} x ${it.quantity} = <strong style="color:#222">${formatCurrency(it.subtotal)}</strong>
@@ -891,7 +891,7 @@ function setupGeolocationButton() {
         geoBtn.disabled = true;
         try {
             const position = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy:true, timeout: 15000, maximumAge:0 });
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
             });
             const { latitude, longitude } = position.coords;
             const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}&language=es`;
@@ -976,7 +976,7 @@ function validateAddress() {
 }
 const addressInput = document.getElementById('cust_address');
 if (addressInput) {
-    addressInput.addEventListener('input', function() {
+    addressInput.addEventListener('input', function () {
         if (!addressInput.value.trim()) {
             showGeoButton();
         }
@@ -1030,12 +1030,14 @@ function openConfirmInline(msg) {
     modal.classList.remove('hidden');
     modal.scrollIntoView({ behavior: 'smooth', block: 'center' });
     ORDER_CONFIRM_SHOWN = true;
+
+    // Solución: cerrar modal pedido enviado con el botón
+    document.getElementById('closeConfirm')?.addEventListener('click', function () {
+        document.getElementById('orderConfirmInline').classList.add('hidden');
+    });
 }
 
-// Solución: cerrar modal pedido enviado con el botón
-document.getElementById('closeConfirm')?.addEventListener('click', function() {
-  document.getElementById('orderConfirmInline').classList.add('hidden');
-});
+
 
 async function submitOrder(customerData) {
     if (!CART.items.length) { showToast('El carrito está vacío'); return; }
@@ -1102,7 +1104,7 @@ function attachGlobalEvents() {
         phoneEl.addEventListener('blur', validatePhone);
     }
     if (addrEl) { addrEl.addEventListener('input', () => { validateAddress(); validateFormAll(); }); addrEl.addEventListener('blur', validateAddress); }
-    if (ageEl)  { ageEl.addEventListener('input', () => { validateAge(); validateFormAll(); }); ageEl.addEventListener('blur', validateAge); }
+    if (ageEl) { ageEl.addEventListener('input', () => { validateAge(); validateFormAll(); }); ageEl.addEventListener('blur', validateAge); }
 
     const checkoutForm = document.getElementById('checkoutForm');
     if (checkoutForm) {
