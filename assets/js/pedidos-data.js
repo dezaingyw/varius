@@ -295,7 +295,7 @@ function renderCartPanel() {
             div.className = 'cart-item';
             div.innerHTML = `
           <div class="cart-item-product" style="width:100%;text-align:left;">
-            <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" style="display:block;margin:0 0 1rem 0;width:100%;max-width:400px;height:140px;object-fit:contain;border-radius:18px;box-shadow:0 8px 24px #0001;">
+            <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" style="display:block;margin:0 0 1rem 0;width:100%;max-width:400px;height:170px;object-fit:contain;border-radius:18px;box-shadow:0 8px 24px #0001;">
             <div style="font-weight:700;font-size:1.1rem;margin-top:0.6rem;text-align:left;">${escapeHtml(it.name)}</div>
             <div style="color:#8c99a6;font-size:1.05rem;margin:4px 0 8px 0;text-align:left;">
               ${formatCurrency(it.price)} x ${it.quantity} = <strong style="color:#222">${formatCurrency(it.subtotal)}</strong>
@@ -1142,3 +1142,4 @@ async function boot() {
 window.addEventListener('load', boot);
 export { };
 // FIN
+
