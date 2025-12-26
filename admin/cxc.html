@@ -51,10 +51,10 @@
             </div>
 
             <div class="cierre-actions">
-                <select id="dateSelect" aria-label="Seleccionar fecha">
-                    <!-- opciones dinámicas -->
-                </select>
-                <button id="calcBtn" class="btn-apply">
+                <!-- Fecha simple -->
+                <input id="dateSelect" type="date" aria-label="Seleccionar fecha" />
+
+                <button id="calcBtn" class="btn-apply" title="Calcular cierre">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="bi bi-calculator" viewBox="0 0 16 16">
                         <path
@@ -63,7 +63,7 @@
                             d="M4 2.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5zm0 4a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm0 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm0 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm0 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm0 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm0 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z" />
                     </svg>
                 </button>
-                <button id="refreshBtn" class="btn-secondary btn-link">
+                <button id="refreshBtn" class="btn-secondary btn-link" title="Refrescar">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z" />
@@ -74,42 +74,42 @@
             </div>
         </section>
 
-        <!-- KPI cards -->
+        <!-- KPI cards (ahora clickables) -->
         <section class="kpis cierre-kpis" aria-label="Indicadores">
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpiTotal" role="button" tabindex="0" aria-pressed="false" title="Ver detalles - Total ventas">
                 <div class="kpi-info">
                     <div class="kpi-title">Total ventas</div>
-                    <div class="kpi-value" id="kpiTotal">$0.00</div>
+                    <div class="kpi-value" id="kpiTotalValue">$0.00</div>
                 </div>
                 <div class="kpi-icon">
                     <div class="icon-square">💲</div>
                 </div>
             </div>
 
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpiOrders" role="button" tabindex="0" title="Ver detalles - Pedidos">
                 <div class="kpi-info">
                     <div class="kpi-title">Pedidos</div>
-                    <div class="kpi-value" id="kpiOrders">0</div>
+                    <div class="kpi-value" id="kpiOrdersValue">0</div>
                 </div>
                 <div class="kpi-icon">
                     <div class="icon-square">🧾</div>
                 </div>
             </div>
 
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpiCash" role="button" tabindex="0" title="Ver detalles - Efectivo">
                 <div class="kpi-info">
                     <div class="kpi-title">Efectivo</div>
-                    <div class="kpi-value" id="kpiCash">$0.00</div>
+                    <div class="kpi-value" id="kpiCashValue">$0.00</div>
                 </div>
                 <div class="kpi-icon">
                     <div class="icon-square">💵</div>
                 </div>
             </div>
 
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpiDigital" role="button" tabindex="0" title="Ver detalles - Digital">
                 <div class="kpi-info">
                     <div class="kpi-title">Digital</div>
-                    <div class="kpi-value" id="kpiDigital">$0.00</div>
+                    <div class="kpi-value" id="kpiDigitalValue">$0.00</div>
                 </div>
                 <div class="kpi-icon">
                     <div class="icon-square">💳</div>
@@ -144,11 +144,47 @@
                 </div>
             </div>
         </section>
+
+        <!-- Range search for stored closures -->
+        <section class="card range-card" style="margin-top:16px;">
+            <h3>Buscar cierres por rango de fechas</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <label style="display:flex;flex-direction:column;">
+                    Desde
+                    <input id="rangeFrom" type="date" />
+                </label>
+                <label style="display:flex;flex-direction:column;">
+                    Hasta
+                    <input id="rangeTo" type="date" />
+                </label>
+                <div style="display:flex;align-items:flex-end;gap:8px;">
+                    <button id="rangeSearchBtn" class="btn-apply">Buscar cierres</button>
+                    <button id="clearRangeBtn" class="btn-secondary">Limpiar</button>
+                </div>
+            </div>
+
+            <div id="closuresList" style="margin-top:12px;"></div>
+        </section>
+
         <div style="display:flex;justify-content:flex-end;margin-top:18px;">
             <button id="closeDayBtn" class="action-primary" title="Cerrar caja del día">Cerrar caja del día</button>
         </div>
         <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
     </main>
+
+    <!-- Detail modal (reutilizable) -->
+    <div id="detailModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal-content modal-small" role="document">
+            <div class="modal-header">
+                <h2 id="detailModalTitle">Detalles</h2>
+                <button id="closeDetailModal" class="close-btn" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="detailModalBody">
+                <!-- Lista de elementos -->
+                <div id="detailList" class="table-scroll"></div>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="../assets/js/cierre-admin.js"></script>
     <script type="module" src="../assets/js/sidebar-loader.js"></script>
