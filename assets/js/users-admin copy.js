@@ -1,17 +1,18 @@
 // assets/js/users-admin.js
-// Cambios principales:
-// - No usar createUserWithEmailAndPassword en el cliente.
-// - Llamar a una Cloud Function HTTPS 'createUser' que usa Admin SDK.
-// - Validaciones estrictas de email y teléfono (configurable).
-// - Toggle "ojo" para mostrar/ocultar contraseña solo cuando ambos campos tienen texto.
-// - Mejora en verificación de duplicados usando campo emailLower en Firestore.
-// - Ajustado: teléfono ahora permite entre 9 y 10 dígitos (ej. 4144723636 => 10 dígitos).
+// Actualizado:
+// - Verificación de emails/teléfonos duplicados usando consultas a Firestore (no solo cache local).
+// - Mantiene filtros y paginado; searchInput, roleFilter, statusFilter, perPageSelect.
+// - Mejora UI: iconos en acciones, inputs estilizados (CSS en usuarios.html).
+//
+// NOTA: Requiere importar `where` en las queries.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {
     getAuth,
-    onAuthStateChanged
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
     getFirestore,
@@ -32,16 +33,7 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Configurables
-const CREATE_USER_FUNCTION_URL = 'https://us-central1-varius-7de76.cloudfunctions.net/createUser'; // ajusta si tu región/nombre difiere
-
-// ------------------
-// Teléfono: permitir entre MIN y MAX dígitos (ej: 9 o 10)
-// ------------------
-const PHONE_MIN_DIGITS = 9;
-const PHONE_MAX_DIGITS = 10;
-
-// DOM elementos de filtros y paginado (igual que antes)
+// DOM elementos de filtros y paginado
 const openAddBtn = document.getElementById('openAddBtn');
 const userModal = document.getElementById('userModal');
 const closeModalBtn = document.getElementById('closeModal');
@@ -96,52 +88,7 @@ function statusClass(status) {
     }
 }
 
-// -----------------------------
-// Validaciones en JS (vanilla)
-// -----------------------------
-
-// Email regex: más estricto, evita dominios con sufijos no alfabéticos (ej: ".com1" o ".com!")
-const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-
-// Normaliza teléfono (solo dígitos)
-function normalizePhone(p) {
-    return (p || '').replace(/\D/g, '');
-}
-
-// Comprueba formato de teléfono con cantidad permitida de dígitos (entre min y max)
-function isPhoneFormatValid(phone) {
-    if (!phone) return false;
-    const len = phone.length;
-    return len >= PHONE_MIN_DIGITS && len <= PHONE_MAX_DIGITS;
-}
-
-// Revisa Firestore si email ya existe (usa campo emailLower para evitar problemas de case-sensitivity)
-async function isEmailTaken(email, excludeId = null) {
-    if (!email) return false;
-    const emailLower = email.toLowerCase();
-    const q = query(collection(db, 'users'), where('emailLower', '==', emailLower));
-    const snap = await getDocs(q);
-    for (const d of snap.docs) {
-        if (d.id !== excludeId) return true;
-    }
-    return false;
-}
-
-// Revisa Firestore si teléfono existe (campo phone normalizado)
-async function isPhoneTaken(phone, excludeId = null) {
-    if (!phone) return false;
-    const norm = normalizePhone(phone);
-    const q = query(collection(db, 'users'), where('phone', '==', norm));
-    const snap = await getDocs(q);
-    for (const d of snap.docs) {
-        if (d.id !== excludeId) return true;
-    }
-    return false;
-}
-
-// -----------------------------
-// Carga inicial de usuarios
-// -----------------------------
+// Load users from Firestore (cache for rendering & filtering)
 async function loadUsers() {
     try {
         const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
@@ -154,7 +101,34 @@ async function loadUsers() {
     }
 }
 
-// Filtering & pagination (igual que antes, se mantiene)
+// Firestore duplicate checks (robustos):
+// - isEmailTaken: consulta a Firestore buscando coincidencias exactas en campo email.
+//   Consideración: Firestore es case-sensitive. Si tus correos se guardan en distintos casos,
+//   lo ideal es normalizar (guardar emailLower) para consultas. Aquí intentamos con email tal cual y con lowercase.
+async function isEmailTaken(email, excludeId = null) {
+    if (!email) return false;
+    const emailVariants = Array.from(new Set([email, email.toLowerCase()]));
+    for (const e of emailVariants) {
+        const q = query(collection(db, 'users'), where('email', '==', e));
+        const snap = await getDocs(q);
+        for (const d of snap.docs) {
+            if (d.id !== excludeId) return true;
+        }
+    }
+    return false;
+}
+
+async function isPhoneTaken(phone, excludeId = null) {
+    if (!phone) return false;
+    const q = query(collection(db, 'users'), where('phone', '==', phone));
+    const snap = await getDocs(q);
+    for (const d of snap.docs) {
+        if (d.id !== excludeId) return true;
+    }
+    return false;
+}
+
+// Filtering & pagination
 function applyFiltersAndRender() {
     const q = (searchInput?.value || '').toLowerCase();
     const r = roleFilter?.value || '';
@@ -221,16 +195,16 @@ function renderTable() {
         const tdActions = document.createElement('td');
         tdActions.innerHTML = `
             <div class="actions">
-                <button class="btn-small btn-assign" data-id="${u.id}" title="Editar" aria-label="Editar">
+                <button class="icon-btn btn-edit" data-id="${u.id}" title="Editar" aria-label="Editar">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
-                        <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
-                        <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+                    <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                    <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
                     </svg>
                 </button>
-                <button class="btn-small btn-suspender" data-id="${u.id}" title="Suspender" aria-label="Suspender">
+                <button class="icon-btn btn-suspender" data-id="${u.id}" title="Suspender" aria-label="Suspender">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
                     </svg>
                 </button>
             </div>
@@ -254,7 +228,7 @@ function renderTable() {
         });
     });
 
-    usersBody.querySelectorAll('.btn-suspender').forEach(btn => {
+    usersBody.querySelectorAll('.btn-suspend').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.currentTarget.getAttribute('data-id');
             if (!confirm('¿Suspender usuario? Esto marcará su estado como "Suspendido".')) return;
@@ -270,9 +244,7 @@ function renderTable() {
     });
 }
 
-// -----------------------------
-// Modal helpers y validación UI
-// -----------------------------
+// Modal helpers and validation
 function openModal(mode = 'add', data = null) {
     const titleEl = document.getElementById('modalTitle');
     const userIdEl = document.getElementById('userId');
@@ -302,16 +274,11 @@ function closeModal() {
 function validateForm(values, isEdit = false) {
     let ok = true;
     if (!values.name || !values.name.trim()) { document.getElementById('u_name_alert').textContent = 'El nombre es requerido.'; ok = false; } else document.getElementById('u_name_alert').textContent = '';
-
-    if (!values.email || !EMAIL_REGEX.test(values.email)) { document.getElementById('u_email_alert').textContent = 'Correo inválido.'; ok = false; } else document.getElementById('u_email_alert').textContent = '';
-
-    if (values.phone && !isPhoneFormatValid(normalizePhone(values.phone))) {
-        document.getElementById('u_phone_alert').textContent = `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos (ej. 4144723636).`; ok = false;
-    } else document.getElementById('u_phone_alert').textContent = '';
+    if (!values.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) { document.getElementById('u_email_alert').textContent = 'Correo inválido.'; ok = false; } else document.getElementById('u_email_alert').textContent = '';
+    if (values.phone && !/^\d{6,15}$/.test(values.phone)) { document.getElementById('u_phone_alert').textContent = 'Teléfono debe tener 6-15 dígitos o estar vacío.'; ok = false; } else document.getElementById('u_phone_alert').textContent = '';
 
     if (!values.role) { ok = false; showToast('Selecciona un rol.'); }
 
-    // Contraseña: si es creación o si se ingresó nueva en edición, validar requisitos
     if (!isEdit || (values.password || values.confirm)) {
         const pw = values.password || '';
         const confirm = values.confirm || '';
@@ -331,74 +298,13 @@ function validateForm(values, isEdit = false) {
     return ok;
 }
 
-// -----------------------------
-// Toggle de visibilidad de password (solo cuando ambos fields tienen texto)
-// -----------------------------
-const pwdInput = document.getElementById('u_password');
-const pwdConfirmInput = document.getElementById('u_password_confirm');
-
-let pwdToggle = null;
-let pwdConfirmToggle = null;
-
-function createToggleBtn() {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'icon-btn small pwd-toggle';
-    btn.setAttribute('aria-pressed', 'false');
-    btn.textContent = '👁️';
-    btn.style.marginLeft = '8px';
-    btn.style.padding = '4px';
-    btn.style.fontSize = '14px';
-    return btn;
-}
-
-function showPasswordTogglesIfNeeded() {
-    const bothHaveText = (pwdInput.value && pwdInput.value.length > 0) && (pwdConfirmInput.value && pwdConfirmInput.value.length > 0);
-    if (bothHaveText) {
-        if (!pwdToggle) {
-            pwdToggle = createToggleBtn();
-            pwdToggle.addEventListener('click', () => {
-                const isPwd = pwdInput.type === 'password';
-                pwdInput.type = isPwd ? 'text' : 'password';
-                pwdToggle.textContent = isPwd ? '🙈' : '👁️';
-                pwdToggle.setAttribute('aria-pressed', String(!isPwd));
-            });
-            pwdInput.parentNode.appendChild(pwdToggle);
-        }
-        if (!pwdConfirmToggle) {
-            pwdConfirmToggle = createToggleBtn();
-            pwdConfirmToggle.addEventListener('click', () => {
-                const isPwd = pwdConfirmInput.type === 'password';
-                pwdConfirmInput.type = isPwd ? 'text' : 'password';
-                pwdConfirmToggle.textContent = isPwd ? '🙈' : '👁️';
-                pwdConfirmToggle.setAttribute('aria-pressed', String(!isPwd));
-            });
-            pwdConfirmInput.parentNode.appendChild(pwdConfirmToggle);
-        }
-    } else {
-        // remover si existen
-        if (pwdToggle) { pwdToggle.remove(); pwdToggle = null; }
-        if (pwdConfirmToggle) { pwdConfirmToggle.remove(); pwdConfirmToggle = null; }
-        pwdInput.type = 'password';
-        pwdConfirmInput.type = 'password';
-    }
-}
-
-if (pwdInput && pwdConfirmInput) {
-    pwdInput.addEventListener('input', showPasswordTogglesIfNeeded);
-    pwdConfirmInput.addEventListener('input', showPasswordTogglesIfNeeded);
-}
-
-// -----------------------------
-// submit del form: ahora llama a Cloud Function segura
-// -----------------------------
+// form submit (uses Firestore queries to check duplicates)
 userForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const userId = document.getElementById('userId').value;
     const name = document.getElementById('u_name').value.trim();
     const email = document.getElementById('u_email').value.trim();
-    const phoneRaw = (document.getElementById('u_phone').value || '');
-    const phone = normalizePhone(phoneRaw);
+    const phone = (document.getElementById('u_phone').value || '').replace(/\D/g, '').trim();
     const role = document.getElementById('u_role').value;
     const status = document.getElementById('u_status').value;
     const password = document.getElementById('u_password').value;
@@ -408,7 +314,7 @@ userForm?.addEventListener('submit', async (e) => {
     const isEdit = !!userId;
     if (!validateForm(values, isEdit)) return;
 
-    // Client-side duplicate checks (Firestore)
+    // Check duplicates using Firestore queries
     try {
         const emailTaken = await isEmailTaken(email, isEdit ? userId : null);
         if (emailTaken) {
@@ -430,51 +336,27 @@ userForm?.addEventListener('submit', async (e) => {
 
     try {
         if (!isEdit) {
-            // --- CREAR USUARIO sin cambiar la sesión actual ---
-            // 1) Pedimos ID token del admin actual para que la Cloud Function verifique permisos.
-            const idToken = await auth.currentUser.getIdToken(/* forceRefresh */ true);
-
-            // 2) Llamada a la Cloud Function createUser (Admin SDK)
-            const res = await fetch(CREATE_USER_FUNCTION_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + idToken
-                },
-                body: JSON.stringify({
-                    name,
-                    email,
-                    phone, // phone = solo dígitos; backend intentará convertir a E.164 si es necesario
-                    role,
-                    status,
-                    password // enviar la contraseña al backend para crear en Auth (solo vía HTTPS y TLS)
-                })
+            const cred = await createUserWithEmailAndPassword(auth, email, password);
+            const uid = cred.user.uid;
+            await setDoc(doc(db, 'users', uid), {
+                name, email, phone, role, status: status || 'Activo', createdAt: serverTimestamp(), createdBy: auth.currentUser?.uid || null
             });
-
-            const result = await res.json();
-            if (!res.ok) {
-                const errMsg = result && result.error ? result.error : 'Error creando usuario.';
-                showToast(errMsg);
-                console.error('createUser error:', result);
-                return;
-            }
-
             showToast('Usuario creado correctamente.');
         } else {
-            // actualización local: guardamos campos editables en Firestore
-            await updateDoc(doc(db, 'users', userId), { name, phone, role, status, updatedAt: serverTimestamp() });
+            await updateDoc(doc(db, 'users', userId), { name, phone, role, status });
             if (password) {
-                // Si admin quiere que el usuario cambie su contraseña, enviar email de restablecimiento es mejor (backend)
+                await sendPasswordResetEmail(auth, email);
                 showToast('Datos actualizados. Email para restablecer contraseña enviado.');
-            } else {
-                showToast('Usuario actualizado.');
-            }
+            } else showToast('Usuario actualizado.');
         }
-
         closeModal();
         await loadUsers();
     } catch (err) {
         console.error('Error saving user', err);
+        if (err && err.code === 'auth/email-already-in-use') {
+            document.getElementById('u_email_alert').textContent = 'El correo ya está registrado en Auth.';
+            return;
+        }
         showToast('Error guardando usuario. Revisa consola.');
     }
 });
@@ -487,7 +369,7 @@ userModal?.addEventListener('click', (e) => { if (e.target === userModal) closeM
 
 // phone input digits-only
 const phoneInput = document.getElementById('u_phone');
-if (phoneInput) phoneInput.addEventListener('input', (e) => { e.target.value = normalizePhone(e.target.value); document.getElementById('u_phone_alert').textContent = ''; });
+if (phoneInput) phoneInput.addEventListener('input', (e) => { e.target.value = (e.target.value || '').replace(/\D/g, ''); document.getElementById('u_phone_alert').textContent = ''; });
 
 // Filters & pagination events
 applyFiltersBtn?.addEventListener('click', () => applyFiltersAndRender());

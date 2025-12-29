@@ -139,7 +139,7 @@
 
         /* Modal input improvements */
         .modal .modal-content {
-            max-width: 540px;
+            max-width: 720px; /* made wider to fit two columns */
             width: 95%;
             padding: 16px;
             border-radius: 12px;
@@ -150,6 +150,7 @@
             display: flex;
             flex-direction: column;
             gap: 6px;
+            position: relative; /* allow absolute children if needed */
         }
 
         .modal-form input[type="text"],
@@ -245,7 +246,63 @@
             table#usersTable tbody td:nth-child(3) {
                 display: none;
             }
+
+            /* stack modal columns on small screens */
+            .two-col {
+                flex-direction: column;
+            }
         }
+
+        /* ---------- New form layout styles ---------- */
+        .two-col {
+            display: flex;
+            gap: 12px;
+        }
+        .two-col .form-row {
+            flex: 1;
+            margin-bottom: 0; /* we control spacing on children */
+        }
+
+        /* wrapper for input + inline toggle button */
+        .input-with-toggle {
+            position: relative;
+        }
+
+        /* make room for toggle icon inside input */
+        .input-with-toggle input {
+            padding-right: 44px; /* space for the eye button */
+        }
+
+        .input-with-toggle .pwd-toggle {
+            position: absolute;
+            right: 70px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 0;
+            background: #ddcbfb;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #374151;
+            border-radius: 6px;
+        }
+        .input-with-toggle .pwd-toggle:focus {
+            outline: none;
+            box-shadow: 0 4px 12px rgba(43,110,246,0.12);
+        }
+
+        /* smaller icon-only buttons used elsewhere */
+        .icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* ---------- end new styles ---------- */
+
     </style>
 </head>
 
@@ -388,7 +445,7 @@
                         <div id="u_phone_alert" class="input-alert"></div>
                     </div>
 
-                    <div style="display:flex; gap:12px;">
+                    <div style="display:flex; gap:12px; margin-bottom:12px;">
                         <div style="flex:1;">
                             <label for="u_role">Rol <span class="required">*</span></label>
                             <select id="u_role" required>
@@ -408,19 +465,27 @@
                         </div>
                     </div>
 
-                    <div class="form-row">
-                        <label for="u_password">Nueva contraseña <span class="required">*</span></label>
-                        <input id="u_password" type="password" minlength="6" maxlength="8"
-                            placeholder="6 a 8 caracteres" />
-                        <div id="u_password_alert" class="input-alert"></div>
-                    </div>
+                    <!-- ---------- Two-column password row ---------- -->
+                    <div class="two-col" style="margin-bottom:12px;">
+                        <div class="form-row">
+                            <label for="u_password">Nueva contraseña <span class="required">*</span></label>
+                            <div class="input-with-toggle">
+                                <input id="u_password" type="password" minlength="6" maxlength="8" placeholder="6 a 8 caracteres" />
+                                <!-- toggle button inserted dynamically by JS -->
+                            </div>
+                            <div id="u_password_alert" class="input-alert"></div>
+                        </div>
 
-                    <div class="form-row">
-                        <label for="u_password_confirm">Confirmar contraseña <span class="required">*</span></label>
-                        <input id="u_password_confirm" type="password" minlength="6" maxlength="8"
-                            placeholder="Repite la contraseña" />
-                        <div id="u_password_confirm_alert" class="input-alert"></div>
+                        <div class="form-row">
+                            <label for="u_password_confirm">Confirmar contraseña <span class="required">*</span></label>
+                            <div class="input-with-toggle">
+                                <input id="u_password_confirm" type="password" minlength="6" maxlength="8" placeholder="Repite la contraseña" />
+                                <!-- toggle button inserted dynamically by JS -->
+                            </div>
+                            <div id="u_password_confirm_alert" class="input-alert"></div>
+                        </div>
                     </div>
+                    <!-- ---------- end two-column password row ---------- -->
 
                     <div style="font-size:13px;color:#6b7280;margin-top:-6px;margin-bottom:6px;">
                         La contraseña debe tener 6 a 8 caracteres e incluir: <strong>mayúscula</strong>,
@@ -428,7 +493,7 @@
                     </div>
 
                     <div class="form-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
-                        <button type="submit" class="btn-primary">Guardar</button>
+                        <button type="submit" class="btn-add">Guardar</button>
                         <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
                     </div>
                 </form>
