@@ -23,7 +23,7 @@
 
 body {
     margin: 0;
-    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--bg);
     color: #111827;
     -webkit-font-smoothing: antialiased;

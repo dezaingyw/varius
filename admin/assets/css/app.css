@@ -22,7 +22,7 @@
     --success: #16a34a;
     --danger: #ef4444;
     --info: #06b6d4;
-    --warning: #f59e0b;
+    --warning: #fad697;
     --shadow-soft: 0 8px 24px rgba(11, 15, 34, 0.06);
     --shadow-subtle: 0 4px 12px rgba(11, 15, 34, 0.04);
     --radius: 12px;
@@ -50,8 +50,7 @@ body {
 
 body {
     margin: 0;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-        Roboto, "Helvetica Neue", Arial;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(180deg, var(--bg), #ffffff);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
@@ -625,8 +624,8 @@ body.is-admin .admin-only {
     border-radius: 999px;
     font-size: 12px;
     font-weight: 700;
-    background: var(--badge-bg);
-    color: var(--muted);
+    background: var(--warning);
+    color: #634919;
 }
 
 .state-badge.state-active {
@@ -1468,9 +1467,21 @@ table#ordersTable tbody td {
     border: 1px solid rgba(16, 185, 129, 0.08);
 }
 
+.badge.asignado {
+    background: #f6ecfd;
+    color: #8615d1;
+    border: 1px solid rgba(16, 185, 129, 0.08);
+}
+
 .badge.pending {
     background: #fff7ed;
     color: #c2410c;
+    border: 1px solid rgba(245, 158, 11, 0.06);
+}
+
+.badge.suspendido {
+    background: #ffeded;
+    color: #d82121;
     border: 1px solid rgba(245, 158, 11, 0.06);
 }
 
@@ -1481,9 +1492,9 @@ table#ordersTable tbody td {
 }
 
 .badge.delivered {
-    background: #f1f5f9;
-    color: #0f172a;
-    border: 1px solid rgba(15, 23, 42, 0.03);
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid rgba(59, 130, 246, 0.06);
 }
 
 /* Small product / customer card */
@@ -1539,6 +1550,12 @@ table#ordersTable tbody td {
     background: linear-gradient(180deg, #fff8f3, #fff2ea);
     color: #7a4b3b;
     border-color: rgba(245, 158, 11, 0.04);
+}
+
+.btn-suspender {
+    background: linear-gradient(180deg, #fff3f3, #ffeaea);
+    color: #7a3b3b;
+    border-color: rgba(245, 11, 11, 0.04);
 }
 
 /* Hover behaviour */

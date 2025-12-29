@@ -12,7 +12,7 @@ function injectStyles() {
 .custom-bank-select {
   position: relative;
   width: 100%;
-  font-family: inherit;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 14px;
 }
 .custom-bank-trigger {

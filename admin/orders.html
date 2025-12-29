@@ -5,7 +5,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Gestión de Pedidos — Varius</title>
-    <!-- Usa tus estilos globales y el nuevo específico para orders -->
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="assets/css/orders.css">
@@ -31,7 +30,6 @@
             <label for="q" class="sr-only">Buscar</label>
             <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
 
-            <!-- dentro de .topbar, a la derecha del contenido -->
             <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
                 <span class="dot"></span>
                 <span class="label">Desconectado</span>
@@ -41,193 +39,189 @@
 
     <div id="app-sidebar"></div>
 
-
     <main class="main">
-        <section class="table-wrap card">
-            <div class="table-header">
-                <h3>Gestión de Pedidos</h3>
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <button id="refreshBtn" class="btn-apply">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                            class="bi bi-arrow-repeat" viewBox="0 0 16 16">
-                            <path
-                                d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9" />
-                            <path fill-rule="evenodd"
-                                d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z" />
-                        </svg>
-                        Actualizar
-                    </button>
+        <!-- Filters -->
+        <section class="card filters-card" aria-label="Filtros">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+                <div class="filter-field" style="min-width:220px;">
+                    <label for="filter-status">Estado del Pedido</label>
+                    <select id="filter-status">
+                        <option value="">Todos</option>
+                        <option value="pendiente">Pendiente</option>
+                        <option value="asignado">Asignado</option>
+                        <option value="en camino">En camino</option>
+                        <option value="entregado">Entregado</option>
+                        <option value="cancelado">Cancelado</option>
+                        <option value="suspendido">Suspendido</option>
+                    </select>
                 </div>
-            </div>
 
-            <div class="table-scroll">
-                <div class="container">
-                    <!-- Filtros -->
-                    <section class="filters-card">
-                        <div class="filters-grid">
-                            <div class="filter-field">
-                                <label for="searchInput">Buscar (ID / nombre / correo)</label>
-                                <input id="searchInput" type="text" placeholder="Buscar..." />
-                            </div>
+                <div class="filter-field" style="min-width:220px;">
+                    <label for="filter-date">Fecha</label>
+                    <input id="filter-date" type="date" />
+                </div>
 
-                            <div class="filter-field">
-                                <label for="paymentFilter">Estado de pago</label>
-                                <select id="paymentFilter">
-                                    <option value="">Todos</option>
-                                    <option value="pending">Pendiente</option>
-                                    <option value="paid">Pagado</option>
-                                    <option value="refunded">Reembolsado</option>
-                                    <option value="partial">Parcial</option>
-                                </select>
-                            </div>
+                <div class="filter-field" style="flex:1;min-width:200px;">
+                    <label for="filter-client">Buscar cliente</label>
+                    <input id="filter-client" type="search" placeholder="Buscar cliente..." />
+                </div>
 
-                            <div class="filter-field">
-                                <label for="shippingFilter">Estado de envío</label>
-                                <select id="shippingFilter">
-                                    <option value="">Todos</option>
-                                    <option value="pending">Pendiente</option>
-                                    <option value="assigned">Asignado</option>
-                                    <option value="in_transit">En tránsito</option>
-                                    <option value="delivered">Entregado</option>
-                                    <option value="cancelled">Cancelado</option>
-                                </select>
-                            </div>
-
-                            <div class="filter-field">
-                                <label for="sellerFilter">Vendedor</label>
-                                <select id="sellerFilter">
-                                    <option value="">Todos</option>
-                                    <!-- poblado dinámicamente -->
-                                </select>
-                            </div>
-
-                            <div class="filter-field">
-                                <label for="motorFilter">Motorizado</label>
-                                <select id="motorFilter">
-                                    <option value="">Todos</option>
-                                    <!-- poblado dinámicamente -->
-                                </select>
-                            </div>
-
-                            <div class="filter-field">
-                                <label>Fecha (desde - hasta)</label>
-                                <div style="display:flex;gap:8px;">
-                                    <input id="dateFrom" type="date" />
-                                    <input id="dateTo" type="date" />
-                                </div>
-                            </div>
-
-                            <div class="filter-field" style="align-self:center">
-                                <label for="perPageSelect">Mostrar</label>
-                                <select id="perPageSelect">
-                                    <option value="10">10</option>
-                                    <option value="50">50</option>
-                                    <option value="100">100</option>
-                                    <option value="all">Todos</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="margin-top:12px;display:flex;gap:8px;">
-                            <button id="applyFilters" class="btn-apply">Aplicar filtros</button>
-                            <button id="clearFilters" class="btn-secondary">Limpiar</button>
-                        </div>
-                    </section>
-
-                    <!-- Tabla -->
-                    <section class="table-card" style="margin-top:12px;">
-                        <div class="table-controls"
-                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                            <div>
-                                Página: <span id="pageInfo">1</span>
-                            </div>
-                            <div class="pagination-controls" style="display:flex;gap:8px;align-items:center;">
-                                <button id="prevPage" class="icon-btn">◀</button>
-                                <button id="nextPage" class="icon-btn">▶</button>
-                            </div>
-                        </div>
-
-                        <table id="ordersTable" role="table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Cliente</th>
-                                    <th>Items</th>
-                                    <th>Total</th>
-                                    <th>Pago</th>
-                                    <th>Envío</th>
-                                    <th>Vendedor</th>
-                                    <th>Motorizado</th>
-                                    <th>Fecha</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ordersBody">
-                                <!-- render JS -->
-                            </tbody>
-                        </table>
-                    </section>
+                <div style="display:flex;gap:8px;align-items:end;">
+                    <button id="btnFilter" class="btn-apply">Buscar</button>
+                    <button id="btnClear" class="icon-btn">Limpiar</button>
                 </div>
             </div>
         </section>
 
-        <!-- Modal: Detalle / asignaciones / confirmaciones -->
-        <div id="orderModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
-            <div class="modal-content">
-                <header class="modal-header">
-                    <h2 id="orderModalTitle">Pedido</h2>
-                    <button id="closeOrderModal" class="close-btn" aria-label="Cerrar">&times;</button>
-                </header>
+        <section class="table-wrap card" style="display:flex;gap:16px;">
+            <div style="flex:1;min-width:0;">
+                <div class="table-header">
+                    <h3>Lista de Pedidos</h3>
+                </div>
 
-                <div class="modal-body" style="padding:12px;">
-                    <!-- Contenido dinámico -->
-                    <div id="orderDetails"></div>
+                <div class="table-scroll" id="orders-area">
+                    <!-- Desktop / tablet table -->
+                    <table id="ordersTable" class="orders-table" aria-label="Tabla de pedidos">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Cliente</th>
+                                <th>Fecha</th>
+                                <th>Total</th>
+                                <th>Vendedor</th>
+                                <th>Motorizado</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersTbody">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
 
-                    <!-- Asignaciones (visible a admin y vendedor) -->
-                    <div id="assignSection" style="margin-top:12px;display:none;">
-                        <label>Asignar vendedor</label>
-                        <select id="assignSellerSelect">
-                            <option value="">-- seleccionar --</option>
-                        </select>
-
-                        <label style="margin-top:8px;">Asignar motorizado</label>
-                        <select id="assignMotorSelect">
-                            <option value="">-- seleccionar --</option>
-                        </select>
-
-                        <div style="margin-top:8px;">
-                            <button id="saveAssignBtn" class="btn-apply">Guardar asignaciones</button>
-                        </div>
-                    </div>
-
-                    <!-- Confirmación de entrega (motorizado) -->
-                    <form id="confirmDeliveryForm" class="hidden" style="margin-top:12px;">
-                        <label>Método de pago</label>
-                        <select id="deliveryPaymentMethod">
-                            <option value="pago_movil">Pago móvil</option>
-                            <option value="divisa">Divisa</option>
-                            <option value="efectivo">Efectivo</option>
-                            <option value="otro">Otro</option>
-                        </select>
-
-                        <label style="margin-top:8px;">Observaciones</label>
-                        <textarea id="deliveryObs" rows="3" placeholder="Observaciones..."></textarea>
-
-                        <label style="margin-top:8px;">Comprobante (imagen / PDF, máx 5MB)</label>
-                        <input id="deliveryProof" type="file" accept="image/*,application/pdf" />
-
-                        <div style="margin-top:8px;">
-                            <button id="confirmDeliveryBtn" class="btn-apply" type="button">Confirmar entrega</button>
-                        </div>
-                    </form>
+                    <!-- Mobile: cards -->
+                    <div id="ordersCards" aria-live="polite"></div>
                 </div>
             </div>
-        </div>
+
+            <!-- Chats column -->
+            <aside id="chatColumn" class="card chat-column" style="width:320px;max-width:34%;">
+                <h3>Mensajes de Clientes</h3>
+                <div id="chatList" class="chat-list" role="list">
+                    <!-- Chat list mirrors orders -->
+                </div>
+            </aside>
+        </section>
+
         <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
     </main>
 
+    <!-- View Modal -->
+    <div id="order-view-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-content modal-lg" role="document">
+            <div class="modal-header">
+                <h2 id="view-order-title">Detalle del Pedido</h2>
+                <button class="close-btn" id="view-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="view-order-body">
+                <!-- Injected -->
+            </div>
+            <div class="modal-footer" style="padding:12px 0;text-align:right;">
+                <button id="view-history" class="btn-small btn-history" title="Historial del cliente">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16">
+                        <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/>
+                        <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/>
+                        <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/>
+                    </svg>
+                </button>
+                <button id="view-close-bottom" class="btn-secondary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="order-edit-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="edit-order-title">Editar Pedido</h2>
+                <button class="close-btn" id="edit-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="edit-order-body">
+                <!-- Form -->
+                <form id="edit-order-form">
+                    <div class="form-row">
+                        <label>Cliente</label>
+                        <div id="edit-customer" class="small-muted"></div>
+                    </div>
+
+                    <div class="form-row inline" style="margin-top:8px;">
+                        <div>
+                            <label>Motorizado asignado</label>
+                            <select id="edit-motorizado">
+                                <option value="">-- POR ASIGNAR --</option>
+                                <!-- opciones pobladas por JS (usuarios con role == "motorizado") -->
+                            </select>
+                        </div>
+                        <!-- NOTE: Input libre eliminado según petición -->
+                    </div>
+
+                    <div class="form-row" style="margin-top:8px;">
+                        <label>Comentario (obligatorio si cambia motorizado)</label>
+                        <textarea id="edit-motorizado-comment" rows="3"
+                            placeholder="Justifique el cambio..."></textarea>
+                    </div>
+
+                    <hr style="margin:12px 0;" />
+
+                    <div id="edit-items-area">
+                        <label>Items</label>
+                        <div id="items-list"></div>
+
+                        <!-- Inputs removidos: ahora la adición se realiza desde la lista de productos disponibles -->
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+                        <div>
+                            <span class="small-muted">Total:</span>
+                            <strong id="edit-total">$0.00</strong>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button id="saveEditBtn" class="btn-apply" type="submit">Guardar</button>
+                            <button id="cancelEditBtn" class="btn-secondary" type="button">Cancelar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat modal (used on mobile / floating) -->
+    <div id="chat-modal" class="modal hidden" aria-hidden="true">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2 id="chat-title">Chat</h2>
+                <button class="close-btn" id="chat-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="chat-body">
+                <!-- chat content -->
+                <div id="chat-messages" style="max-height:320px;overflow:auto;margin-bottom:8px;"></div>
+                <div style="display:flex;gap:8px;">
+                    <input id="chat-input" placeholder="Escribe un mensaje..."
+                        style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);" />
+                    <button id="chat-send" class="btn-apply">Enviar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating chat button (mobile) -->
+    <button id="floatingChatBtn" class="icon-btn" aria-label="Abrir chat"
+        style="position:fixed;right:18px;bottom:88px;z-index:1600;background:var(--accent-2);color:#fff;border:none;display:none;">
+        💬
+    </button>
+
     <script type="module" src="../assets/js/sidebar-loader.js"></script>
-    <script type="module" src="../assets/js/orders-admin.js"></script>
+    <script type="module" src="../assets/js/orders.js"></script>
 </body>
 
 </html>

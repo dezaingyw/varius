@@ -26,8 +26,7 @@ html,
 body {
   height: 100%;
   margin: 0;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: var(--bg);
   color: var(--accent);
   -webkit-font-smoothing: antialiased;
