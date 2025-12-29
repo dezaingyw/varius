@@ -284,12 +284,7 @@
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <script type="module" src="../assets/js/sidebar-loader.js"></script>
 
-  <!-- Importo logout para el botón -->
-  <script type="module">
-    import { logout } from '../assets/js/auth.js';
-    const logoutBtn = document.getElementById('logout');
-    if (logoutBtn) logoutBtn.addEventListener('click', async (e) => { e.preventDefault(); await logout(); });
-  </script>
+ 
 
   <!-- Lógica específica para vendedores (filtrado de datos) -->
   <script type="module" src="../assets/js/vendedor-orders.js"></script>

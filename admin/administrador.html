@@ -113,7 +113,7 @@
                     <span>Inventario</span>
                 </button>
 
-                <button class="action-btn" data-action="cierre-caja" onclick="window.location.href='cxc.html'">
+                <button class="action-btn" data-action="cierre-caja" onclick="window.location.href='cierre-caja.html'">
                     <span class="action-icon">🧾</span>
                     <span>Cierre de caja</span>
                 </button>
@@ -401,27 +401,6 @@
 
     <script type="module" src="../assets/js/sidebar-loader.js"></script>
     <script type="module" src="../assets/js/admin-product-quick.js"></script>
-    <script type="module">
-        import { logout } from '../assets/js/auth.js';
-        const logoutBtn = document.getElementById('logout');
-        if (logoutBtn) logoutBtn.addEventListener('click', logout);
-
-        // forward top-bar search (id="q") to internal searchInput to improve UX
-        const q = document.getElementById('q');
-        const searchInput = document.getElementById('searchInput');
-        if (q && searchInput) {
-            q.addEventListener('input', (e) => {
-                searchInput.value = e.target.value;
-            });
-            q.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    // trigger a search by dispatching Enter on the internal input
-                    const ev = new KeyboardEvent('keypress', { key: 'Enter' });
-                    searchInput.dispatchEvent(ev);
-                }
-            });
-        }
-    </script>
 
     <!-- Admin orders manager -->
     <script type="module" src="../assets/js/orders-admin.js"></script>

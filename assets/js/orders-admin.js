@@ -114,6 +114,65 @@ function formatCurrency(amount, currency = 'USD') {
   }
 }
 
+/* ---------------- Traducción de estatus a español ---------------- */
+function translateStatus(raw) {
+  if (raw === undefined || raw === null) return '';
+  const s = String(raw).trim().toLowerCase();
+  const map = {
+    // pagos
+    'paid': 'Pagado',
+    'pagado': 'Pagado',
+    'partial': 'Parcial',
+    'partial_payment': 'Parcial',
+    'pending': 'Pendiente',
+    'pendiente': 'Pendiente',
+    'refunded': 'Reembolsado',
+    'reembolsado': 'Reembolsado',
+    'failed': 'Fallido',
+    'fallido': 'Fallido',
+    // envíos / delivery
+    'delivered': 'Entregado',
+    'entregado': 'Entregado',
+    'in_transit': 'En tránsito',
+    'in transit': 'En tránsito',
+    'in_transit': 'En tránsito',
+    'assigned': 'Asignado',
+    'asignado': 'Asignado',
+    'cancelled': 'Cancelado',
+    'cancelado': 'Cancelado',
+    'sin-asignar': 'Sin asignar',
+    'pending_shipment': 'Pendiente',
+    // estados de pedido genéricos
+    'suspended': 'Suspendido',
+    'suspendido': 'Suspendido',
+    'assigned': 'Asignado'
+  };
+  if (map[s]) return map[s];
+  // fallback: capitalizar la palabra
+  return String(raw).charAt(0).toUpperCase() + String(raw).slice(1);
+}
+
+/* ---------------- Build history URL helper (robusta) ---------------- */
+function buildHistoryUrlFromOrder(o) {
+  try {
+    const od = o || {};
+    // soporta estructura donde cliente está en customerData o customer o campos sueltos
+    const cust = od.customerData || od.customer || {};
+    const custId = cust.uid || od.customerId || cust.customerId || od.customerId || '';
+    const custName = cust.name || cust.Customname || od.customerName || od.customer_name || '';
+    const custPhone = cust.phone || cust.telefono || cust.mobile || od.customerPhone || '';
+    const params = new URLSearchParams();
+    if (custId) params.set('customerId', custId);
+    if (custName) params.set('name', custName);
+    if (custPhone) params.set('phone', custPhone);
+    const q = params.toString();
+    return q ? `history.html?${q}` : 'history.html';
+  } catch (err) {
+    console.warn('buildHistoryUrlFromOrder error', err);
+    return 'history.html';
+  }
+}
+
 /* ---------------- Image resolution caches & helpers (shared with vendedor) ---------------- */
 const urlCache = new Map(); // storagePath or gs:// -> downloadURL
 const productImagesCache = new Map(); // productId -> [urls]
@@ -408,7 +467,8 @@ function renderPage() {
     const payStatus = o.paymentStatus || 'pending';
     const payBadge = document.createElement('span');
     payBadge.className = `badge ${payStatus === 'paid' || payStatus === 'pagado' ? 'paid' : 'pending'}`;
-    payBadge.textContent = capitalize(payStatus);
+    // show status in Spanish
+    payBadge.textContent = translateStatus(payStatus);
     tdPay.appendChild(payBadge);
     tr.appendChild(tdPay);
 
@@ -418,7 +478,7 @@ function renderPage() {
     const shipStatus = o.shippingStatus || 'pending';
     const shipBadge = document.createElement('span');
     shipBadge.className = `badge ${shipStatus === 'delivered' || shipStatus === 'entregado' ? 'delivered' : shipStatus === 'in_transit' || shipStatus === 'enviado' ? 'in_transit' : ''}`;
-    shipBadge.textContent = capitalize(shipStatus);
+    shipBadge.textContent = translateStatus(shipStatus);
     tdShip.appendChild(shipBadge);
     tr.appendChild(tdShip);
 
@@ -470,11 +530,9 @@ function renderPage() {
     histBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#7a4b3b" stroke-width="2"
       viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 7h12"/></svg>`;
     histBtn.addEventListener('click', () => {
-      const params = new URLSearchParams();
-      if (custId) params.set('customerId', custId);
-      if (custName) params.set('name', custName);
-      if (custPhone) params.set('phone', custPhone);
-      window.location.href = `history.html?${params.toString()}`;
+      // use robust helper to build URL
+      const url = buildHistoryUrlFromOrder(o);
+      window.location.href = url;
     });
     tdActions.appendChild(histBtn);
 
@@ -514,7 +572,7 @@ function renderPage() {
             <div class="order-card-cust-address">${escapeHtml(customer.address || customer.addressLine1 || '')}</div>
           </div>
           <div class="order-card-info">
-            <div class="order-card-total">$${formatCurrency(order.total || 0, order.currency || 'USD')}</div>
+            <div class="order-card-total">${formatCurrency(order.total || 0, order.currency || 'USD')}</div>
             <div class="order-card-code">#${order.id}</div>
           </div>
         </div>
@@ -527,9 +585,9 @@ function renderPage() {
         </div>
         <div class="order-card-status">
           <span>Envío:</span>
-          <span class="badge ${isDelivered ? 'badge-ok' : 'badge-pending'}">${capitalize(order.shippingStatus || 'Pendiente')}</span>
+          <span class="badge ${isDelivered ? 'badge-ok' : 'badge-pending'}">${escapeHtml(translateStatus(order.shippingStatus || 'Pendiente'))}</span>
           <span>Pago:</span>
-          <span class="badge ${isPaid ? 'badge-ok' : 'badge-pending'}">${capitalize(order.paymentStatus || 'Pendiente')}</span>
+          <span class="badge ${isPaid ? 'badge-ok' : 'badge-pending'}">${escapeHtml(translateStatus(order.paymentStatus || 'Pendiente'))}</span>
         </div>
         <div class="order-card-actions"></div>
       `;
@@ -543,14 +601,8 @@ function renderPage() {
       const assignBtn = actionsDiv.querySelector('.btn-assign');
       if (assignBtn) assignBtn.onclick = () => openOrderModal(order, { openAssign: true });
       actionsDiv.querySelector('.btn-history').onclick = () => {
-        const params = new URLSearchParams();
-        const custId = (customer.uid || order.customerId || customer.customerId) || '';
-        const custName = (customer.name || customer.Customname || '') || '';
-        const custPhone = (customer.phone || '') || '';
-        if (custId) params.set('customerId', custId);
-        if (custName) params.set('name', custName);
-        if (custPhone) params.set('phone', custPhone);
-        window.location.href = `history.html?${params.toString()}`;
+        const url = buildHistoryUrlFromOrder(order);
+        window.location.href = url;
       };
     });
   }
@@ -764,8 +816,8 @@ async function openOrderModal(order, opts = {}) {
     <div style="font-size:13px;color:#6b7280">Subtotal: <span style="font-weight:700">${formatCurrency(order.subtotal || order.total || 0, order.currency || 'USD')}</span></div>
     <div style="font-size:13px;color:#6b7280;margin-top:6px">Envío: <span style="font-weight:700">${order.shippingFee ? formatCurrency(order.shippingFee, order.currency || 'USD') : '—'}</span></div>
     <div style="font-size:15px;margin-top:8px">Total: <span style="font-weight:900">${formatCurrency(order.total || order.amount || 0, order.currency || 'USD')}</span></div>
-    <div style="font-size:13px;color:#6b7280;margin-top:8px">Pago: <strong>${escapeHtml(capitalize(order.paymentStatus || 'pending'))}</strong></div>
-    <div style="font-size:13px;color:#6b7280;margin-top:4px">Envío: <strong>${escapeHtml(capitalize(order.shippingStatus || 'pending'))}</strong></div>
+    <div style="font-size:13px;color:#6b7280;margin-top:8px">Pago: <strong>${escapeHtml(translateStatus(order.paymentStatus || 'pending'))}</strong></div>
+    <div style="font-size:13px;color:#6b7280;margin-top:4px">Envío: <strong>${escapeHtml(translateStatus(order.shippingStatus || 'pending'))}</strong></div>
   `;
   metaWrap.appendChild(totals);
 

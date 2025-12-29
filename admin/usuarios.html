@@ -9,12 +9,6 @@
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
-    <script type="module" src="../assets/js/auth-guard.js"></script>
-    <script type="module">
-        import { requireRole } from '../assets/js/role-guard.js';
-        requireRole(['administrador'], { redirectTo: 'index.html' });
-    </script>
-
     <style>
         /* Tabla: nombre + punto de presencia + email debajo */
         table#usersTable {

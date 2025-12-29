@@ -423,18 +423,6 @@
   <!-- Sidebar user helper -->
   <script type="module" src="../assets/js/sidebar-loader.js"></script>
 
-  <script type="module">
-    import { logout } from '../assets/js/auth.js';
-    const logoutBtn = document.getElementById('logout');
-    if (logoutBtn) logoutBtn.addEventListener('click', async (e) => { e.preventDefault(); await logout(); });
-
-    // small UX: focus search
-    const q = document.getElementById('q');
-    if (q) q.addEventListener('input', (e) => {
-      document.dispatchEvent(new CustomEvent('orders:search', { detail: e.target.value }));
-    });
-  </script>
-
   <!-- App scripts -->
   <script type="module" src="../assets/js/bank-select.js"></script>
   <script type="module" src="../assets/js/order-view-modal.js"></script>

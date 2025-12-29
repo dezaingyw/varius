@@ -204,6 +204,29 @@ function showFieldError(element, message) {
     if (typeof element.focus === 'function') element.focus();
 }
 
+/* ================= NAV TO HISTORY HELPERS ================= */
+/* Build history.html URL with query params extracted from order object.
+   Keeps behavior safe: if no params available, redirects to plain history.html.
+*/
+function buildHistoryUrlFromOrder(order) {
+    try {
+        const od = order && order.data ? order.data : order || {};
+        const custData = od.customerData || od.customer || {};
+        const custId = custData.uid || od.customerId || custData.customerId || '';
+        const custName = custData.name || custData.Customname || od.customerName || '';
+        const custPhone = custData.phone || custData.telefono || custData.mobile || '';
+        const params = new URLSearchParams();
+        if (custId) params.set('customerId', custId);
+        if (custName) params.set('name', custName);
+        if (custPhone) params.set('phone', custPhone);
+        const q = params.toString();
+        return q ? `history.html?${q}` : 'history.html';
+    } catch (err) {
+        console.warn('buildHistoryUrlFromOrder error', err);
+        return 'history.html';
+    }
+}
+
 /* ================= RENDERERS ================= */
 function render(list) {
     renderTable(list);
@@ -274,12 +297,15 @@ function renderTable(list) {
             deliveredSpan.textContent = 'Entregado';
             rowActions.appendChild(deliveredSpan);
 
-            // History button (siempre mostrar)
+            // History button (siempre mostrar) -> ahora envía parámetros
             const histBtn = document.createElement('button');
             histBtn.className = 'btn-small btn-history';
             histBtn.title = 'Historial de Cliente';
             histBtn.innerHTML = `${getIconSvg('clock', 14)}`;
-            histBtn.addEventListener('click', () => window.location.href = 'history.html');
+            histBtn.addEventListener('click', () => {
+                const url = buildHistoryUrlFromOrder(o);
+                window.location.href = url;
+            });
             rowActions.appendChild(histBtn);
         } else {
             // View button
@@ -298,12 +324,15 @@ function renderTable(list) {
             editBtn.addEventListener('click', () => openEditModal(o));
             rowActions.appendChild(editBtn);
 
-            // History button
+            // History button -> ahora envía parámetros
             const histBtn = document.createElement('button');
             histBtn.className = 'btn-small btn-history';
             histBtn.title = 'Historial de Cliente';
             histBtn.innerHTML = `${getIconSvg('clock', 14)}`;
-            histBtn.addEventListener('click', () => window.location.href = 'history.html');
+            histBtn.addEventListener('click', () => {
+                const url = buildHistoryUrlFromOrder(o);
+                window.location.href = url;
+            });
             rowActions.appendChild(histBtn);
 
             // Suspend button
@@ -375,7 +404,10 @@ function renderCards(list) {
                 const a = btn.getAttribute('data-action');
                 if (a === 'view') openViewModal(o);
                 if (a === 'edit') openEditModal(o);
-                if (a === 'history') window.location.href = 'history.html';
+                if (a === 'history') {
+                    const url = buildHistoryUrlFromOrder(o);
+                    window.location.href = url;
+                }
             });
         });
         ordersCards.appendChild(card);

@@ -1,10 +1,6 @@
 // assets/js/product-admin.js
-// Versión completa revisada con validaciones inline y precio > 0
-// - Campos obligatorios (inline errors): nombre, descripción, precio (>0), categoría, estado, stock (entero >=0), y al menos 1 foto al crear.
-// - Precio mostrado con miles y decimales (ej. 9,014.66). El input se fuerza a `type="text"` y `inputmode="decimal"` en runtime.
-// - Validaciones muestran mensajes junto al campo (no toasts). Toasts se siguen usando para éxito/errores no-validación.
-// - Conserva funcionalidades previas: render, mini-rotator, optimizar imágenes, subir, soft-delete, RBAC, etc.
-// Requiere: image-utils.js, rbac.js y storage.rules apropiadas.
+// Versión completa revisada con paginación cliente y data-labels para vista responsive (tarjetas)
+// Mantiene el resto de la lógica (uploads, validaciones, etc.)
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -60,6 +56,7 @@ const prevSlideBtn = document.getElementById('prevSlide');
 const nextSlideBtn = document.getElementById('nextSlide');
 
 let productsLocal = [];
+let filteredProducts = [];
 let currentUser = null;
 let currentUserRole = null;
 let isEditing = false;
@@ -77,6 +74,74 @@ const CATEGORY_PREFIX = {
     "Hogar": "HOG",
     "Accesorios": "ACC"
 };
+
+/* ---------------- PAGINACIÓN ---------------- */
+let pageSize = 10;
+let currentPage = 1;
+const PAGE_SIZES = [10, 50, 100, 500];
+
+let paginationContainer = null;
+let pageSizeSelect = null;
+let prevPageBtn = null;
+let nextPageBtn = null;
+let pageInfoEl = null;
+let totalCountEl = null;
+
+function ensurePaginationUi() {
+    if (paginationContainer) return;
+    const tableCard = document.querySelector('.table-card');
+    if (!tableCard) return;
+
+    paginationContainer = document.createElement('div');
+    paginationContainer.className = 'pagination-controls';
+
+    // page size
+    const sizeWrap = document.createElement('div');
+    sizeWrap.className = 'page-size';
+    sizeWrap.innerHTML = `<label for="pageSizeSelect">Mostrar</label>`;
+    pageSizeSelect = document.createElement('select');
+    pageSizeSelect.id = 'pageSizeSelect';
+    PAGE_SIZES.forEach(s => {
+        const o = document.createElement('option'); o.value = String(s); o.textContent = String(s);
+        if (s === pageSize) o.selected = true;
+        pageSizeSelect.appendChild(o);
+    });
+    sizeWrap.appendChild(pageSizeSelect);
+    paginationContainer.appendChild(sizeWrap);
+
+    // pager controls
+    const pager = document.createElement('div');
+    pager.className = 'pager';
+    prevPageBtn = document.createElement('button'); prevPageBtn.type = 'button'; prevPageBtn.className = 'pager-btn prev'; prevPageBtn.textContent = '«';
+    nextPageBtn = document.createElement('button'); nextPageBtn.type = 'button'; nextPageBtn.className = 'pager-btn next'; nextPageBtn.textContent = '»';
+    pageInfoEl = document.createElement('span'); pageInfoEl.className = 'page-info';
+    totalCountEl = document.createElement('span'); totalCountEl.className = 'total-info';
+    pager.appendChild(prevPageBtn);
+    pager.appendChild(pageInfoEl);
+    pager.appendChild(nextPageBtn);
+    paginationContainer.appendChild(pager);
+
+    // total
+    const totalWrap = document.createElement('div');
+    totalWrap.className = 'page-total';
+    totalWrap.appendChild(totalCountEl);
+    paginationContainer.appendChild(totalWrap);
+
+    // append after table-card
+    tableCard.parentNode.insertBefore(paginationContainer, tableCard.nextSibling);
+
+    // events
+    pageSizeSelect.addEventListener('change', () => {
+        pageSize = Number(pageSizeSelect.value) || 10;
+        currentPage = 1;
+        paginateAndRender(filteredProducts);
+    });
+    prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; paginateAndRender(filteredProducts); } });
+    nextPageBtn.addEventListener('click', () => {
+        const totalPages = Math.max(1, Math.ceil((filteredProducts?.length || 0) / pageSize));
+        if (currentPage < totalPages) { currentPage += 1; paginateAndRender(filteredProducts); }
+    });
+}
 
 /* ---------------- Helpers ---------------- */
 function showToast(msg, ms = 3000) {
@@ -97,7 +162,6 @@ function escapeHtml(str) {
 }
 
 function formatPriceDisplay(num) {
-    // Format number with thousands comma and dot decimals: 9,014.66
     if (num === undefined || num === null || num === '') return '';
     const n = Number(num);
     if (Number.isNaN(n)) return '';
@@ -105,7 +169,6 @@ function formatPriceDisplay(num) {
 }
 function parseFormattedPrice(str) {
     if (str === undefined || str === null) return NaN;
-    // Accept "9,014.66" or "9014.66" or "9014"
     const cleaned = String(str).trim().replace(/\s+/g, '').replace(/,/g, '');
     const v = parseFloat(cleaned);
     return Number.isNaN(v) ? NaN : v;
@@ -154,7 +217,7 @@ function clearAllFieldErrors(formEl) {
 }
 
 /* ---------------- Render products ----------------
-   uses badges: state-active, state-inactive, state-suspended
+   Usa data-label en cada td para permitir la vista responsive tipo tarjetas.
 */
 function renderProducts(list) {
     productsBody.innerHTML = '';
@@ -173,7 +236,6 @@ function renderProducts(list) {
     }
 
     list.forEach(prod => {
-        // If suspended and not admin, skip
         if ((prod.status || '').toLowerCase() === 'suspendido' && currentUserRole !== 'administrador') return;
 
         const tr = document.createElement('tr');
@@ -181,6 +243,7 @@ function renderProducts(list) {
         // Images mini-slider cell
         const tdImg = document.createElement('td');
         tdImg.className = 'mini-slider-cell';
+        tdImg.setAttribute('data-label', 'Imagen');
         const sliderWrap = document.createElement('div');
         sliderWrap.className = 'mini-slider';
         const track = document.createElement('div');
@@ -210,14 +273,15 @@ function renderProducts(list) {
 
         // Name & category
         const tdName = document.createElement('td'); tdName.className = 'product-name';
+        tdName.setAttribute('data-label', 'Nombre');
         tdName.innerHTML = `<div>${escapeHtml(prod.name)}</div><div style="font-size:12px;color:#6b7280">${escapeHtml(prod.category || '')}</div>`;
         tr.appendChild(tdName);
 
         // Price
-        const tdPrice = document.createElement('td'); tdPrice.textContent = formatPriceDisplay(prod.price); tr.appendChild(tdPrice);
+        const tdPrice = document.createElement('td'); tdPrice.textContent = formatPriceDisplay(prod.price); tdPrice.setAttribute('data-label', 'Precio'); tr.appendChild(tdPrice);
 
         // Offer badge
-        const tdOffer = document.createElement('td');
+        const tdOffer = document.createElement('td'); tdOffer.setAttribute('data-label', 'Oferta');
         const offerBadge = document.createElement('span');
         offerBadge.className = 'badge offer-badge';
         if (prod.onOffer) { offerBadge.classList.add('offer-yes'); offerBadge.textContent = 'En oferta'; }
@@ -226,21 +290,21 @@ function renderProducts(list) {
         tr.appendChild(tdOffer);
 
         // Discount
-        const tdDiscount = document.createElement('td');
+        const tdDiscount = document.createElement('td'); tdDiscount.setAttribute('data-label', 'Descuento');
         tdDiscount.textContent = prod.onOffer ? `-${(prod.discount || 0)}%` : '-';
         tr.appendChild(tdDiscount);
 
         // Offer price
-        const tdOfferPrice = document.createElement('td');
+        const tdOfferPrice = document.createElement('td'); tdOfferPrice.setAttribute('data-label', 'Precio Oferta');
         const op = prod.onOffer ? calculateOfferPrice(prod.price, prod.discount) : null;
         tdOfferPrice.textContent = op !== null ? formatPriceDisplay(op) : '-';
         tr.appendChild(tdOfferPrice);
 
         // Stock
-        const tdStock = document.createElement('td'); tdStock.textContent = prod.stock ?? 0; tr.appendChild(tdStock);
+        const tdStock = document.createElement('td'); tdStock.setAttribute('data-label', 'Stock'); tdStock.textContent = prod.stock ?? 0; tr.appendChild(tdStock);
 
         // State badge
-        const tdState = document.createElement('td');
+        const tdState = document.createElement('td'); tdState.setAttribute('data-label', 'Estado');
         const stateBadge = document.createElement('span');
         stateBadge.className = 'badge-state state-badge';
         const st = (prod.status || 'Activo').toLowerCase();
@@ -252,7 +316,7 @@ function renderProducts(list) {
         tr.appendChild(tdState);
 
         // Actions
-        const tdActions = document.createElement('td'); tdActions.className = 'actions';
+        const tdActions = document.createElement('td'); tdActions.className = 'actions'; tdActions.setAttribute('data-label', 'Acciones');
         const actions = document.createElement('div'); actions.className = 'actions';
 
         // Copy link - always visible
@@ -357,7 +421,35 @@ function applyFilters() {
         if (offerVal === 'en_oferta') filtered = filtered.filter(p => !!p.onOffer);
         if (offerVal === 'no_oferta') filtered = filtered.filter(p => !p.onOffer);
     }
-    renderProducts(filtered);
+    filteredProducts = filtered;
+    currentPage = 1;
+    ensurePaginationUi();
+    paginateAndRender(filteredProducts);
+}
+
+function paginateAndRender(list) {
+    ensurePaginationUi();
+    const total = list.length || 0;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const slice = list.slice(start, end);
+    renderProducts(slice);
+
+    // update pagination UI
+    if (paginationContainer) {
+        pageInfoEl.textContent = `Página ${currentPage} / ${totalPages}`;
+        totalCountEl.textContent = `Total: ${total}`;
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
+        // hide paginador si no hay paginación necesaria
+        if (total <= pageSize) {
+            paginationContainer.style.display = 'none';
+        } else {
+            paginationContainer.style.display = 'flex';
+        }
+    }
 }
 
 function startRealtimeListener() {
@@ -395,7 +487,6 @@ function openAddModal() {
     productIdField.value = '';
     skuField.value = '';
     skuField.placeholder = 'Se generará al seleccionar categoría';
-    // ensure price input accepts formatted value
     if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
     productModal.classList.remove('hidden');
     productModal.setAttribute('aria-hidden', 'false');
@@ -433,7 +524,6 @@ async function openEditProduct(id) {
         currentPreviewFiles = [];
         currentPreviewUrls = [];
         showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
-        // ensure price input accepts formatted value
         if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
         productModal.classList.remove('hidden');
         productModal.setAttribute('aria-hidden', 'false');
@@ -489,11 +579,9 @@ imageDropZone.addEventListener('drop', (e) => {
 });
 
 /* ---------- Price input formatting behavior ---------- */
-// Force price input to text to allow formatted display even if HTML has type=number
 if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
 
 priceField?.addEventListener('focus', () => {
-    // remove formatting for editing
     const raw = priceField.value;
     if (!raw) { priceField.value = ''; return; }
     const n = parseFormattedPrice(raw);
@@ -572,7 +660,6 @@ async function addProduct(data, files) {
 
     clearAllFieldErrors(productForm);
 
-    // Validation: required fields (inline)
     if (!data.name || !data.name.trim()) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
     if (!data.description || !data.description.trim()) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
     const priceParsed = parseFormattedPrice(String(data.price));
@@ -613,7 +700,6 @@ async function addProduct(data, files) {
         const docRef = await addDoc(productsCol, newDoc);
         const productId = docRef.id;
 
-        // show modal progress
         createModalProgressUI();
         const uploaded = await uploadImagesToProductFolder(productId, files, data.name, 8, (pct) => updateModalProgress(pct));
         removeModalProgressUI();
@@ -638,7 +724,6 @@ async function updateProduct(id, data, newFiles = []) {
 
     clearAllFieldErrors(productForm);
 
-    // Validation: required fields (inline)
     if (!data.name || !data.name.trim()) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
     if (!data.description || !data.description.trim()) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
     const priceParsed = parseFormattedPrice(String(data.price));
@@ -655,7 +740,6 @@ async function updateProduct(id, data, newFiles = []) {
         let imageUrls = Array.isArray(docData.imageUrls) ? docData.imageUrls.slice() : [];
         let imagePaths = Array.isArray(docData.imagePaths) ? docData.imagePaths.slice() : [];
 
-        // If new files, upload and append
         if (newFiles && newFiles.length) {
             createModalProgressUI();
             const uploaded = await uploadImagesToProductFolder(id, newFiles, data.name, 8, (pct) => updateModalProgress(pct));
@@ -664,10 +748,8 @@ async function updateProduct(id, data, newFiles = []) {
             imagePaths = imagePaths.concat(uploaded.map(x => x.path));
         }
 
-        // If any pendingDeletePaths, remove them
         if (pendingDeletePaths.length) {
             imagePaths = imagePaths.filter(p => !pendingDeletePaths.includes(p));
-            // rebuild imageUrls to match remaining paths if mapping exists
             const pathToUrl = {};
             if (Array.isArray(docData.imagePaths)) {
                 docData.imagePaths.forEach((p, idx) => { if (docData.imageUrls && docData.imageUrls[idx]) pathToUrl[p] = docData.imageUrls[idx]; });
@@ -680,7 +762,6 @@ async function updateProduct(id, data, newFiles = []) {
             pendingDeletePaths = [];
         }
 
-        // Ensure at least one image remains (either saved or newly uploaded)
         if ((!imageUrls || !imageUrls.length)) {
             setFieldError(imageFileField, 'Debe tener al menos una imagen asociada al producto');
             return;
@@ -723,7 +804,6 @@ async function deleteSavedImageFromProduct(productId, imageObj) {
             const ref = storageRef(storage, path);
             await deleteObject(ref).catch(() => { /* ignore */ });
         }
-        // Update Firestore to remove this image
         const productRef = doc(db, 'product', productId);
         const snap = await getDoc(productRef);
         if (!snap.exists()) return true;
@@ -818,7 +898,6 @@ productForm.addEventListener('submit', async (e) => {
     const status = statusField.value;
     const stockVal = stockField.value;
 
-    // Basic validation (inline)
     if (!name) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
     if (!description) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
     const priceParsed = parseFormattedPrice(String(priceRaw));
@@ -841,11 +920,9 @@ productForm.addEventListener('submit', async (e) => {
         sku: skuField.value || ''
     };
 
-    // Determine files to upload: for adding must have at least one preview file; for editing accept existing saved images
     const filesToUpload = currentPreviewFiles.slice();
 
     if (isEditing && editingId) {
-        // if editing and no saved images and no new files -> error
         const hasSaved = currentSavedImageObjs && currentSavedImageObjs.length;
         if (!hasSaved && (!filesToUpload || !filesToUpload.length)) {
             setFieldError(imageFileField, 'Debe agregar al menos una imagen');
