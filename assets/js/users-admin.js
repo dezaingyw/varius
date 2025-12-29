@@ -1,17 +1,17 @@
-// assets/js/users-admin.js (actualizado)
-// Cambios principales:
-// - Usa callable Function createUserAdmin para crear usuarios sin afectar sesión actual
-// - Normaliza email (emailLower) y phone (digits only)
-// - Validación de email más estricta
-// - isEmailTaken consulta emailLower
-// - Arregla selector btn-suspender
-// - Añade toggles (ojos) para ver/ocultar contraseñas en modal
+// assets/js/users-admin.js
+// Actualizado:
+// - Verificación de emails/teléfonos duplicados usando consultas a Firestore (no solo cache local).
+// - Mantiene filtros y paginado; searchInput, roleFilter, statusFilter, perPageSelect.
+// - Mejora UI: iconos en acciones, inputs estilizados (CSS en usuarios.html).
+//
+// NOTA: Requiere importar `where` en las queries.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {
     getAuth,
     onAuthStateChanged,
+    createUserWithEmailAndPassword,
     sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
@@ -27,16 +27,11 @@ import {
     orderBy,
     where
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
-import {
-    getFunctions,
-    httpsCallable
-} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js";
 
 // Inicializa Firebase (solo si no está)
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const functions = getFunctions(app);
 
 // DOM elementos de filtros y paginado
 const openAddBtn = document.getElementById('openAddBtn');
@@ -93,9 +88,6 @@ function statusClass(status) {
     }
 }
 
-// stricter email regexp (TLD de letras de al menos 2 caracteres)
-const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}$/;
-
 // Load users from Firestore (cache for rendering & filtering)
 async function loadUsers() {
     try {
@@ -109,36 +101,29 @@ async function loadUsers() {
     }
 }
 
-// Firestore duplicate checks (robustos) — usa emailLower
+// Firestore duplicate checks (robustos):
+// - isEmailTaken: consulta a Firestore buscando coincidencias exactas en campo email.
+//   Consideración: Firestore es case-sensitive. Si tus correos se guardan en distintos casos,
+//   lo ideal es normalizar (guardar emailLower) para consultas. Aquí intentamos con email tal cual y con lowercase.
 async function isEmailTaken(email, excludeId = null) {
     if (!email) return false;
-    const emailLower = email.toLowerCase();
-    try {
-        const q = query(collection(db, 'users'), where('emailLower', '==', emailLower));
+    const emailVariants = Array.from(new Set([email, email.toLowerCase()]));
+    for (const e of emailVariants) {
+        const q = query(collection(db, 'users'), where('email', '==', e));
         const snap = await getDocs(q);
         for (const d of snap.docs) {
             if (d.id !== excludeId) return true;
         }
-    } catch (err) {
-        console.error('isEmailTaken error', err);
-        // si hay problema consultando, mejor no bloquear la creación aquí (el servidor robusto también comprobará)
-        return false;
     }
     return false;
 }
 
 async function isPhoneTaken(phone, excludeId = null) {
     if (!phone) return false;
-    const phoneDigits = String(phone).replace(/\D/g, '');
-    try {
-        const q = query(collection(db, 'users'), where('phone', '==', phoneDigits));
-        const snap = await getDocs(q);
-        for (const d of snap.docs) {
-            if (d.id !== excludeId) return true;
-        }
-    } catch (err) {
-        console.error('isPhoneTaken error', err);
-        return false;
+    const q = query(collection(db, 'users'), where('phone', '==', phone));
+    const snap = await getDocs(q);
+    for (const d of snap.docs) {
+        if (d.id !== excludeId) return true;
     }
     return false;
 }
@@ -211,14 +196,12 @@ function renderTable() {
         tdActions.innerHTML = `
             <div class="actions">
                 <button class="icon-btn btn-edit" data-id="${u.id}" title="Editar" aria-label="Editar">
-                    <!-- svg edit -->
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
                     <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
                     <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
                     </svg>
                 </button>
                 <button class="icon-btn btn-suspender" data-id="${u.id}" title="Suspender" aria-label="Suspender">
-                    <!-- svg trash -->
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                     <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
                     <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
@@ -245,8 +228,7 @@ function renderTable() {
         });
     });
 
-    // CORRECCIÓN: selector correcto .btn-suspender
-    usersBody.querySelectorAll('.btn-suspender').forEach(btn => {
+    usersBody.querySelectorAll('.btn-suspend').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.currentTarget.getAttribute('data-id');
             if (!confirm('¿Suspender usuario? Esto marcará su estado como "Suspendido".')) return;
@@ -283,90 +265,16 @@ function openModal(mode = 'add', data = null) {
 
     userModal.classList.remove('hidden');
     userModal.setAttribute('aria-hidden', 'false');
-
-    // Mostrar/ocultar toggles cuando se abre modal
-    setupPasswordToggles();
 }
 function closeModal() {
     userModal.classList.add('hidden');
     userModal.setAttribute('aria-hidden', 'true');
 }
 
-// Mostrar/ocultar ojo en inputs de password
-function setupPasswordToggles() {
-    const pw = document.getElementById('u_password');
-    const pwc = document.getElementById('u_password_confirm');
-
-    // crear botones si no existen
-    function ensureToggle(nextTo) {
-        if (!nextTo) return null;
-        // colocar el botón justo después del input
-        let wrapper = nextTo.parentElement;
-        // crear contenedor si no hay
-        if (!wrapper.classList.contains('pw-wrapper')) {
-            wrapper.classList.add('pw-wrapper');
-            // posición relativa para el botón (puedes ajustar estilos en CSS)
-            wrapper.style.position = 'relative';
-        }
-        let btn = wrapper.querySelector('.pw-toggle');
-        if (!btn) {
-            btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'pw-toggle';
-            btn.setAttribute('aria-pressed', 'false');
-            btn.style.position = 'absolute';
-            btn.style.right = '10px';
-            btn.style.top = '34px';
-            btn.style.border = 'none';
-            btn.style.background = 'transparent';
-            btn.style.cursor = 'pointer';
-            btn.textContent = '👁️';
-            wrapper.appendChild(btn);
-        }
-        return btn;
-    }
-
-    const btn1 = ensureToggle(pw);
-    const btn2 = ensureToggle(pwc);
-
-    function updateToggleVisibility() {
-        const show = (pw.value && pw.value.length) || (pwc.value && pwc.value.length);
-        if (btn1) btn1.style.display = show ? '' : 'none';
-        if (btn2) btn2.style.display = show ? '' : 'none';
-    }
-
-    updateToggleVisibility();
-
-    [pw, pwc].forEach(el => {
-        if (!el) return;
-        el.addEventListener('input', updateToggleVisibility);
-        el.addEventListener('focus', updateToggleVisibility);
-    });
-
-    function toggleHandler(e) {
-        const target = e.currentTarget;
-        const siblingInput = target.previousElementSibling && target.previousElementSibling.tagName === 'INPUT' ? target.previousElementSibling : null;
-        // If didn't find previous sibling, attempt find input in same wrapper
-        let inputEl = null;
-        const wrapper = target.parentElement;
-        if (wrapper) {
-            inputEl = wrapper.querySelector('input[type="password"], input[type="text"]');
-        }
-        if (!inputEl) return;
-        const isPwd = inputEl.type === 'password';
-        inputEl.type = isPwd ? 'text' : 'password';
-        target.textContent = isPwd ? '🙈' : '👁️';
-        target.setAttribute('aria-pressed', String(!isPwd));
-    }
-
-    if (btn1) btn1.removeEventListener('click', toggleHandler); btn1 && btn1.addEventListener('click', toggleHandler);
-    if (btn2) btn2.removeEventListener('click', toggleHandler); btn2 && btn2.addEventListener('click', toggleHandler);
-}
-
 function validateForm(values, isEdit = false) {
     let ok = true;
     if (!values.name || !values.name.trim()) { document.getElementById('u_name_alert').textContent = 'El nombre es requerido.'; ok = false; } else document.getElementById('u_name_alert').textContent = '';
-    if (!values.email || !EMAIL_RE.test(values.email)) { document.getElementById('u_email_alert').textContent = 'Correo inválido.'; ok = false; } else document.getElementById('u_email_alert').textContent = '';
+    if (!values.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) { document.getElementById('u_email_alert').textContent = 'Correo inválido.'; ok = false; } else document.getElementById('u_email_alert').textContent = '';
     if (values.phone && !/^\d{6,15}$/.test(values.phone)) { document.getElementById('u_phone_alert').textContent = 'Teléfono debe tener 6-15 dígitos o estar vacío.'; ok = false; } else document.getElementById('u_phone_alert').textContent = '';
 
     if (!values.role) { ok = false; showToast('Selecciona un rol.'); }
@@ -390,7 +298,7 @@ function validateForm(values, isEdit = false) {
     return ok;
 }
 
-// form submit (usa Cloud Function para creación sin cambiar sesión)
+// form submit (uses Firestore queries to check duplicates)
 userForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const userId = document.getElementById('userId').value;
@@ -406,7 +314,7 @@ userForm?.addEventListener('submit', async (e) => {
     const isEdit = !!userId;
     if (!validateForm(values, isEdit)) return;
 
-    // Check duplicates using Firestore queries (client-side quick check)
+    // Check duplicates using Firestore queries
     try {
         const emailTaken = await isEmailTaken(email, isEdit ? userId : null);
         if (emailTaken) {
@@ -428,19 +336,15 @@ userForm?.addEventListener('submit', async (e) => {
 
     try {
         if (!isEdit) {
-            // Llamar a Cloud Function createUserAdmin
-            const createUserFn = httpsCallable(functions, 'createUserAdmin');
-            const payload = { name, email, phone, role, status: status || 'Activo', password };
-            const res = await createUserFn(payload);
-            if (res && res.data && res.data.success) {
-                showToast('Usuario creado correctamente.');
-            } else {
-                showToast('Respuesta inesperada al crear usuario.');
-            }
+            const cred = await createUserWithEmailAndPassword(auth, email, password);
+            const uid = cred.user.uid;
+            await setDoc(doc(db, 'users', uid), {
+                name, email, phone, role, status: status || 'Activo', createdAt: serverTimestamp(), createdBy: auth.currentUser?.uid || null
+            });
+            showToast('Usuario creado correctamente.');
         } else {
             await updateDoc(doc(db, 'users', userId), { name, phone, role, status });
             if (password) {
-                // envia email para cambiar password (no se cambia directamente desde cliente por seguridad)
                 await sendPasswordResetEmail(auth, email);
                 showToast('Datos actualizados. Email para restablecer contraseña enviado.');
             } else showToast('Usuario actualizado.');
@@ -449,13 +353,11 @@ userForm?.addEventListener('submit', async (e) => {
         await loadUsers();
     } catch (err) {
         console.error('Error saving user', err);
-        // Si la función retornó un HttpsError con details
-        const msg = (err && err.message) ? err.message : 'Error guardando usuario. Revisa consola.';
-        if (err && err.code === 'already-exists') {
-            document.getElementById('u_email_alert').textContent = 'El correo ya está registrado.';
+        if (err && err.code === 'auth/email-already-in-use') {
+            document.getElementById('u_email_alert').textContent = 'El correo ya está registrado en Auth.';
             return;
         }
-        showToast(msg);
+        showToast('Error guardando usuario. Revisa consola.');
     }
 });
 
