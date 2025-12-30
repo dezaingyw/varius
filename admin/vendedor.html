@@ -5,10 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Vendedor — Pedidos</title>
-  <!-- Mantengo los mismos estilos que el administrador para que la apariencia sea idéntica -->
-  
   <link rel="stylesheet" href="assets/css/style.css">
-      <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/app.css">
   <link rel="stylesheet" href="assets/css/order-management.css">
   <link rel="stylesheet" href="../assets/css/presence.css">
 </head>
@@ -16,7 +14,6 @@
 <body>
   <input id="nav-toggle" type="checkbox" class="nav-toggle" aria-hidden="true">
 
-  <!-- Top bar (idéntico) -->
   <header class="topbar">
     <div class="top-left">
       <label for="nav-toggle" class="hamburger" aria-hidden="true">
@@ -29,10 +26,8 @@
     </div>
 
     <div class="top-search">
-      <label for="q" class="sr-only">Buscar</label>
-      <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
-
-      <!-- dentro de .topbar, a la derecha del contenido -->
+      <label for="filter-client" class="sr-only">Buscar</label>
+      <input id="filter-client" type="search" placeholder="Buscar cliente..." aria-label="Buscar cliente" />
       <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
         <span class="dot"></span>
         <span class="label">Desconectado</span>
@@ -42,10 +37,7 @@
 
   <div id="app-sidebar"></div>
 
-
-  <!-- Main content: idéntico visualmente al administrador -->
   <main class="main">
-
     <section class="kpis" aria-label="Indicadores rápidos">
       <article class="card kpi-card" id="kpi-card-orders" data-kpi="orders-today" tabindex="0" role="button"
         aria-pressed="false">
@@ -58,6 +50,7 @@
           <div class="icon-square">📦</div>
         </div>
       </article>
+
       <article class="card kpi-card" id="kpi-card-sales" data-kpi="sales-today" tabindex="0" role="button"
         aria-pressed="false">
         <div class="kpi-info">
@@ -70,7 +63,6 @@
         </div>
       </article>
 
-      <!-- Mantengo las otras tarjetas por apariencia; pueden mostrarse o esconderse según prefieras -->
       <article class="card kpi-card" id="kpi-card-assigned" data-kpi="assigned" tabindex="0" role="button"
         aria-pressed="false">
         <div class="kpi-info">
@@ -82,17 +74,6 @@
           <div class="icon-square">🏷️</div>
         </div>
       </article>
-
-      <article class="card kpi-card">
-        <div class="kpi-info">
-          <div class="kpi-title">Caja</div>
-          <div class="kpi-value">Abierta</div>
-          <div class="kpi-meta muted">Estado actual</div>
-        </div>
-        <div class="kpi-icon" aria-hidden="true">
-          <div class="icon-square">🏧</div>
-        </div>
-      </article>
     </section>
 
     <section class="table-wrap card quick-actions-card" aria-label="Acciones rápidas">
@@ -100,20 +81,18 @@
         <h3>Acciones Rápidas</h3>
       </div>
       <div class="quick-actions" style="padding: 12px;">
-
-        <button class="action-btn" data-action="inventario" onclick="window.location.href='product.html'">
+        <button class="action-btn" onclick="window.location.href='product.html'">
           <span class="action-icon">🏬</span>
           <span>Inventario</span>
         </button>
-
-        <button class="action-btn" data-action="cierre-caja" onclick="window.location.href='cxc.html'">
+        <button class="action-btn" onclick="window.location.href='cxc.html'">
           <span class="action-icon">🧾</span>
           <span>Cierre de caja</span>
         </button>
       </div>
     </section>
 
-    <!-- Filters (idénticos pero se aplicarán solo a los pedidos del vendedor) -->
+    <!-- filtros reducidos -->
     <section class="filters-card card" aria-label="Filtros de pedidos" style="margin-top:16px;">
       <div class="table-header" style="padding: 0 6px 12px;">
         <h3>Filtros</h3>
@@ -121,64 +100,35 @@
 
       <form class="filters-grid" id="ordersFilters" style="gap:12px; align-items:end;">
         <div class="filter-field">
-          <label for="fechaInicio">Fecha inicio</label>
-          <input id="fechaInicio" name="fechaInicio" type="date" />
-        </div>
-
-        <div class="filter-field">
-          <label for="fechaFin">Fecha fin</label>
-          <input id="fechaFin" name="fechaFin" type="date" />
-        </div>
-
-        <div class="filter-field">
-          <label for="productoFiltro">Producto</label>
-          <select id="productoFiltro" name="productoFiltro">
+          <label for="filter-status">Estado pedido</label>
+          <select id="filter-status" name="filter-status">
             <option value="">Todos</option>
-            <option value="zapatillas">Zapatillas Urbanas</option>
-            <option value="auriculares">Auriculares</option>
-          </select>
-        </div>
-
-        <div class="filter-field">
-          <label for="estadoPago">Estado de pago</label>
-          <select id="estadoPago" name="estadoPago">
-            <option value="">Todos</option>
+            <option value="pendiente">Pendiente</option>
             <option value="pagado">Pagado</option>
-            <option value="pendiente">Pendiente</option>
-          </select>
-        </div>
-
-        <div class="filter-field">
-          <label for="estadoEnvio">Estado de envío</label>
-          <select id="estadoEnvio" name="estadoEnvio">
-            <option value="">Todos</option>
-            <option value="pendiente">Pendiente</option>
             <option value="enviado">Enviado</option>
             <option value="entregado">Entregado</option>
+            <option value="suspendido">Suspendido</option>
+            <option value="cancelado">Cancelado</option>
           </select>
         </div>
 
         <div class="filter-field">
-          <label for="motorizadoFiltro">Motorizado</label>
-          <select id="motorizadoFiltro" name="motorizadoFiltro">
-            <option value="">Todos</option>
-            <option value="sin-asignar">Sin asignar</option>
-            <!-- para vendedores es opcional; se puede usar para filtrar si necesitas -->
-          </select>
+          <label for="filter-date">Fecha</label>
+          <input id="filter-date" name="filter-date" type="date" />
         </div>
 
         <div style="grid-column: 1 / -1; display:flex; justify-content:flex-start; margin-top:4px;">
-          <button type="button" class="btn-apply" id="applyFilters">Aplicar filtros</button>
-          <button type="button" class="btn-secondary" id="resetFilters" style="margin-left:8px;">Limpiar</button>
+          <button type="button" class="btn-apply" id="btnFilter">Aplicar filtros</button>
+          <button type="button" class="btn-secondary" id="btnClear" style="margin-left:8px;">Limpiar</button>
+          <button type="button" class="btn" id="refreshBtn" style="margin-left:8px;">Refrescar</button>
         </div>
       </form>
     </section>
 
-    <!-- Orders table (idéntica en estructura, con ajustes: quitamos columna VENDEDOR y añadimos CANTIDAD) -->
+    <!-- tabla -->
     <section class="table-wrap card" style="margin-top:16px;">
       <div class="table-header">
-        <h3>Pedidos</h3>
-        <!-- BOTÓN CSV: visibilidad controlada por JS (oculto para vendedores si lo deseas) -->
+        <h3>Lista de Pedidos</h3>
         <a class="view-all admin-only" href="#" id="downloadCsv">Exportar CSV</a>
       </div>
       <div class="table-scroll">
@@ -187,13 +137,11 @@
             <tr>
               <th>ID</th>
               <th>CLIENTE</th>
-              <th>PRODUCTO</th>
-              <th>CANT.</th>
               <th>FECHA</th>
               <th>TOTAL</th>
-              <th>ESTADO PAGO</th>
-              <th>ESTADO ENVÍO</th>
+              <th>VENDEDOR</th>
               <th>MOTORIZADO</th>
+              <th>ESTADO</th>
               <th>ACCIONES</th>
             </tr>
           </thead>
@@ -201,92 +149,103 @@
         </table>
       </div>
     </section>
+
+    <!-- cards (mobile) -->
+    <div id="ordersCards" class="orders-cards"></div>
   </main>
 
-  <!-- Modales -->
-  <div id="assignModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true"
-    aria-labelledby="assignModalTitle">
-    <div class="modal-content" role="document">
+  <!-- Modales (IDs y estructura idéntica a orders.js para compatibilidad) -->
+  <div id="order-view-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true"
+    aria-labelledby="orderViewTitle">
+    <div class="modal-content">
       <div class="modal-header">
-        <h2 id="assignModalTitle">Asignar personal al pedido</h2>
-        <button class="close-btn" id="assignModalClose" aria-label="Cerrar">×</button>
+        <h2 id="orderViewTitle">Detalle del pedido</h2>
+        <button id="view-close" class="close-btn" aria-label="Cerrar">×</button>
       </div>
-
-      <div class="modal-body" style="padding:12px 0;">
-        <div>
-          <h3 style="margin:0 0 8px 0;">Vendedores activos y online</h3>
-          <table class="table-card small" id="vendedoresList">
-            <thead>
-              <tr>
-                <th style="width:48px;"></th>
-                <th>Nombre</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-
-        <hr style="margin:12px 0;" />
-
-        <div>
-          <h3 style="margin:0 0 8px 0;">Motorizados activos y online</h3>
-          <table class="table-card small" id="motorizadosList">
-            <thead>
-              <tr>
-                <th style="width:48px;"></th>
-                <th>Nombre</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding-top:12px;">
-        <button class="btn-secondary admin-only" id="assignCancel">Cancelar</button>
-        <button class="btn-primary admin-only" id="assignConfirm">Asignarlos</button>
+      <div id="view-order-body" class="modal-body"></div>
+      <div class="modal-footer">
+        <button id="view-close-bottom" class="btn-secondary">Cerrar</button>
       </div>
     </div>
   </div>
 
-  <div id="viewModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true"
-    aria-labelledby="viewModalTitle">
-    <div class="modal-content" role="document">
+  <div id="order-edit-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-content">
       <div class="modal-header">
-        <h2 id="viewModalTitle">Detalle del pedido</h2>
-        <button class="close-btn" id="viewModalClose" aria-label="Cerrar">×</button>
+        <h2>Editar Pedido</h2>
+        <button id="edit-close" class="close-btn">×</button>
       </div>
-      <div class="modal-body" id="viewModalBody" style="padding:12px 0;">
-        <!-- Aquí se inyectará: tarjeta cliente + lista de productos (miniaturas) -->
+      <form id="edit-order-form" class="modal-body">
+        <div>
+          <div><strong>Cliente:</strong> <span id="edit-customer">—</span></div>
+          <div style="margin-top:8px">
+            <label for="edit-motorizado">Asignar motorizado</label>
+            <select id="edit-motorizado"></select>
+            <input id="edit-motorizado-free" placeholder="O escribe nombre/email" style="display:block;margin-top:6px;">
+            <textarea id="edit-motorizado-comment" placeholder="Justifica el cambio (requerido si cambias motorizado)"
+              style="width:100%;margin-top:6px"></textarea>
+          </div>
+
+          <div id="edit-items-area" style="margin-top:12px;">
+            <div id="items-list"></div>
+
+            <div style="margin-top:8px;">
+              <input id="new-item-name" placeholder="Nombre producto">
+              <input id="new-item-price" placeholder="Precio" type="number" step="0.01">
+              <input id="new-item-qty" placeholder="Cantidad" type="number" min="1" value="1">
+              <button id="add-item-btn" type="button" class="btn-secondary">Agregar</button>
+            </div>
+            <div id="available-products-list"></div>
+            <div style="margin-top:8px;">Total: <span id="edit-total">0</span></div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="cancelEditBtn" type="button" class="btn-secondary">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="assignModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="assignModalTitle">Asignar personal</h2>
+        <button id="assignModalClose" class="close-btn">×</button>
       </div>
-      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding-top:12px;">
-        <button class="btn-secondary" id="viewCloseBtn">Cerrar</button>
+      <div class="modal-body">
+        <table id="vendedoresList">
+          <tbody></tbody>
+        </table>
+        <hr>
+        <table id="motorizadosList">
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button id="assignCancel" class="btn-secondary">Cancelar</button>
+        <button id="assignConfirm" class="btn-primary">Asignar</button>
       </div>
     </div>
   </div>
 
-  <!-- KPI info modal -->
-  <div id="kpiModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true"
-    aria-labelledby="kpiModalTitle">
-    <div class="modal-content" role="document">
+  <div id="kpiModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-content">
       <div class="modal-header">
         <h2 id="kpiModalTitle">Información</h2>
-        <button class="close-btn" id="kpiModalClose" aria-label="Cerrar">×</button>
+        <button id="kpiModalClose" class="close-btn">×</button>
       </div>
-      <div class="modal-body" id="kpiModalBody" style="padding:12px 0;">
-        <!-- Contenido dinámico -->
-      </div>
-      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding-top:12px;">
-        <button class="btn-secondary" id="kpiModalCloseBtn">Cerrar</button>
+      <div id="kpiModalBody" class="modal-body"></div>
+      <div class="modal-footer">
+        <button id="kpiModalCloseBtn" class="btn-secondary">Cerrar</button>
       </div>
     </div>
   </div>
+
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
   <script type="module" src="../assets/js/sidebar-loader.js"></script>
-
- 
-
-  <!-- Lógica específica para vendedores (filtrado de datos) -->
   <script type="module" src="../assets/js/vendedor-orders.js"></script>
   <script type="module" src="../assets/js/vendedor-kpis.js"></script>
 </body>
