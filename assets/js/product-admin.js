@@ -1,6 +1,12 @@
 // assets/js/product-admin.js
 // Versión completa revisada con paginación cliente y data-labels para vista responsive (tarjetas)
-// Mantiene el resto de la lógica (uploads, validaciones, etc.)
+// Actualizaciones:
+// - Precio formatea con miles '.' y decimales ',' (ej: 1.570,85)
+// - parseFormattedPrice acepta ese formato
+// - Inputs `stock`, `price` y `discount` no permiten letras (se sanitizan)
+// - `discount` está deshabilitado hasta que `onOffer` esté activo; al activar se habilita y se hace focus
+// - Precio: al escribir sólo enteros (por ejemplo "1" o "15") automáticamente se muestra con ",00" ("1,00", "15,00")
+// - Si el usuario escribe la coma decimal ("," o "."), permite ingresar decimales libres (sin limitar longitud)
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -161,17 +167,29 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '=': '&#x3D;', '`': '&#x60;' }[c]));
 }
 
+/* Price formatting/parsing using locale that uses '.' thousands and ',' decimals (es-ES) */
 function formatPriceDisplay(num) {
     if (num === undefined || num === null || num === '') return '';
     const n = Number(num);
     if (Number.isNaN(n)) return '';
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    // use 2 decimal places, thousands '.' and decimal ','
+    return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 function parseFormattedPrice(str) {
     if (str === undefined || str === null) return NaN;
-    const cleaned = String(str).trim().replace(/\s+/g, '').replace(/,/g, '');
+    const s = String(str).trim();
+    if (!s) return NaN;
+    // Remove thousand separators '.' and replace decimal ',' with '.'
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.').replace(/\s+/g, '');
     const v = parseFloat(cleaned);
     return Number.isNaN(v) ? NaN : v;
+}
+function formatIntegerWithThousands(intStr) {
+    // intStr: digits only string
+    if (!intStr) return '0';
+    const n = Number(intStr);
+    if (Number.isNaN(n)) return intStr;
+    return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(n);
 }
 function calculateOfferPrice(price, discount) {
     if (price === undefined || price === null) return null;
@@ -214,6 +232,180 @@ function clearAllFieldErrors(formEl) {
     const els = (formEl || document).querySelectorAll('.field-error');
     els.forEach(e => e.remove());
     (formEl || document).querySelectorAll('.input-error').forEach(i => i.classList.remove('input-error'));
+}
+
+/* ---------------- Input sanitizers and handlers ---------------- */
+function sanitizeIntegerInputValue(v) {
+    // remove everything except digits
+    return (String(v || '')).replace(/\D+/g, '');
+}
+function sanitizeNumericFieldValue(v) {
+    // allow digits, dots and commas; remove letters and other chars
+    return (String(v || '')).replace(/[^0-9\.,]+/g, '');
+}
+
+// prevent paste of invalid characters
+function handlePasteSanitize(e, type = 'numeric') {
+    const paste = (e.clipboardData || window.clipboardData).getData('text') || '';
+    if (!paste) return;
+    let cleaned = paste;
+    if (type === 'integer') cleaned = sanitizeIntegerInputValue(cleaned);
+    else cleaned = sanitizeNumericFieldValue(cleaned);
+    // replace selection with cleaned text
+    e.preventDefault();
+    const el = e.target;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const newVal = el.value.slice(0, start) + cleaned + el.value.slice(end);
+    el.value = newVal;
+    el.dispatchEvent(new Event('input'));
+}
+
+// Setup handlers for stock, price and discount
+if (stockField) {
+    stockField.addEventListener('input', () => {
+        const v = sanitizeIntegerInputValue(stockField.value);
+        stockField.value = v;
+        clearFieldError(stockField);
+    });
+    stockField.addEventListener('paste', (e) => handlePasteSanitize(e, 'integer'));
+    stockField.addEventListener('keydown', (e) => {
+        // allow control/navigation keys and digits only
+        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End'];
+        if (allowed.includes(e.key)) return;
+        if (/^\d$/.test(e.key)) return;
+        e.preventDefault();
+    });
+}
+
+if (discountField) {
+    // initially disabled; will be toggled by onOffer
+    discountField.addEventListener('input', () => {
+        const v = sanitizeIntegerInputValue(discountField.value);
+        let n = v === '' ? '' : String(Number(v));
+        // clamp 0-100
+        if (n !== '') {
+            let ni = Number(n);
+            if (ni > 100) ni = 100;
+            if (ni < 0) ni = 0;
+            n = String(ni);
+        }
+        discountField.value = n;
+        clearFieldError(discountField);
+    });
+    discountField.addEventListener('paste', (e) => handlePasteSanitize(e, 'integer'));
+    discountField.addEventListener('keydown', (e) => {
+        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End'];
+        if (allowed.includes(e.key)) return;
+        if (/^\d$/.test(e.key)) return;
+        e.preventDefault();
+    });
+}
+
+// Price input behavior:
+// - As user types digits only (no comma/dot), auto-append ",00" and format thousands.
+// - If user types comma or dot, allow free decimal input (normalize display using comma).
+// - Allow navigation keys etc.
+if (priceField) {
+    priceField.addEventListener('input', () => {
+        // sanitize keeping digits, dots and commas
+        let raw = priceField.value || '';
+        raw = raw.replace(/[^\d\.,]/g, '');
+
+        // If the user has typed a comma or dot, treat that as start of decimals.
+        // Normalize to single decimal separator (comma) and keep the decimal part as typed (no trimming).
+        if (raw.includes(',') || raw.includes('.')) {
+            // Determine which separator to treat as decimal: prefer the last separator typed
+            const lastComma = raw.lastIndexOf(',');
+            const lastDot = raw.lastIndexOf('.');
+            let sepIndex = Math.max(lastComma, lastDot);
+            let sepChar = sepIndex === lastComma ? ',' : '.';
+            // integer part: all chars before sepIndex, remove other separators from integer part
+            let integerPart = raw.slice(0, sepIndex).replace(/[\.,]/g, '');
+            let decimalPart = raw.slice(sepIndex + 1).replace(/[\.,]/g, ''); // remove accidental separators in decimals
+            if (!integerPart) integerPart = '0';
+            // format integer part with thousands
+            const intFmt = formatIntegerWithThousands(integerPart);
+            // Build display: intFmt, then comma, then decimalPart (can be empty if user just typed separator)
+            priceField.value = decimalPart.length ? `${intFmt},${decimalPart}` : `${intFmt},`;
+        } else {
+            // No separator typed -> treat as integer input and auto-append ",00"
+            const digits = raw.replace(/\D/g, '') || '';
+            if (!digits) {
+                priceField.value = '';
+                return;
+            }
+            const intFmt = formatIntegerWithThousands(digits);
+            priceField.value = `${intFmt},00`;
+        }
+        clearFieldError(priceField);
+    });
+
+    priceField.addEventListener('paste', (e) => handlePasteSanitize(e, 'numeric'));
+
+    priceField.addEventListener('keydown', (e) => {
+        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End','Enter'];
+        if (allowed.includes(e.key)) return;
+        // Allow digits, comma and dot
+        if (/^[0-9\.,]$/.test(e.key)) return;
+        e.preventDefault();
+    });
+
+    // When focusing, transform displayed formatted value into an editable form preserving decimals:
+    priceField.addEventListener('focus', () => {
+        const val = priceField.value;
+        if (!val) { priceField.value = ''; return; }
+        // Convert display (es format) to an edit-friendly string:
+        // Replace thousands '.' remove them; keep comma as decimal separator
+        const withoutThousands = val.replace(/\./g, '');
+        priceField.value = withoutThousands;
+        clearFieldError(priceField);
+        // Place caret at end
+        setTimeout(() => {
+            try { priceField.selectionStart = priceField.selectionEnd = priceField.value.length; } catch (e) {}
+        }, 0);
+    });
+
+    // On blur format final using formatPriceDisplay (ensures always show two decimals if no decimal typed)
+    priceField.addEventListener('blur', () => {
+        const raw = priceField.value;
+        if (raw === '' || raw === null) {
+            priceField.value = '';
+            return;
+        }
+        const n = parseFormattedPrice(String(raw));
+        if (!Number.isNaN(n)) {
+            // If the user typed a comma with decimals, preserve the exact decimal digits length they entered.
+            // But requirement says if they typed integer it becomes x,00. We'll format to 2 decimals by default.
+            // If user intentionally entered decimals longer, we keep up to 10 decimals to avoid truncation; but display standard 2 decimals.
+            priceField.value = formatPriceDisplay(n);
+        } else {
+            setFieldError(priceField, 'Precio inválido');
+        }
+    });
+}
+
+/* Offer toggle: enable/disable discount input */
+function setDiscountEnabled(enabled) {
+    if (!discountField) return;
+    discountField.disabled = !enabled;
+    discountField.setAttribute('aria-disabled', String(!enabled));
+    if (!enabled) {
+        discountField.value = '0';
+        clearFieldError(discountField);
+    } else {
+        // focus for quick entry
+        discountField.focus();
+        // ensure value is a number string
+        if (!discountField.value) discountField.value = '0';
+    }
+}
+if (onOfferField) {
+    // initialize discount state on load
+    setDiscountEnabled(!!onOfferField.checked);
+    onOfferField.addEventListener('change', () => {
+        setDiscountEnabled(!!onOfferField.checked);
+    });
 }
 
 /* ---------------- Render products ----------------
@@ -507,7 +699,8 @@ function openAddModal() {
     productIdField.value = '';
     skuField.value = '';
     skuField.placeholder = 'Se generará al seleccionar categoría';
-    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
+    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); priceField.value = ''; }
+    setDiscountEnabled(!!onOfferField?.checked);
     productModal.classList.remove('hidden');
     productModal.setAttribute('aria-hidden', 'false');
 }
@@ -532,6 +725,8 @@ async function openEditProduct(id) {
         stockField.value = prod.stock || 0;
         skuField.value = prod.sku || '';
         imageFileField.value = '';
+
+        setDiscountEnabled(!!onOfferField?.checked);
 
         currentSavedImageObjs = [];
         if (Array.isArray(prod.imageUrls) && prod.imageUrls.length) {
@@ -598,32 +793,6 @@ imageDropZone.addEventListener('drop', (e) => {
     showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
 });
 
-/* ---------- Price input formatting behavior ---------- */
-if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
-
-priceField?.addEventListener('focus', () => {
-    const raw = priceField.value;
-    if (!raw) { priceField.value = ''; return; }
-    const n = parseFormattedPrice(raw);
-    if (!Number.isNaN(n)) {
-        priceField.value = n.toString();
-    }
-    clearFieldError(priceField);
-});
-priceField?.addEventListener('blur', () => {
-    const raw = priceField.value;
-    if (raw === '' || raw === null) {
-        priceField.value = '';
-        return;
-    }
-    const n = parseFormattedPrice(String(raw));
-    if (!Number.isNaN(n)) {
-        priceField.value = formatPriceDisplay(n);
-    } else {
-        setFieldError(priceField, 'Precio inválido');
-    }
-});
-
 /* ---------- Upload images helper with optimization & resumable progress ---------- */
 async function uploadImagesToProductFolder(productId, files = [], baseName = 'product', maxFiles = 8, onProgress = null) {
     if (!files || !files.length) return [];
@@ -688,6 +857,14 @@ async function addProduct(data, files) {
     if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
     if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
 
+    // discount validation when onOffer
+    if (data.onOffer) {
+        const d = Number(data.discount || 0);
+        if (Number.isNaN(d) || d < 0 || d > 100) { setFieldError(discountField, 'Descuento inválido (0-100)'); discountField.focus(); return; }
+    } else {
+        data.discount = 0;
+    }
+
     const minImages = 1;
     const filesCount = (files && files.length) ? files.length : 0;
     if (filesCount < minImages) {
@@ -751,6 +928,14 @@ async function updateProduct(id, data, newFiles = []) {
     if (!data.category) { setFieldError(categoryField, 'La categoría es requerida'); categoryField.focus(); return; }
     if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
     if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
+
+    // discount validation when onOffer
+    if (data.onOffer) {
+        const d = Number(data.discount || 0);
+        if (Number.isNaN(d) || d < 0 || d > 100) { setFieldError(discountField, 'Descuento inválido (0-100)'); discountField.focus(); return; }
+    } else {
+        data.discount = 0;
+    }
 
     try {
         const prodRef = doc(db, 'product', id);
@@ -973,6 +1158,8 @@ onAuthStateChanged(auth, async (user) => {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         currentUserRole = userDoc.exists() ? (userDoc.data().role || 'vendedor') : 'vendedor';
         applyUiRestrictions(currentUserRole);
+        // ensure discount state reflects onOffer checkbox on start
+        setDiscountEnabled(!!onOfferField?.checked);
         startRealtimeListener();
     } catch (err) {
         console.error('Error checking role', err);
