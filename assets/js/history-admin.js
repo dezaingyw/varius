@@ -1,8 +1,7 @@
 // assets/js/history-admin.js
-// Página "Historial de Compras".
-// - Lee params ?customerId, ?name, ?phone para prefiltrar.
-// - Permite filtrar por rango de fechas y buscar por nombre/telefono.
-// - Muestra lista de pedidos (cliente) y agrega "Movimiento de productos" agregando cantidades y revenue.
+// Página "Historial de Compras" - actualización para mostrar solo "Veces compradas"
+// - Reemplaza las columnas "Cantidad vendida" y "Veces vendido" por una única columna "Veces compradas"
+// - "Veces compradas" cuenta en cuántos pedidos apareció el producto (1 por pedido), no la cantidad total vendida.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -92,30 +91,39 @@ function renderHistoryOrders(orders) {
     orders.forEach(o => {
         const tr = document.createElement('tr');
         const d = o.orderDate ? (o.orderDate.toDate ? o.orderDate.toDate() : new Date(o.orderDate)) : null;
-        tr.innerHTML = `<td>${d ? d.toLocaleString() : '—'}</td><td>${escapeHtml(o.id)}</td><td>${(Array.isArray(o.items) ? o.items.length : 0)}</td><td>${o.total ? formatCurrency(o.total) : '—'}</td><td>${escapeHtml(o.paymentStatus || '—')}</td>`;
+        tr.innerHTML = `<td data-label="Fecha">${d ? d.toLocaleString() : '—'}</td><td data-label="ID">${escapeHtml(o.id)}</td><td data-label="Items">${(Array.isArray(o.items) ? o.items.length : 0)}</td><td data-label="Total">${o.total ? formatCurrency(o.total) : '—'}</td><td data-label="Pago">${escapeHtml(o.paymentStatus || '—')}</td>`;
         tbody.appendChild(tr);
     });
     tbl.appendChild(tbody);
     histOrdersContainer.appendChild(tbl);
 }
 
+/**
+ * computeProductMovement
+ * Ahora: devuelve por producto { productId, name, times }
+ * donde `times` = número de pedidos (orders) en los que apareció el producto (cuenta única por pedido).
+ */
 function computeProductMovement(orders) {
     const map = {};
     for (const o of orders) {
         const items = Array.isArray(o.items) ? o.items : [];
+        // Para evitar contar múltiples veces el mismo producto en un mismo pedido,
+        // creamos un Set de product ids presentes en este pedido.
+        const seenInThisOrder = new Set();
         for (const it of items) {
             const pid = it.productId || it.product_id || it.id || it.product || '';
-            const name = it.name || it.title || it.productName || (it.product && it.product.name) || 'Producto';
-            const qty = Number(it.quantity || it.qty || it.count || 1) || 1;
-            const price = Number(it.price || it.unitPrice || it.productPrice || 0) || 0;
-            if (!map[pid]) map[pid] = { productId: pid, name, qty: 0, times: 0, revenue: 0 };
-            map[pid].qty += qty;
-            map[pid].times += 1;
-            map[pid].revenue += price * qty;
+            if (!pid) continue;
+            if (!seenInThisOrder.has(pid)) {
+                seenInThisOrder.add(pid);
+                const name = it.name || it.title || it.productName || (it.product && it.product.name) || 'Producto';
+                if (!map[pid]) map[pid] = { productId: pid, name, times: 0 };
+                map[pid].times += 1; // increment once per order per product
+            }
         }
     }
     const arr = Object.keys(map).map(k => map[k]);
-    arr.sort((a, b) => b.qty - a.qty);
+    // ordenar por veces compradas (más alto primero)
+    arr.sort((a, b) => b.times - a.times);
     return arr;
 }
 
@@ -123,12 +131,13 @@ function renderProductMovement(list) {
     movementContainer.innerHTML = '';
     if (!list.length) { movementContainer.innerHTML = '<div class="small-muted">No hay movimientos.</div>'; return; }
     const tbl = document.createElement('table'); tbl.className = 'history-table';
-    const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>Producto</th><th>Cantidad vendida</th><th>Veces vendido</th><th>Revenue</th></tr>';
+    // Mostrar solo "Veces compradas"
+    const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>Producto</th><th>Veces compradas</th></tr>';
     tbl.appendChild(thead);
     const tbody = document.createElement('tbody');
     list.forEach(p => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(p.name)}</td><td>${p.qty}</td><td>${p.times}</td><td>${formatCurrency(p.revenue)}</td>`;
+        tr.innerHTML = `<td data-label="Producto">${escapeHtml(p.name)}</td><td data-label="Veces compradas">${p.times}</td>`;
         tbody.appendChild(tr);
     });
     tbl.appendChild(tbody);
