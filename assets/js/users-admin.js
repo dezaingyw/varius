@@ -1,11 +1,8 @@
 // assets/js/users-admin.js
-// Cambios principales:
-// - No usar createUserWithEmailAndPassword en el cliente.
-// - Llamar a una Cloud Function HTTPS 'createUser' que usa Admin SDK.
-// - Validaciones estrictas de email y teléfono (configurable).
-// - Toggle "ojo" para mostrar/ocultar contraseña solo cuando ambos campos tienen texto.
-// - Mejora en verificación de duplicados usando campo emailLower en Firestore.
-// - Ajustado: teléfono ahora permite entre 9 y 10 dígitos (ej. 4144723636 => 10 dígitos).
+// Modificado para: email (local + extensión con prevención de '@' en local),
+// phone local EXACTAMENTE 7 dígitos (y aviso si intentan pegar más),
+// mejoras responsive handling en modal.
+// Arreglo: botón "Editar" ahora usa la clase .btn-edit para que el event listener funcione.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -33,15 +30,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Configurables
-const CREATE_USER_FUNCTION_URL = 'https://us-central1-varius-7de76.cloudfunctions.net/createUser'; // ajusta si tu región/nombre difiere
+const CREATE_USER_FUNCTION_URL = 'https://us-central1-varius-7de76.cloudfunctions.net/createUser';
 
-// ------------------
-// Teléfono: permitir entre MIN y MAX dígitos (ej: 9 o 10)
-// ------------------
+// Teléfono: operador(3) + local(7) => total 10 dígitos esperado.
+// Conservamos min/max por compatibilidad, pero validaremos operadora+local por separado.
 const PHONE_MIN_DIGITS = 9;
 const PHONE_MAX_DIGITS = 10;
 
-// DOM elementos de filtros y paginado (igual que antes)
+// DOM elementos
 const openAddBtn = document.getElementById('openAddBtn');
 const userModal = document.getElementById('userModal');
 const closeModalBtn = document.getElementById('closeModal');
@@ -60,10 +56,10 @@ const pageInfo = document.getElementById('pageInfo');
 const applyFiltersBtn = document.getElementById('applyFilters');
 const clearFiltersBtn = document.getElementById('clearFilters');
 
-let allUsers = []; // cache (para renderizado y filtros)
+let allUsers = [];
 let filteredUsers = [];
 let currentPage = 1;
-let presenceMap = {}; // uid -> 'online'|'offline'
+let presenceMap = {};
 
 // Toast helper
 function showToast(msg, time = 2500) {
@@ -74,10 +70,7 @@ function showToast(msg, time = 2500) {
 }
 
 // utils
-function escapeHtml(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+function escapeHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function roleClass(role) {
     if (!role) return 'role-vendedor';
     switch (role) {
@@ -96,26 +89,21 @@ function statusClass(status) {
     }
 }
 
-// -----------------------------
-// Validaciones en JS (vanilla)
-// -----------------------------
-
-// Email regex: más estricto, evita dominios con sufijos no alfabéticos (ej: ".com1" o ".com!")
+// Email regex: componente completa validación (local@domain)
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+// Domain regex for custom ext (sin @)
+const DOMAIN_REGEX = /^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 // Normaliza teléfono (solo dígitos)
-function normalizePhone(p) {
-    return (p || '').replace(/\D/g, '');
-}
+function normalizePhone(p) { return (p || '').replace(/\D/g, ''); }
 
-// Comprueba formato de teléfono con cantidad permitida de dígitos (entre min y max)
 function isPhoneFormatValid(phone) {
     if (!phone) return false;
     const len = phone.length;
     return len >= PHONE_MIN_DIGITS && len <= PHONE_MAX_DIGITS;
 }
 
-// Revisa Firestore si email ya existe (usa campo emailLower para evitar problemas de case-sensitivity)
+// Firestore duplicate checks (como antes)
 async function isEmailTaken(email, excludeId = null) {
     if (!email) return false;
     const emailLower = email.toLowerCase();
@@ -127,7 +115,6 @@ async function isEmailTaken(email, excludeId = null) {
     return false;
 }
 
-// Revisa Firestore si teléfono existe (campo phone normalizado)
 async function isPhoneTaken(phone, excludeId = null) {
     if (!phone) return false;
     const norm = normalizePhone(phone);
@@ -139,9 +126,7 @@ async function isPhoneTaken(phone, excludeId = null) {
     return false;
 }
 
-// -----------------------------
-// Carga inicial de usuarios
-// -----------------------------
+// Load users
 async function loadUsers() {
     try {
         const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
@@ -154,12 +139,11 @@ async function loadUsers() {
     }
 }
 
-// Filtering & pagination (igual que antes, se mantiene)
+// Filters & render (sin cambios funcionales)
 function applyFiltersAndRender() {
     const q = (searchInput?.value || '').toLowerCase();
     const r = roleFilter?.value || '';
     const s = statusFilter?.value || '';
-
     filteredUsers = allUsers.filter(u => {
         const matchesQ = !q || (
             (u.name || '').toLowerCase().includes(q) ||
@@ -170,7 +154,6 @@ function applyFiltersAndRender() {
         const matchesStatus = !s || (u.status === s);
         return matchesQ && matchesRole && matchesStatus;
     });
-
     currentPage = 1;
     renderTable();
 }
@@ -190,10 +173,8 @@ function renderTable() {
     for (const u of pageItems) {
         const state = presenceMap[u.id] || 'offline';
         const dotClass = state === 'online' ? 'online-dot' : 'offline-dot';
-
         const tr = document.createElement('tr');
 
-        // Nombre cell
         const tdName = document.createElement('td');
         tdName.innerHTML = `
             <div class="user-cell">
@@ -205,23 +186,20 @@ function renderTable() {
             </div>
         `;
 
-        // role
         const tdRole = document.createElement('td');
         tdRole.innerHTML = `<span class="role-badge ${roleClass(u.role)}">${escapeHtml(u.role || '')}</span>`;
 
-        // phone
         const tdPhone = document.createElement('td');
         tdPhone.textContent = u.phone || '';
 
-        // status
         const tdStatus = document.createElement('td');
         tdStatus.innerHTML = `<span class="status-badge ${statusClass(u.status)}">${escapeHtml(u.status || 'Activo')}</span>`;
 
-        // actions: icon buttons
         const tdActions = document.createElement('td');
+        // IMPORTANT: usar clase btn-edit para que el listener funcione
         tdActions.innerHTML = `
             <div class="actions">
-                <button class="btn-small btn-assign" data-id="${u.id}" title="Editar" aria-label="Editar">
+                <button class="btn-small btn-edit" data-id="${u.id}" title="Editar" aria-label="Editar">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
                         <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
                         <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
@@ -241,7 +219,6 @@ function renderTable() {
         tr.appendChild(tdPhone);
         tr.appendChild(tdStatus);
         tr.appendChild(tdActions);
-
         usersBody.appendChild(tr);
     }
 
@@ -278,40 +255,112 @@ function openModal(mode = 'add', data = null) {
     const userIdEl = document.getElementById('userId');
     titleEl.textContent = mode === 'add' ? 'Agregar Usuario' : 'Editar Usuario';
     userIdEl.value = data?.id || '';
-
     document.getElementById('u_name').value = data?.name || '';
-    document.getElementById('u_email').value = data?.email || '';
-    document.getElementById('u_phone').value = data?.phone || '';
+
+    // email split: si trae email, separo local + dominio
+    const emailLocalEl = document.getElementById('u_email_local');
+    const emailExtSelect = document.getElementById('u_email_ext');
+    const emailExtCustom = document.getElementById('u_email_ext_custom');
+    const emailFull = data?.email || '';
+    if (emailFull && emailFull.includes('@')) {
+        const [local, domain] = emailFull.split('@');
+        emailLocalEl.value = local || '';
+        const found = Array.from(emailExtSelect.options).some(opt => opt.value === domain);
+        if (found) {
+            emailExtSelect.value = domain;
+            emailExtCustom.style.display = 'none';
+            emailExtCustom.value = '';
+        } else {
+            emailExtSelect.value = 'otro';
+            emailExtCustom.style.display = 'block';
+            emailExtCustom.value = domain || '';
+        }
+    } else {
+        emailLocalEl.value = '';
+        emailExtSelect.value = 'gmail.com';
+        emailExtCustom.style.display = 'none';
+        emailExtCustom.value = '';
+    }
+
+    // phone split
+    const operatorEl = document.getElementById('u_operator');
+    const phoneLocalEl = document.getElementById('u_phone_local');
+    const phoneStored = data?.phone || '';
+    if (phoneStored && phoneStored.length >= 7) {
+        const norm = normalizePhone(phoneStored);
+        if (norm.length >= 10) {
+            const op = norm.slice(0,3);
+            const local = norm.slice(3);
+            operatorEl.value = op;
+            phoneLocalEl.value = local;
+        } else {
+            operatorEl.value = '';
+            phoneLocalEl.value = norm;
+        }
+    } else {
+        operatorEl.value = '';
+        phoneLocalEl.value = '';
+    }
+
     document.getElementById('u_role').value = data?.role || '';
     document.getElementById('u_status').value = data?.status || 'Activo';
     document.getElementById('u_password').value = '';
     document.getElementById('u_password_confirm').value = '';
-
-    ['u_name_alert', 'u_email_alert', 'u_phone_alert', 'u_password_alert', 'u_password_confirm_alert'].forEach(id => {
+    ['u_name_alert','u_email_alert','u_phone_alert','u_password_alert','u_password_confirm_alert'].forEach(id => {
         const el = document.getElementById(id); if (el) el.textContent = '';
     });
 
     userModal.classList.remove('hidden');
-    userModal.setAttribute('aria-hidden', 'false');
+    userModal.setAttribute('aria-hidden','false');
 }
+
 function closeModal() {
     userModal.classList.add('hidden');
-    userModal.setAttribute('aria-hidden', 'true');
+    userModal.setAttribute('aria-hidden','true');
+}
+
+function getFullEmailFromForm() {
+    const local = (document.getElementById('u_email_local').value || '').trim();
+    const extSelect = document.getElementById('u_email_ext').value;
+    const extCustomEl = document.getElementById('u_email_ext_custom');
+    const ext = extSelect === 'otro' ? (extCustomEl.value || '').trim() : extSelect;
+    if (!local || !ext) return '';
+    return `${local}@${ext}`;
+}
+
+function getFullPhoneFromForm() {
+    const operator = (document.getElementById('u_operator').value || '').trim(); // ej '414'
+    const local = (document.getElementById('u_phone_local').value || '').trim();
+    return normalizePhone((operator || '') + (local || ''));
 }
 
 function validateForm(values, isEdit = false) {
     let ok = true;
-    if (!values.name || !values.name.trim()) { document.getElementById('u_name_alert').textContent = 'El nombre es requerido.'; ok = false; } else document.getElementById('u_name_alert').textContent = '';
+    if (!values.name || !values.name.trim()) { document.getElementById('u_name_alert').textContent = 'El nombre es requerido.'; ok = false; }
+    else document.getElementById('u_name_alert').textContent = '';
 
-    if (!values.email || !EMAIL_REGEX.test(values.email)) { document.getElementById('u_email_alert').textContent = 'Correo inválido.'; ok = false; } else document.getElementById('u_email_alert').textContent = '';
+    if (!values.email || !EMAIL_REGEX.test(values.email)) { document.getElementById('u_email_alert').textContent = 'Correo inválido.'; ok = false; }
+    else document.getElementById('u_email_alert').textContent = '';
 
-    if (values.phone && !isPhoneFormatValid(normalizePhone(values.phone))) {
-        document.getElementById('u_phone_alert').textContent = `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos (ej. 4144723636).`; ok = false;
-    } else document.getElementById('u_phone_alert').textContent = '';
+    // phone: require operator + local 7 dígitos -> total 10
+    const operator = (document.getElementById('u_operator').value || '').trim();
+    const phoneLocal = (document.getElementById('u_phone_local').value || '').trim();
+    const fullPhone = values.phone || '';
+
+    if (!operator) {
+        document.getElementById('u_phone_alert').textContent = 'Selecciona la operadora.';
+        ok = false;
+    } else if (phoneLocal.length !== 7) {
+        document.getElementById('u_phone_alert').textContent = 'El número local debe tener 7 dígitos.';
+        ok = false;
+    } else if (!isPhoneFormatValid(fullPhone)) {
+        document.getElementById('u_phone_alert').textContent = `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos.`; ok = false;
+    } else {
+        document.getElementById('u_phone_alert').textContent = '';
+    }
 
     if (!values.role) { ok = false; showToast('Selecciona un rol.'); }
 
-    // Contraseña: si es creación o si se ingresó nueva en edición, validar requisitos
     if (!isEdit || (values.password || values.confirm)) {
         const pw = values.password || '';
         const confirm = values.confirm || '';
@@ -332,27 +381,24 @@ function validateForm(values, isEdit = false) {
 }
 
 // -----------------------------
-// Toggle de visibilidad de password (solo cuando ambos fields tienen texto)
-// -----------------------------
+// Password toggles (igual que antes) -----------------------------
 const pwdInput = document.getElementById('u_password');
 const pwdConfirmInput = document.getElementById('u_password_confirm');
-
 let pwdToggle = null;
 let pwdConfirmToggle = null;
-
 function createToggleBtn() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'icon-btn small pwd-toggle';
-    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-pressed','false');
     btn.textContent = '👁️';
     btn.style.marginLeft = '8px';
     btn.style.padding = '4px';
     btn.style.fontSize = '14px';
     return btn;
 }
-
 function showPasswordTogglesIfNeeded() {
+    if (!pwdInput || !pwdConfirmInput) return;
     const bothHaveText = (pwdInput.value && pwdInput.value.length > 0) && (pwdConfirmInput.value && pwdConfirmInput.value.length > 0);
     if (bothHaveText) {
         if (!pwdToggle) {
@@ -376,29 +422,25 @@ function showPasswordTogglesIfNeeded() {
             pwdConfirmInput.parentNode.appendChild(pwdConfirmToggle);
         }
     } else {
-        // remover si existen
         if (pwdToggle) { pwdToggle.remove(); pwdToggle = null; }
         if (pwdConfirmToggle) { pwdConfirmToggle.remove(); pwdConfirmToggle = null; }
         pwdInput.type = 'password';
         pwdConfirmInput.type = 'password';
     }
 }
-
 if (pwdInput && pwdConfirmInput) {
     pwdInput.addEventListener('input', showPasswordTogglesIfNeeded);
     pwdConfirmInput.addEventListener('input', showPasswordTogglesIfNeeded);
 }
 
 // -----------------------------
-// submit del form: ahora llama a Cloud Function segura
-// -----------------------------
+// Form submit (Cloud Function) -----------------------------
 userForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const userId = document.getElementById('userId').value;
     const name = document.getElementById('u_name').value.trim();
-    const email = document.getElementById('u_email').value.trim();
-    const phoneRaw = (document.getElementById('u_phone').value || '');
-    const phone = normalizePhone(phoneRaw);
+    const email = getFullEmailFromForm();
+    const phone = getFullPhoneFromForm();
     const role = document.getElementById('u_role').value;
     const status = document.getElementById('u_status').value;
     const password = document.getElementById('u_password').value;
@@ -408,19 +450,13 @@ userForm?.addEventListener('submit', async (e) => {
     const isEdit = !!userId;
     if (!validateForm(values, isEdit)) return;
 
-    // Client-side duplicate checks (Firestore)
+    // duplicados
     try {
         const emailTaken = await isEmailTaken(email, isEdit ? userId : null);
-        if (emailTaken) {
-            document.getElementById('u_email_alert').textContent = 'El correo ya está registrado.';
-            return;
-        }
+        if (emailTaken) { document.getElementById('u_email_alert').textContent = 'El correo ya está registrado.'; return; }
         if (phone) {
             const phoneTaken = await isPhoneTaken(phone, isEdit ? userId : null);
-            if (phoneTaken) {
-                document.getElementById('u_phone_alert').textContent = 'El teléfono ya está registrado.';
-                return;
-            }
+            if (phoneTaken) { document.getElementById('u_phone_alert').textContent = 'El teléfono ya está registrado.'; return; }
         }
     } catch (err) {
         console.error('Error checking duplicates', err);
@@ -430,27 +466,12 @@ userForm?.addEventListener('submit', async (e) => {
 
     try {
         if (!isEdit) {
-            // --- CREAR USUARIO sin cambiar la sesión actual ---
-            // 1) Pedimos ID token del admin actual para que la Cloud Function verifique permisos.
-            const idToken = await auth.currentUser.getIdToken(/* forceRefresh */ true);
-
-            // 2) Llamada a la Cloud Function createUser (Admin SDK)
+            const idToken = await auth.currentUser.getIdToken(true);
             const res = await fetch(CREATE_USER_FUNCTION_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + idToken
-                },
-                body: JSON.stringify({
-                    name,
-                    email,
-                    phone, // phone = solo dígitos; backend intentará convertir a E.164 si es necesario
-                    role,
-                    status,
-                    password // enviar la contraseña al backend para crear en Auth (solo vía HTTPS y TLS)
-                })
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+                body: JSON.stringify({ name, email, phone, role, status, password })
             });
-
             const result = await res.json();
             if (!res.ok) {
                 const errMsg = result && result.error ? result.error : 'Error creando usuario.';
@@ -458,19 +479,12 @@ userForm?.addEventListener('submit', async (e) => {
                 console.error('createUser error:', result);
                 return;
             }
-
             showToast('Usuario creado correctamente.');
         } else {
-            // actualización local: guardamos campos editables en Firestore
             await updateDoc(doc(db, 'users', userId), { name, phone, role, status, updatedAt: serverTimestamp() });
-            if (password) {
-                // Si admin quiere que el usuario cambie su contraseña, enviar email de restablecimiento es mejor (backend)
-                showToast('Datos actualizados. Email para restablecer contraseña enviado.');
-            } else {
-                showToast('Usuario actualizado.');
-            }
+            if (password) showToast('Datos actualizados. Email para restablecer contraseña enviado.');
+            else showToast('Usuario actualizado.');
         }
-
         closeModal();
         await loadUsers();
     } catch (err) {
@@ -485,9 +499,78 @@ closeModalBtn?.addEventListener('click', closeModal);
 cancelBtn?.addEventListener('click', (e) => { e.preventDefault(); closeModal(); });
 userModal?.addEventListener('click', (e) => { if (e.target === userModal) closeModal(); });
 
-// phone input digits-only
-const phoneInput = document.getElementById('u_phone');
-if (phoneInput) phoneInput.addEventListener('input', (e) => { e.target.value = normalizePhone(e.target.value); document.getElementById('u_phone_alert').textContent = ''; });
+// Phone local input: only digits, max 7, show alert if attempted paste more
+const phoneLocalInput = document.getElementById('u_phone_local');
+if (phoneLocalInput) {
+    phoneLocalInput.addEventListener('input', (e) => {
+        const cleaned = normalizePhone(e.target.value);
+        if (cleaned.length > 7) {
+            e.target.value = cleaned.slice(0,7);
+            document.getElementById('u_phone_alert').textContent = 'Máximo 7 dígitos (parte local).';
+            setTimeout(() => { const el = document.getElementById('u_phone_alert'); if (el) el.textContent = ''; }, 2200);
+        } else {
+            e.target.value = cleaned;
+            document.getElementById('u_phone_alert').textContent = '';
+        }
+    });
+}
+
+// Email local input: impedir '@' y si el usuario pega "local@dominio" mover dominio al select (UX)
+const emailLocalInput = document.getElementById('u_email_local');
+const emailExtSelectEl = document.getElementById('u_email_ext');
+const emailExtCustomEl = document.getElementById('u_email_ext_custom');
+
+if (emailLocalInput) {
+    emailLocalInput.addEventListener('input', (e) => {
+        const v = e.target.value;
+        if (v.includes('@')) {
+            // separar local y dominio
+            const [local, rest] = v.split('@');
+            e.target.value = local || '';
+            if (rest && rest.length) {
+                // check if matches known options
+                const domainCandidate = rest.split('/')[0].split('?')[0];
+                const found = Array.from(emailExtSelectEl.options).some(opt => opt.value === domainCandidate);
+                if (found) {
+                    emailExtSelectEl.value = domainCandidate;
+                    emailExtCustomEl.style.display = 'none';
+                    emailExtCustomEl.value = '';
+                } else {
+                    emailExtSelectEl.value = 'otro';
+                    emailExtCustomEl.style.display = 'block';
+                    emailExtCustomEl.value = domainCandidate;
+                }
+            }
+            document.getElementById('u_email_alert').textContent = '';
+        } else {
+            // remove stray spaces at ends
+            e.target.value = v.replace(/\s+/g, ' ').trimStart();
+            document.getElementById('u_email_alert').textContent = '';
+        }
+    });
+}
+
+// Email extension select handling: mostrar input custom si "otro"
+if (emailExtSelectEl) {
+    emailExtSelectEl.addEventListener('change', () => {
+        if (emailExtSelectEl.value === 'otro') {
+            emailExtCustomEl.style.display = 'block';
+            emailExtCustomEl.focus();
+        } else {
+            emailExtCustomEl.style.display = 'none';
+            emailExtCustomEl.value = '';
+        }
+        document.getElementById('u_email_alert').textContent = '';
+    });
+}
+if (emailExtCustomEl) {
+    emailExtCustomEl.addEventListener('input', (e) => {
+        // evitar '@' dentro del dominio custom
+        const v = e.target.value;
+        if (v.includes('@')) e.target.value = v.replace(/@/g, '');
+        document.getElementById('u_email_alert').textContent = '';
+    });
+}
 
 // Filters & pagination events
 applyFiltersBtn?.addEventListener('click', () => applyFiltersAndRender());
