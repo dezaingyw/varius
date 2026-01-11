@@ -1,12 +1,14 @@
 // assets/js/product-admin.js
 // Versión completa revisada con paginación cliente y data-labels para vista responsive (tarjetas)
-// Actualizaciones:
-// - Precio formatea con miles '.' y decimales ',' (ej: 1.570,85)
-// - parseFormattedPrice acepta ese formato
-// - Inputs `stock`, `price` y `discount` no permiten letras (se sanitizan)
-// - `discount` está deshabilitado hasta que `onOffer` esté activo; al activar se habilita y se hace focus
-// - Precio: al escribir sólo enteros (por ejemplo "1" o "15") automáticamente se muestra con ",00" ("1,00", "15,00")
-// - Si el usuario escribe la coma decimal ("," o "."), permite ingresar decimales libres (sin limitar longitud)
+// Actualizaciones principales:
+// - Precio: entrada tipo "enteros primero, decimales solo si se presiona ','".
+//   - Campo inicia en "0,00".
+//   - Al escribir dígitos se construye la parte entera (izquierda de la coma) y se mantiene ",00" hasta que el usuario presione ','.
+//   - Si el usuario presiona ',' entra en modo decimal y los dígitos siguientes rellenan la fracción (se permiten varios decimales).
+//   - Backspace elimina en decimal si hay decimales, si no hay decimales elimina la parte entera.
+//   - Pegado intenta parsear un número (acepta formatos con '.' y ','), y establece buffers apropiadamente.
+// - `stock` y `discount` siguen sanitizados como enteros; `discount` permanece deshabilitado hasta activar `onOffer`.
+// - Formateo mostrado usa miles con '.' y decimales con ',' (locale es-ES).
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -261,7 +263,7 @@ function handlePasteSanitize(e, type = 'numeric') {
     el.dispatchEvent(new Event('input'));
 }
 
-// Setup handlers for stock, price and discount
+// Setup handlers for stock and discount (integers)
 if (stockField) {
     stockField.addEventListener('input', () => {
         const v = sanitizeIntegerInputValue(stockField.value);
@@ -302,86 +304,206 @@ if (discountField) {
     });
 }
 
-// Price input behavior:
-// - As user types digits only (no comma/dot), auto-append ",00" and format thousands.
-// - If user types comma or dot, allow free decimal input (normalize display using comma).
-// - Allow navigation keys etc.
+/* ---------------- Price field: integer-first with explicit decimal mode ---------------- */
+/*
+ Behavior:
+ - Field shows formatted price with thousands (.) and decimals (,).
+ - Default mode: integerMode. Digits typed go to integer part (left of comma). ",00" shown but decimals are zero until user enters decimal mode.
+ - If user presses ',' or '.' key, switch to decimalMode and subsequent digits go to decimal part.
+ - Backspace removes last decimal digit if in decimalMode and decimal part non-empty; if decimal empty, exit decimalMode; otherwise delete last integer digit.
+ - Paste will parse numeric strings and set both buffers.
+ - On openEditModal the buffers are loaded from the product value.
+*/
+
+let priceIntegerBuffer = ''; // digits for integer part, without thousand separators
+let priceDecimalBuffer = ''; // digits for decimal fractional part (can be 0..n)
+let priceDecimalMode = false;
+const PRICE_DECIMAL_MAX = 6; // max decimals allowed for entry (configurable)
+
+function priceBuffersToDisplay() {
+    const intPart = priceIntegerBuffer ? Number(priceIntegerBuffer) : 0;
+    const intFmt = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(intPart);
+    const dec = priceDecimalBuffer || '00';
+    // ensure at least two decimals displayed for consistency
+    const decDisplay = priceDecimalMode ? (priceDecimalBuffer === '' ? '' : priceDecimalBuffer) : (dec.length ? dec.padStart(2, '0').slice(0, 2) : '00');
+    // when in decimalMode and decimal buffer empty show trailing comma to indicate mode
+    if (priceDecimalMode) {
+        return decDisplay === '' ? `${intFmt},` : `${intFmt},${decDisplay}`;
+    } else {
+        return `${intFmt},${(decDisplay || '00').slice(0,2)}`;
+    }
+}
+
+function updatePriceFieldFromBuffers() {
+    if (!priceField) return;
+    priceField.value = priceBuffersToDisplay();
+    // attach data-cents for potential machine use
+    const cents = Number((priceIntegerBuffer || '0')) * 100 + Number((priceDecimalBuffer || '0').padEnd(2, '0').slice(0,2));
+    priceField.setAttribute('data-cents', String(cents));
+    clearFieldError(priceField);
+}
+
+function resetPriceBuffersToZero() {
+    priceIntegerBuffer = '0';
+    priceDecimalBuffer = '';
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+}
+
+function setPriceBuffersFromNumber(n) {
+    if (!Number.isFinite(n)) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; updatePriceFieldFromBuffers(); return; }
+    const cents = Math.round(Number(n) * 100);
+    const intPart = Math.floor(cents / 100);
+    const decPart = String(cents % 100).padStart(2, '0');
+    priceIntegerBuffer = String(intPart);
+    priceDecimalBuffer = decPart;
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+}
+
+function setPriceBuffersFromFormattedString(s) {
+    const parsed = parseFormattedPrice(s);
+    if (!Number.isNaN(parsed)) {
+        setPriceBuffersFromNumber(parsed);
+        return;
+    }
+    // fallback: extract digits around comma
+    const parts = String(s || '').trim().split(/[,\.]/);
+    if (parts.length === 0) { resetPriceBuffersToZero(); return; }
+    priceIntegerBuffer = (parts[0] || '').replace(/\D+/g, '') || '0';
+    priceDecimalBuffer = (parts[1] || '').replace(/\D+/g, '');
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+}
+
+// Append integer digit
+function priceAddIntegerDigit(d) {
+    if (!/^\d$/.test(String(d))) return;
+    // prevent leading zeros unless user wants them
+    if (priceIntegerBuffer === '0') priceIntegerBuffer = d;
+    else priceIntegerBuffer = (priceIntegerBuffer || '') + d;
+    updatePriceFieldFromBuffers();
+}
+
+// Remove last integer digit
+function priceRemoveIntegerDigit() {
+    if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; updatePriceFieldFromBuffers(); return; }
+    priceIntegerBuffer = priceIntegerBuffer.slice(0, -1);
+    if (priceIntegerBuffer === '') priceIntegerBuffer = '0';
+    updatePriceFieldFromBuffers();
+}
+
+// Append decimal digit (only in decimalMode)
+function priceAddDecimalDigit(d) {
+    if (!/^\d$/.test(String(d))) return;
+    if (priceDecimalBuffer.length >= PRICE_DECIMAL_MAX) return;
+    priceDecimalBuffer = priceDecimalBuffer + d;
+    updatePriceFieldFromBuffers();
+}
+
+// Remove last decimal digit
+function priceRemoveDecimalDigit() {
+    if (!priceDecimalBuffer) {
+        // if nothing in decimal buffer, exit decimal mode
+        priceDecimalMode = false;
+    } else {
+        priceDecimalBuffer = priceDecimalBuffer.slice(0, -1);
+    }
+    updatePriceFieldFromBuffers();
+}
+
+// Handle paste into price
+function priceHandlePaste(text) {
+    if (!text) return;
+    const parsed = parseFormattedPrice(text);
+    if (!Number.isNaN(parsed)) {
+        setPriceBuffersFromNumber(parsed);
+        return;
+    }
+    // fallback: try to pull digits left and right of comma if present
+    const t = String(text || '').trim();
+    const match = t.match(/^([\d\.\s]+)[,\.]?(\d*)$/);
+    if (match) {
+        priceIntegerBuffer = (match[1] || '').replace(/\D+/g, '') || '0';
+        priceDecimalBuffer = (match[2] || '').replace(/\D+/g, '');
+        priceDecimalMode = !!(match[2] && match[2].length > 0);
+        updatePriceFieldFromBuffers();
+    }
+}
+
+// Price field keyboard handling
 if (priceField) {
-    priceField.addEventListener('input', () => {
-        // sanitize keeping digits, dots and commas
-        let raw = priceField.value || '';
-        raw = raw.replace(/[^\d\.,]/g, '');
+    // Ensure buffers exist
+    if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; }
 
-        // If the user has typed a comma or dot, treat that as start of decimals.
-        // Normalize to single decimal separator (comma) and keep the decimal part as typed (no trimming).
-        if (raw.includes(',') || raw.includes('.')) {
-            // Determine which separator to treat as decimal: prefer the last separator typed
-            const lastComma = raw.lastIndexOf(',');
-            const lastDot = raw.lastIndexOf('.');
-            let sepIndex = Math.max(lastComma, lastDot);
-            let sepChar = sepIndex === lastComma ? ',' : '.';
-            // integer part: all chars before sepIndex, remove other separators from integer part
-            let integerPart = raw.slice(0, sepIndex).replace(/[\.,]/g, '');
-            let decimalPart = raw.slice(sepIndex + 1).replace(/[\.,]/g, ''); // remove accidental separators in decimals
-            if (!integerPart) integerPart = '0';
-            // format integer part with thousands
-            const intFmt = formatIntegerWithThousands(integerPart);
-            // Build display: intFmt, then comma, then decimalPart (can be empty if user just typed separator)
-            priceField.value = decimalPart.length ? `${intFmt},${decimalPart}` : `${intFmt},`;
-        } else {
-            // No separator typed -> treat as integer input and auto-append ",00"
-            const digits = raw.replace(/\D/g, '') || '';
-            if (!digits) {
-                priceField.value = '';
-                return;
-            }
-            const intFmt = formatIntegerWithThousands(digits);
-            priceField.value = `${intFmt},00`;
-        }
-        clearFieldError(priceField);
-    });
-
-    priceField.addEventListener('paste', (e) => handlePasteSanitize(e, 'numeric'));
-
-    priceField.addEventListener('keydown', (e) => {
-        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End','Enter'];
-        if (allowed.includes(e.key)) return;
-        // Allow digits, comma and dot
-        if (/^[0-9\.,]$/.test(e.key)) return;
-        e.preventDefault();
-    });
-
-    // When focusing, transform displayed formatted value into an editable form preserving decimals:
     priceField.addEventListener('focus', () => {
-        const val = priceField.value;
-        if (!val) { priceField.value = ''; return; }
-        // Convert display (es format) to an edit-friendly string:
-        // Replace thousands '.' remove them; keep comma as decimal separator
-        const withoutThousands = val.replace(/\./g, '');
-        priceField.value = withoutThousands;
-        clearFieldError(priceField);
-        // Place caret at end
+        // Keep display up-to-date; caret placed at end
+        updatePriceFieldFromBuffers();
         setTimeout(() => {
             try { priceField.selectionStart = priceField.selectionEnd = priceField.value.length; } catch (e) {}
         }, 0);
     });
 
-    // On blur format final using formatPriceDisplay (ensures always show two decimals if no decimal typed)
-    priceField.addEventListener('blur', () => {
-        const raw = priceField.value;
-        if (raw === '' || raw === null) {
-            priceField.value = '';
+    priceField.addEventListener('keydown', (e) => {
+        // allow navigation and editing handled below
+        const navAllowed = ['ArrowLeft','ArrowRight','Home','End','Tab'];
+        if (navAllowed.includes(e.key)) return;
+
+        if (e.key === 'Backspace') {
+            e.preventDefault();
+            if (priceDecimalMode) {
+                if (priceDecimalBuffer.length > 0) priceRemoveDecimalDigit();
+                else priceDecimalMode = false; // exit decimal mode if buffer empty
+            } else {
+                // remove integer digit
+                priceRemoveIntegerDigit();
+            }
             return;
         }
-        const n = parseFormattedPrice(String(raw));
-        if (!Number.isNaN(n)) {
-            // If the user typed a comma with decimals, preserve the exact decimal digits length they entered.
-            // But requirement says if they typed integer it becomes x,00. We'll format to 2 decimals by default.
-            // If user intentionally entered decimals longer, we keep up to 10 decimals to avoid truncation; but display standard 2 decimals.
-            priceField.value = formatPriceDisplay(n);
-        } else {
-            setFieldError(priceField, 'Precio inválido');
+
+        // Enter decimal mode on comma or dot
+        if (e.key === ',' || e.key === '.') {
+            e.preventDefault();
+            priceDecimalMode = true;
+            // keep current decimalBuffer unchanged
+            updatePriceFieldFromBuffers();
+            return;
         }
+
+        // Digits
+        if (/^[0-9]$/.test(e.key)) {
+            e.preventDefault();
+            if (priceDecimalMode) {
+                priceAddDecimalDigit(e.key);
+            } else {
+                priceAddIntegerDigit(e.key);
+            }
+            return;
+        }
+
+        // prevent everything else (letters, symbols)
+        e.preventDefault();
+    });
+
+    priceField.addEventListener('paste', (e) => {
+        const txt = (e.clipboardData || window.clipboardData).getData('text') || '';
+        e.preventDefault();
+        priceHandlePaste(txt);
+    });
+
+    // blur: ensure consistent formatting (two decimals shown)
+    priceField.addEventListener('blur', () => {
+        // If decimalMode and decimalBuffer empty, show trailing comma is removed and ",00" displayed
+        priceDecimalMode = false;
+        // Normalize decimalBuffer to two digits for display (but keep full decimal buffer internally)
+        if (!priceDecimalBuffer) priceDecimalBuffer = '00';
+        // Update display
+        // Compose number from buffers to get consistent rounding when necessary
+        const intVal = Number(priceIntegerBuffer || '0');
+        const decVal = Number((priceDecimalBuffer || '00').slice(0, 2).padEnd(2, '0'));
+        const finalNumber = intVal + decVal / 100;
+        setPriceBuffersFromNumber(finalNumber);
+        updatePriceFieldFromBuffers();
     });
 }
 
@@ -699,7 +821,12 @@ function openAddModal() {
     productIdField.value = '';
     skuField.value = '';
     skuField.placeholder = 'Se generará al seleccionar categoría';
-    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); priceField.value = ''; }
+    // initialize price buffers to zero
+    priceIntegerBuffer = '0';
+    priceDecimalBuffer = '';
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
     setDiscountEnabled(!!onOfferField?.checked);
     productModal.classList.remove('hidden');
     productModal.setAttribute('aria-hidden', 'false');
@@ -717,7 +844,8 @@ async function openEditProduct(id) {
         productIdField.value = id;
         nameField.value = prod.name || '';
         descriptionField.value = prod.description || '';
-        priceField.value = prod.price !== undefined && prod.price !== null ? formatPriceDisplay(prod.price) : '';
+        // set price buffers from stored number
+        setPriceBuffersFromNumber(Number(prod.price || 0));
         categoryField.value = prod.category || '';
         statusField.value = prod.status || 'Activo';
         onOfferField.checked = !!prod.onOffer;
@@ -739,7 +867,7 @@ async function openEditProduct(id) {
         currentPreviewFiles = [];
         currentPreviewUrls = [];
         showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
-        if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'decimal'); }
+        if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
         productModal.classList.remove('hidden');
         productModal.setAttribute('aria-hidden', 'false');
     } catch (err) {
@@ -1160,6 +1288,8 @@ onAuthStateChanged(auth, async (user) => {
         applyUiRestrictions(currentUserRole);
         // ensure discount state reflects onOffer checkbox on start
         setDiscountEnabled(!!onOfferField?.checked);
+        // initialize price buffers to zero if empty
+        if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; updatePriceFieldFromBuffers(); }
         startRealtimeListener();
     } catch (err) {
         console.error('Error checking role', err);
