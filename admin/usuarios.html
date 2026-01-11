@@ -124,7 +124,6 @@
             border: 1px solid rgba(239, 68, 68, 0.06);
         }
 
-        /* Acciones: icon-only buttons */
         .actions {
             display: flex;
             gap: 8px;
@@ -133,10 +132,11 @@
 
         /* Modal input improvements */
         .modal .modal-content {
-            max-width: 720px; /* made wider to fit two columns */
+            max-width: 720px;
             width: 95%;
             padding: 16px;
             border-radius: 12px;
+            background: #fff;
         }
 
         .modal-form .form-row {
@@ -144,7 +144,7 @@
             display: flex;
             flex-direction: column;
             gap: 6px;
-            position: relative; /* allow absolute children if needed */
+            position: relative;
         }
 
         .modal-form input[type="text"],
@@ -173,7 +173,6 @@
             min-height: 16px;
         }
 
-        /* Filters area: restore original compact style */
         .search-row {
             display: flex;
             gap: 12px;
@@ -206,7 +205,6 @@
             background: #fff;
         }
 
-        /* Table controls / pagination */
         .table-controls {
             display: flex;
             justify-content: space-between;
@@ -228,43 +226,29 @@
             background: #fff;
         }
 
-        /* small responsive tweak */
-        @media (max-width:700px) {
-
-            table#usersTable thead th:nth-child(2),
-            table#usersTable thead th:nth-child(3) {
-                display: none;
-            }
-
-            table#usersTable tbody td:nth-child(2),
-            table#usersTable tbody td:nth-child(3) {
-                display: none;
-            }
-
-            /* stack modal columns on small screens */
-            .two-col {
-                flex-direction: column;
-            }
+        .icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        /* ---------- New form layout styles ---------- */
+        /* Layout utilities */
         .two-col {
             display: flex;
             gap: 12px;
         }
+
         .two-col .form-row {
             flex: 1;
-            margin-bottom: 0; /* we control spacing on children */
+            margin-bottom: 0;
         }
 
-        /* wrapper for input + inline toggle button */
         .input-with-toggle {
             position: relative;
         }
 
-        /* make room for toggle icon inside input */
         .input-with-toggle input {
-            padding-right: 44px; /* space for the eye button */
+            padding-right: 44px;
         }
 
         .input-with-toggle .pwd-toggle {
@@ -276,7 +260,6 @@
             background: #ddcbfb;
             cursor: pointer;
             font-size: 16px;
-            line-height: 1;
             padding: 6px;
             display: inline-flex;
             align-items: center;
@@ -284,19 +267,80 @@
             color: #374151;
             border-radius: 6px;
         }
-        .input-with-toggle .pwd-toggle:focus {
-            outline: none;
-            box-shadow: 0 4px 12px rgba(43,110,246,0.12);
+
+        /* small helper to align two inputs on same row */
+        .row-2 {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
         }
 
-        /* smaller icon-only buttons used elsewhere */
-        .icon-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+        .row-2>* {
+            flex: 1;
         }
-        /* ---------- end new styles ---------- */
 
+        /* small width helper (for extension select and operator) */
+        .w-160 {
+            width: 160px;
+            flex: 0 0 160px;
+        }
+
+        .w-120 {
+            width: 120px;
+            flex: 0 0 120px;
+        }
+
+        /* Responsive tweaks */
+        @media (max-width: 700px) {
+
+            table#usersTable thead th:nth-child(2),
+            table#usersTable thead th:nth-child(3) {
+                display: none;
+            }
+
+            table#usersTable tbody td:nth-child(2),
+            table#usersTable tbody td:nth-child(3) {
+                display: none;
+            }
+
+            .two-col,
+            .row-2 {
+                flex-direction: column;
+            }
+        }
+
+        /* target very small screens including < 380px */
+        @media (max-width: 380px) {
+            .modal .modal-content {
+                padding: 12px;
+                border-radius: 8px;
+                width: 98%;
+            }
+
+            .modal-form input[type="text"],
+            .modal-form input[type="tel"],
+            .modal-form select {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+
+            .modal-header h2 {
+                font-size: 16px;
+            }
+
+            .btn-add,
+            .btn-secondary {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+
+            .w-160,
+            .w-120 {
+                width: 100%;
+                flex-basis: 100%;
+                flex: 1 1 auto;
+            }
+        }
     </style>
 </head>
 
@@ -317,8 +361,6 @@
         <div class="top-search">
             <label for="q" class="sr-only">Buscar</label>
             <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
-
-            <!-- dentro de .topbar, a la derecha del contenido -->
             <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
                 <span class="dot"></span>
                 <span class="label">Desconectado</span>
@@ -334,22 +376,19 @@
         <section class="table-wrap card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>Gestión de Usuarios</h3>
-                <button id="openAddBtn" class="btn-add">
-                    <span class="plus">＋</span> Añadir usuario
-                </button>
+                <button id="openAddBtn" class="btn-add"><span class="plus">＋</span> Añadir usuario</button>
             </div>
 
-            <!-- Filters: restored original compact style -->
+            <!-- Filters -->
             <section class="filters-card" style="margin-top:12px;">
                 <div class="search-row">
-                    <div class="search" style="min-width:320px;">
+                    <div class="search" style="min-width: auto;">
                         <svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                             <path fill="currentColor"
                                 d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16a6.471 6.471 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM10 15a5 5 0 110-10 5 5 0 010 10z">
                             </path>
                         </svg>
-                        <input id="searchInput" type="text" placeholder="Buscar por nombre o correo..."
-                            aria-label="Buscar usuarios" />
+                        <input id="searchInput" type="text" placeholder="Buscar por nombre o correo..." aria-label="Buscar usuarios" />
                     </div>
 
                     <select id="roleFilter" class="filter-select">
@@ -403,9 +442,7 @@
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="usersBody">
-                        <!-- JS render -->
-                    </tbody>
+                    <tbody id="usersBody"><!-- JS render --></tbody>
                 </table>
             </div>
         </section>
@@ -427,16 +464,49 @@
                         <div id="u_name_alert" class="input-alert"></div>
                     </div>
 
-                    <div class="form-row">
-                        <label for="u_email">Correo <span class="required">*</span></label>
-                        <input id="u_email" type="email" required />
-                        <div id="u_email_alert" class="input-alert"></div>
+                    <!-- Email: local + extension select -->
+                    <div class="row-2" style="margin-bottom:12px;">
+                        <div class="form-row" style="flex:1;">
+                            <label for="u_email_local">Correo <span class="required">*</span></label>
+                            <input id="u_email_local" type="text" placeholder="usuario"
+                                aria-describedby="u_email_alert" />
+                            <div id="u_email_alert" class="input-alert"></div>
+                        </div>
+
+                        <div class="form-row w-160">
+                            <label for="u_email_ext">Extensión Email</label>
+                            <select id="u_email_ext">
+                                <option value="gmail.com">Gmail.com</option>
+                                <option value="hotmail.com">Hotmail.com</option>
+                                <option value="outlook.com">Outlook.com</option>
+                                <option value="yahoo.com">Yahoo.com</option>
+                                <option value="otro">Otro...</option>
+                            </select>
+                            <input id="u_email_ext_custom" type="text" placeholder="dominio.com"
+                                style="display:none;margin-top:6px;" />
+                        </div>
                     </div>
 
-                    <div class="form-row">
-                        <label for="u_phone">Teléfono</label>
-                        <input id="u_phone" type="tel" inputmode="numeric" maxlength="15" placeholder="Solo números" />
-                        <div id="u_phone_alert" class="input-alert"></div>
+                    <!-- Operadora + numero local -->
+                    <div class="row-2" style="margin-bottom:12px;">
+                        <div class="form-row w-120">
+                            <label for="u_operator">Operadora</label>
+                            <select id="u_operator">
+                                <option value="">Seleccionar</option>
+                                <option value="414">0414</option>
+                                <option value="412">0412</option>
+                                <option value="424">0424</option>
+                                <option value="416">0416</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row" style="flex:1;">
+                            <label for="u_phone_local">Numero de Telefono</label>
+                            <!-- local: EXACTAMENTE 7 dígitos -->
+                            <input id="u_phone_local" type="tel" inputmode="numeric" maxlength="7"
+                                placeholder="4723636" />
+                            <div id="u_phone_alert" class="input-alert"></div>
+                        </div>
                     </div>
 
                     <div style="display:flex; gap:12px; margin-bottom:12px;">
@@ -459,13 +529,13 @@
                         </div>
                     </div>
 
-                    <!-- ---------- Two-column password row ---------- -->
+                    <!-- Two-column password -->
                     <div class="two-col" style="margin-bottom:12px;">
                         <div class="form-row">
                             <label for="u_password">Nueva contraseña <span class="required">*</span></label>
                             <div class="input-with-toggle">
-                                <input id="u_password" type="password" minlength="6" maxlength="8" placeholder="6 a 8 caracteres" />
-                                <!-- toggle button inserted dynamically by JS -->
+                                <input id="u_password" type="password" minlength="6" maxlength="8"
+                                    placeholder="6 a 8 caracteres" />
                             </div>
                             <div id="u_password_alert" class="input-alert"></div>
                         </div>
@@ -473,13 +543,12 @@
                         <div class="form-row">
                             <label for="u_password_confirm">Confirmar contraseña <span class="required">*</span></label>
                             <div class="input-with-toggle">
-                                <input id="u_password_confirm" type="password" minlength="6" maxlength="8" placeholder="Repite la contraseña" />
-                                <!-- toggle button inserted dynamically by JS -->
+                                <input id="u_password_confirm" type="password" minlength="6" maxlength="8"
+                                    placeholder="Repite la contraseña" />
                             </div>
                             <div id="u_password_confirm_alert" class="input-alert"></div>
                         </div>
                     </div>
-                    <!-- ---------- end two-column password row ---------- -->
 
                     <div style="font-size:13px;color:#6b7280;margin-top:-6px;margin-bottom:6px;">
                         La contraseña debe tener 6 a 8 caracteres e incluir: <strong>mayúscula</strong>,
@@ -493,6 +562,7 @@
                 </form>
             </div>
         </div>
+
         <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
     </main>
 
