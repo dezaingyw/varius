@@ -218,6 +218,7 @@ function clearAllFieldErrors(formEl) {
 
 /* ---------------- Render products ----------------
    Usa data-label en cada td para permitir la vista responsive tipo tarjetas.
+   La fila se marca visualmente cuando el stock es menor a 5.
 */
 function renderProducts(list) {
     productsBody.innerHTML = '';
@@ -239,6 +240,18 @@ function renderProducts(list) {
         if ((prod.status || '').toLowerCase() === 'suspendido' && currentUserRole !== 'administrador') return;
 
         const tr = document.createElement('tr');
+
+        // Determine stock and low-stock state
+        const stockNum = Number(prod.stock ?? 0);
+        const isLowStock = Number.isFinite(stockNum) && stockNum < 5;
+
+        // If low stock, visually highlight the whole row (red tint + left red border)
+        if (isLowStock) {
+            tr.style.backgroundColor = '#fff5f5'; // very light red/pink
+            tr.style.borderLeft = '4px solid #ef4444'; // red left accent
+            tr.setAttribute('data-low-stock', 'true');
+            tr.setAttribute('aria-label', `Stock bajo: ${stockNum}`);
+        }
 
         // Images mini-slider cell
         const tdImg = document.createElement('td');
@@ -301,7 +314,14 @@ function renderProducts(list) {
         tr.appendChild(tdOfferPrice);
 
         // Stock
-        const tdStock = document.createElement('td'); tdStock.setAttribute('data-label', 'Stock'); tdStock.textContent = prod.stock ?? 0; tr.appendChild(tdStock);
+        const tdStock = document.createElement('td'); tdStock.setAttribute('data-label', 'Stock');
+        tdStock.textContent = prod.stock ?? 0;
+        // If low stock, set clearer color on the stock cell
+        if (isLowStock) {
+            tdStock.style.color = '#991b1b'; // dark red text
+            tdStock.style.fontWeight = '700';
+        }
+        tr.appendChild(tdStock);
 
         // State badge
         const tdState = document.createElement('td'); tdState.setAttribute('data-label', 'Estado');
