@@ -460,7 +460,7 @@
 
                     <div class="form-row">
                         <label for="u_name">Nombre <span class="required">*</span></label>
-                        <input id="u_name" type="text" required />
+                        <input id="u_name" type="text" />
                         <div id="u_name_alert" class="input-alert"></div>
                     </div>
 
@@ -512,12 +512,13 @@
                     <div style="display:flex; gap:12px; margin-bottom:12px;">
                         <div style="flex:1;">
                             <label for="u_role">Rol <span class="required">*</span></label>
-                            <select id="u_role" required>
+                            <select id="u_role">
                                 <option value="">Seleccionar</option>
                                 <option value="administrador">Administrador</option>
                                 <option value="vendedor">Vendedor</option>
                                 <option value="motorizado">Motorizado</option>
                             </select>
+                            <div id="u_role_alert" class="input-alert"></div>
                         </div>
 
                         <div style="width:160px;">
