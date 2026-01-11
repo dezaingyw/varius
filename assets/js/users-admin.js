@@ -60,6 +60,7 @@ let allUsers = [];
 let filteredUsers = [];
 let currentPage = 1;
 let presenceMap = {};
+let modalMode = 'add'; // 'add' or 'edit'
 
 // Toast helper
 function showToast(msg, time = 2500) {
@@ -251,6 +252,7 @@ function renderTable() {
 // Modal helpers y validación UI
 // -----------------------------
 function openModal(mode = 'add', data = null) {
+    modalMode = mode;
     const titleEl = document.getElementById('modalTitle');
     const userIdEl = document.getElementById('userId');
     titleEl.textContent = mode === 'add' ? 'Agregar Usuario' : 'Editar Usuario';
@@ -306,9 +308,30 @@ function openModal(mode = 'add', data = null) {
     document.getElementById('u_status').value = data?.status || 'Activo';
     document.getElementById('u_password').value = '';
     document.getElementById('u_password_confirm').value = '';
-    ['u_name_alert','u_email_alert','u_phone_alert','u_password_alert','u_password_confirm_alert'].forEach(id => {
+    ['u_name_alert','u_email_alert','u_phone_alert','u_password_alert','u_password_confirm_alert','u_role_alert'].forEach(id => {
         const el = document.getElementById(id); if (el) el.textContent = '';
     });
+
+    // En modo 'add' marcar campos como required; en 'edit' remover required para no bloquear la edición
+    const setRequired = (id, req) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (req) el.setAttribute('required','true');
+        else el.removeAttribute('required');
+    };
+    const addRequired = mode === 'add';
+    setRequired('u_email_local', addRequired);
+    setRequired('u_email_ext', addRequired);
+    setRequired('u_operator', addRequired);
+    setRequired('u_phone_local', addRequired);
+    setRequired('u_role', addRequired);
+    setRequired('u_status', addRequired);
+    setRequired('u_password', addRequired);
+    setRequired('u_password_confirm', addRequired);
+
+    // si está en 'otro' y es modo add, requerir el custom
+    if (emailExtSelect.value === 'otro' && addRequired) emailExtCustom.setAttribute('required','true');
+    else emailExtCustom.removeAttribute('required');
 
     userModal.classList.remove('hidden');
     userModal.setAttribute('aria-hidden','false');
@@ -339,8 +362,33 @@ function validateForm(values, isEdit = false) {
     if (!values.name || !values.name.trim()) { document.getElementById('u_name_alert').textContent = 'El nombre es requerido.'; ok = false; }
     else document.getElementById('u_name_alert').textContent = '';
 
-    if (!values.email || !EMAIL_REGEX.test(values.email)) { document.getElementById('u_email_alert').textContent = 'Correo inválido.'; ok = false; }
-    else document.getElementById('u_email_alert').textContent = '';
+    // email: verificar existencia y formato. Además validar extensión custom si aplica.
+    const emailAlertEl = document.getElementById('u_email_alert');
+    const emailExtSelectEl = document.getElementById('u_email_ext');
+    const emailExtCustomEl = document.getElementById('u_email_ext_custom');
+    if (!values.email) {
+        emailAlertEl.textContent = 'Correo requerido.';
+        ok = false;
+    } else if (!EMAIL_REGEX.test(values.email)) {
+        emailAlertEl.textContent = 'Correo inválido.';
+        ok = false;
+    } else {
+        // si seleccionaron 'otro' validar dominio custom
+        if (emailExtSelectEl && emailExtSelectEl.value === 'otro') {
+            const custom = (emailExtCustomEl.value || '').trim();
+            if (!custom) {
+                emailAlertEl.textContent = 'Ingresa la extensión de correo.';
+                ok = false;
+            } else if (!DOMAIN_REGEX.test(custom)) {
+                emailAlertEl.textContent = 'Dominio inválido.';
+                ok = false;
+            } else {
+                emailAlertEl.textContent = '';
+            }
+        } else {
+            emailAlertEl.textContent = '';
+        }
+    }
 
     // phone: require operator + local 7 dígitos -> total 10
     const operator = (document.getElementById('u_operator').value || '').trim();
@@ -354,13 +402,30 @@ function validateForm(values, isEdit = false) {
         document.getElementById('u_phone_alert').textContent = 'El número local debe tener 7 dígitos.';
         ok = false;
     } else if (!isPhoneFormatValid(fullPhone)) {
-        document.getElementById('u_phone_alert').textContent = `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos.`; ok = false;
+        document.getElementById('u_phone_alert').textContent = `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos.`;
+        ok = false;
     } else {
         document.getElementById('u_phone_alert').textContent = '';
     }
 
-    if (!values.role) { ok = false; showToast('Selecciona un rol.'); }
+    // rol: ahora mostramos alerta inline (en lugar de solo toast)
+    const roleEl = document.getElementById('u_role');
+    const roleAlertEl = document.getElementById('u_role_alert');
+    if (!values.role || !values.role.trim()) {
+        if (roleAlertEl) roleAlertEl.textContent = 'Selecciona un rol.';
+        else showToast('Selecciona un rol.');
+        ok = false;
+    } else {
+        if (roleAlertEl) roleAlertEl.textContent = '';
+    }
 
+    // estado (por seguridad)
+    if (!values.status) {
+        showToast('Selecciona un estado.');
+        ok = false;
+    }
+
+    // Contraseña: si estamos agregando (no isEdit) o el usuario intentó cambiar password -> validar
     if (!isEdit || (values.password || values.confirm)) {
         const pw = values.password || '';
         const confirm = values.confirm || '';
@@ -535,10 +600,12 @@ if (emailLocalInput) {
                     emailExtSelectEl.value = domainCandidate;
                     emailExtCustomEl.style.display = 'none';
                     emailExtCustomEl.value = '';
+                    emailExtCustomEl.removeAttribute('required');
                 } else {
                     emailExtSelectEl.value = 'otro';
                     emailExtCustomEl.style.display = 'block';
                     emailExtCustomEl.value = domainCandidate;
+                    if (modalMode === 'add') emailExtCustomEl.setAttribute('required','true');
                 }
             }
             document.getElementById('u_email_alert').textContent = '';
@@ -556,9 +623,11 @@ if (emailExtSelectEl) {
         if (emailExtSelectEl.value === 'otro') {
             emailExtCustomEl.style.display = 'block';
             emailExtCustomEl.focus();
+            if (modalMode === 'add') emailExtCustomEl.setAttribute('required','true');
         } else {
             emailExtCustomEl.style.display = 'none';
             emailExtCustomEl.value = '';
+            emailExtCustomEl.removeAttribute('required');
         }
         document.getElementById('u_email_alert').textContent = '';
     });
