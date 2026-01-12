@@ -127,6 +127,21 @@ async function isPhoneTaken(phone, excludeId = null) {
     return false;
 }
 
+// Formatea Timestamp (Firestore) u otros tipos a string legible
+function formatTimestamp(ts) {
+    if (!ts) return '';
+    let dateObj = null;
+    try {
+        if (typeof ts.toDate === 'function') dateObj = ts.toDate();
+        else if (ts instanceof Date) dateObj = ts;
+        else if (typeof ts === 'number') dateObj = new Date(ts);
+        else dateObj = new Date(ts);
+        return dateObj.toLocaleString();
+    } catch (err) {
+        return '';
+    }
+}
+
 // Load users
 async function loadUsers() {
     try {
@@ -176,6 +191,11 @@ function renderTable() {
         const dotClass = state === 'online' ? 'online-dot' : 'offline-dot';
         const tr = document.createElement('tr');
 
+        // Si está suspendido, marcar la fila con clase para estilo rojo
+        if ((u.status || '').toLowerCase() === 'suspendido') {
+            tr.classList.add('row-suspendido');
+        }
+
         const tdName = document.createElement('td');
         tdName.innerHTML = `
             <div class="user-cell">
@@ -192,6 +212,14 @@ function renderTable() {
 
         const tdPhone = document.createElement('td');
         tdPhone.textContent = u.phone || '';
+
+        // Nueva columna: Fecha (createdAt por defecto, si está suspendido muestra updatedAt si existe)
+        const tdDate = document.createElement('td');
+        let dateToShow = u.createdAt || null;
+        if ((u.status || '').toLowerCase() === 'suspendido') {
+            dateToShow = u.updatedAt || u.createdAt || null;
+        }
+        tdDate.textContent = dateToShow ? formatTimestamp(dateToShow) : '';
 
         const tdStatus = document.createElement('td');
         tdStatus.innerHTML = `<span class="status-badge ${statusClass(u.status)}">${escapeHtml(u.status || 'Activo')}</span>`;
@@ -218,6 +246,7 @@ function renderTable() {
         tr.appendChild(tdName);
         tr.appendChild(tdRole);
         tr.appendChild(tdPhone);
+        tr.appendChild(tdDate);
         tr.appendChild(tdStatus);
         tr.appendChild(tdActions);
         usersBody.appendChild(tr);
@@ -237,7 +266,8 @@ function renderTable() {
             const id = e.currentTarget.getAttribute('data-id');
             if (!confirm('¿Suspender usuario? Esto marcará su estado como "Suspendido".')) return;
             try {
-                await updateDoc(doc(db, 'users', id), { status: 'Suspendido' });
+                // Ahora guardamos updatedAt para poder mostrar la fecha de suspensión
+                await updateDoc(doc(db, 'users', id), { status: 'Suspendido', updatedAt: serverTimestamp() });
                 showToast('Usuario suspendido.');
                 await loadUsers();
             } catch (err) {
