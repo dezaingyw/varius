@@ -6,7 +6,7 @@
 //   - Al escribir dígitos se construye la parte entera (izquierda de la coma) y se mantiene ",00" hasta que el usuario presione ','.
 //   - Si el usuario presiona ',' entra en modo decimal y los dígitos siguientes rellenan la fracción (se permiten varios decimales).
 //   - Backspace elimina en decimal si hay decimales, si no hay decimales elimina la parte entera.
-//   - Pegado intenta parsear un número (acepta formatos con '.' y ','), y establece buffers apropiadamente.
+//   - Pegado intenta parsear un número (acepta formatos con '.' y ','), y establece buffers apropiados.
 // - `stock` y `discount` siguen sanitizados como enteros; `discount` permanece deshabilitado hasta activar `onOffer`.
 // - Formateo mostrado usa miles con '.' y decimales con ',' (locale es-ES).
 
@@ -71,7 +71,7 @@ let isEditing = false;
 let editingId = null;
 let currentPreviewFiles = [];
 let currentPreviewUrls = [];
-let currentSavedImageObjs = [];
+let currentSavedImageObjs = []; // [{url, path}]
 let pendingDeletePaths = [];
 
 const productsCol = collection(db, 'product');
@@ -810,102 +810,155 @@ function clearModalPreviews() {
     clearAllFieldErrors(productForm);
 }
 
-function openAddModal() {
-    if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
-    isEditing = false;
-    editingId = null;
-    currentSavedImageObjs = [];
-    clearModalPreviews();
-    modalTitle.textContent = 'Agregar Producto';
-    productForm.reset();
-    productIdField.value = '';
-    skuField.value = '';
-    skuField.placeholder = 'Se generará al seleccionar categoría';
-    // initialize price buffers to zero
-    priceIntegerBuffer = '0';
-    priceDecimalBuffer = '';
-    priceDecimalMode = false;
-    updatePriceFieldFromBuffers();
-    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
-    setDiscountEnabled(!!onOfferField?.checked);
-    productModal.classList.remove('hidden');
-    productModal.setAttribute('aria-hidden', 'false');
-}
-
-async function openEditProduct(id) {
-    try {
-        const snap = await getDoc(doc(db, 'product', id));
-        if (!snap.exists()) { showToast('Producto no encontrado'); return; }
-        const prod = { id: snap.id, ...snap.data() };
-        if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
-        isEditing = true;
-        editingId = id;
-        modalTitle.textContent = 'Editar Producto';
-        productIdField.value = id;
-        nameField.value = prod.name || '';
-        descriptionField.value = prod.description || '';
-        // set price buffers from stored number
-        setPriceBuffersFromNumber(Number(prod.price || 0));
-        categoryField.value = prod.category || '';
-        statusField.value = prod.status || 'Activo';
-        onOfferField.checked = !!prod.onOffer;
-        discountField.value = prod.discount || 0;
-        stockField.value = prod.stock || 0;
-        skuField.value = prod.sku || '';
-        imageFileField.value = '';
-
-        setDiscountEnabled(!!onOfferField?.checked);
-
-        currentSavedImageObjs = [];
-        if (Array.isArray(prod.imageUrls) && prod.imageUrls.length) {
-            const urls = prod.imageUrls;
-            const paths = Array.isArray(prod.imagePaths) ? prod.imagePaths : [];
-            for (let i = 0; i < urls.length; i++) currentSavedImageObjs.push({ url: urls[i], path: paths[i] || '' });
-        } else if (prod.imageUrl) {
-            currentSavedImageObjs.push({ url: prod.imageUrl, path: '' });
-        }
-        currentPreviewFiles = [];
-        currentPreviewUrls = [];
-        showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
-        if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
-        productModal.classList.remove('hidden');
-        productModal.setAttribute('aria-hidden', 'false');
-    } catch (err) {
-        console.error('openEdit error', err);
-        showToast('Error abriendo producto');
-    }
-}
-
-// small helper to show combined slider in modal (saved + preview)
-function showModalSliderForFiles(combined) {
+// Abstracción para mostrar el slider dentro del modal usando los arrays actuales:
+// - currentSavedImageObjs (array de {url, path})
+// - currentPreviewUrls (array de object URLs para previews)
+function showModalSliderForFiles() {
     slideTrack.innerHTML = '';
-    if (!combined || !combined.length) {
+    const saved = Array.isArray(currentSavedImageObjs) ? currentSavedImageObjs : [];
+    const previews = Array.isArray(currentPreviewUrls) ? currentPreviewUrls : [];
+    const combinedLen = saved.length + previews.length;
+
+    if (!combinedLen) {
         imagePreviewSlider.classList.add('hidden');
         imagePreviewSlider.setAttribute('aria-hidden', 'true');
         return;
     }
+
     imagePreviewSlider.classList.remove('hidden');
     imagePreviewSlider.setAttribute('aria-hidden', 'false');
-    combined.forEach(url => {
+
+    // Render saved images first (they map to currentSavedImageObjs)
+    saved.forEach((obj, idx) => {
         const node = document.createElement('div');
         node.className = 'slide-item';
+        node.style.position = 'relative';
+        const img = document.createElement('img');
+        img.src = obj.url;
+        img.alt = 'preview';
+        img.loading = 'lazy';
+        img.style.display = 'block';
+        img.style.maxWidth = '100%';
+        node.appendChild(img);
+
+        // remove button for saved image
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'img-remove';
+        btn.title = 'Eliminar imagen';
+        btn.dataset.type = 'saved';
+        btn.dataset.index = String(idx);
+        // basic inline styles so funciona sin CSS adicional
+        btn.style.position = 'absolute';
+        btn.style.top = '6px';
+        btn.style.right = '6px';
+        btn.style.width = '28px';
+        btn.style.height = '28px';
+        btn.style.borderRadius = '50%';
+        btn.style.border = 'none';
+        btn.style.background = 'rgba(0,0,0,0.55)';
+        btn.style.color = '#fff';
+        btn.style.cursor = 'pointer';
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.justifyContent = 'center';
+        btn.style.fontSize = '16px';
+        btn.textContent = '×';
+        node.appendChild(btn);
+
+        slideTrack.appendChild(node);
+    });
+
+    // Render preview images (files selected but not yet uploaded)
+    previews.forEach((url, idx) => {
+        const node = document.createElement('div');
+        node.className = 'slide-item';
+        node.style.position = 'relative';
         const img = document.createElement('img');
         img.src = url;
         img.alt = 'preview';
         img.loading = 'lazy';
+        img.style.display = 'block';
+        img.style.maxWidth = '100%';
         node.appendChild(img);
+
+        // remove button for preview
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'img-remove';
+        btn.title = 'Eliminar imagen';
+        btn.dataset.type = 'preview';
+        btn.dataset.index = String(idx);
+        btn.style.position = 'absolute';
+        btn.style.top = '6px';
+        btn.style.right = '6px';
+        btn.style.width = '28px';
+        btn.style.height = '28px';
+        btn.style.borderRadius = '50%';
+        btn.style.border = 'none';
+        btn.style.background = 'rgba(0,0,0,0.55)';
+        btn.style.color = '#fff';
+        btn.style.cursor = 'pointer';
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.justifyContent = 'center';
+        btn.style.fontSize = '16px';
+        btn.textContent = '×';
+        node.appendChild(btn);
+
         slideTrack.appendChild(node);
     });
+
     slideTrack.scrollLeft = 0;
 }
 
-// handle preview selection
+// Remove selected preview image (before upload)
+function removePreviewImage(idx) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= currentPreviewUrls.length) return;
+    // Revoke object URL
+    try { URL.revokeObjectURL(currentPreviewUrls[idx]); } catch (e) { }
+    // Remove file and url in same index
+    currentPreviewFiles.splice(idx, 1);
+    currentPreviewUrls.splice(idx, 1);
+    showModalSliderForFiles();
+}
+
+// Mark saved image for deletion (during edit). It will be removed from UI and path added to pendingDeletePaths.
+// Actual deletion from storage/doc happens when the product is updated (updateProduct).
+function removeSavedImage(idx) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= currentSavedImageObjs.length) return;
+    const imgObj = currentSavedImageObjs[idx];
+    if (imgObj && imgObj.path) {
+        pendingDeletePaths.push(imgObj.path);
+    }
+    // remove image from saved array
+    currentSavedImageObjs.splice(idx, 1);
+    showModalSliderForFiles();
+}
+
+// delegated click handler for remove buttons inside slideTrack
+slideTrack.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('.img-remove');
+    if (!btn) return;
+    const type = btn.dataset.type;
+    const idx = Number(btn.dataset.index);
+    if (type === 'preview') {
+        removePreviewImage(idx);
+    } else if (type === 'saved') {
+        // confirm deletion of saved image from product (mark for deletion)
+        const c = confirm('Eliminar esta imagen del producto? Se quitará al guardar los cambios.');
+        if (c) removeSavedImage(idx);
+    }
+});
+
+/* ---------------- Image upload / drag-drop: allow multiple (min 4 recommended) ---------------- */
+// ... (rest unchanged)
 imageFileField.addEventListener('change', (e) => {
     const files = Array.from(e.target.files || []).slice(0, 8);
     currentPreviewFiles = currentPreviewFiles.concat(files);
     const urls = files.map(f => URL.createObjectURL(f));
     currentPreviewUrls = currentPreviewUrls.concat(urls);
-    showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
+    showModalSliderForFiles();
 });
 
 imageDropZone.addEventListener('click', () => imageFileField.click());
@@ -918,7 +971,7 @@ imageDropZone.addEventListener('drop', (e) => {
     currentPreviewFiles = currentPreviewFiles.concat(dtFiles);
     const urls = dtFiles.map(f => URL.createObjectURL(f));
     currentPreviewUrls = currentPreviewUrls.concat(urls);
-    showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
+    showModalSliderForFiles();
 });
 
 /* ---------- Upload images helper with optimization & resumable progress ---------- */
@@ -1081,7 +1134,18 @@ async function updateProduct(id, data, newFiles = []) {
             imagePaths = imagePaths.concat(uploaded.map(x => x.path));
         }
 
+        // If there are pendingDeletePaths (images the user removed in the modal), attempt to delete them from storage
         if (pendingDeletePaths.length) {
+            // Try to delete storage objects (best-effort)
+            for (const p of pendingDeletePaths) {
+                try {
+                    const ref = storageRef(storage, p);
+                    await deleteObject(ref).catch(() => { /* ignore deletion errors */ });
+                } catch (err) {
+                    console.warn('Error deleting storage path', p, err);
+                }
+            }
+            // Now remove paths and corresponding urls from arrays
             imagePaths = imagePaths.filter(p => !pendingDeletePaths.includes(p));
             const pathToUrl = {};
             if (Array.isArray(docData.imagePaths)) {
@@ -1092,6 +1156,7 @@ async function updateProduct(id, data, newFiles = []) {
             } else {
                 imageUrls = imageUrls.slice(0, imagePaths.length);
             }
+            // clear pending deletes after processing
             pendingDeletePaths = [];
         }
 
@@ -1296,3 +1361,72 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = new URL('../index.html', window.location.href).toString();
     }
 });
+
+// Modal open/edit functions (moved further down to keep flow consistent)
+function openAddModal() {
+    if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
+    isEditing = false;
+    editingId = null;
+    currentSavedImageObjs = [];
+    clearModalPreviews();
+    modalTitle.textContent = 'Agregar Producto';
+    productForm.reset();
+    productIdField.value = '';
+    skuField.value = '';
+    skuField.placeholder = 'Se generará al seleccionar categoría';
+    // initialize price buffers to zero
+    priceIntegerBuffer = '0';
+    priceDecimalBuffer = '';
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
+    setDiscountEnabled(!!onOfferField?.checked);
+    productModal.classList.remove('hidden');
+    productModal.setAttribute('aria-hidden', 'false');
+}
+
+async function openEditProduct(id) {
+    try {
+        const snap = await getDoc(doc(db, 'product', id));
+        if (!snap.exists()) { showToast('Producto no encontrado'); return; }
+        const prod = { id: snap.id, ...snap.data() };
+        if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
+        isEditing = true;
+        editingId = id;
+        modalTitle.textContent = 'Editar Producto';
+        productIdField.value = id;
+        nameField.value = prod.name || '';
+        descriptionField.value = prod.description || '';
+        // set price buffers from stored number
+        setPriceBuffersFromNumber(Number(prod.price || 0));
+        categoryField.value = prod.category || '';
+        statusField.value = prod.status || 'Activo';
+        onOfferField.checked = !!prod.onOffer;
+        discountField.value = prod.discount || 0;
+        stockField.value = prod.stock || 0;
+        skuField.value = prod.sku || '';
+        imageFileField.value = '';
+
+        setDiscountEnabled(!!onOfferField?.checked);
+
+        currentSavedImageObjs = [];
+        if (Array.isArray(prod.imageUrls) && prod.imageUrls.length) {
+            const urls = prod.imageUrls;
+            const paths = Array.isArray(prod.imagePaths) ? prod.imagePaths : [];
+            for (let i = 0; i < urls.length; i++) currentSavedImageObjs.push({ url: urls[i], path: paths[i] || '' });
+        } else if (prod.imageUrl) {
+            currentSavedImageObjs.push({ url: prod.imageUrl, path: '' });
+        }
+        currentPreviewFiles = [];
+        currentPreviewUrls = [];
+        pendingDeletePaths = [];
+        // render combined slider using internal arrays
+        showModalSliderForFiles();
+        if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
+        productModal.classList.remove('hidden');
+        productModal.setAttribute('aria-hidden', 'false');
+    } catch (err) {
+        console.error('openEdit error', err);
+        showToast('Error abriendo producto');
+    }
+}
