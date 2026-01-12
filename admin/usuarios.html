@@ -293,13 +293,16 @@
         /* Responsive tweaks */
         @media (max-width: 700px) {
 
+            /* ocultar rol, teléfono y fecha en pantallas pequeñas */
             table#usersTable thead th:nth-child(2),
-            table#usersTable thead th:nth-child(3) {
+            table#usersTable thead th:nth-child(3),
+            table#usersTable thead th:nth-child(4) {
                 display: none;
             }
 
             table#usersTable tbody td:nth-child(2),
-            table#usersTable tbody td:nth-child(3) {
+            table#usersTable tbody td:nth-child(3),
+            table#usersTable tbody td:nth-child(4) {
                 display: none;
             }
 
@@ -340,6 +343,29 @@
                 flex-basis: 100%;
                 flex: 1 1 auto;
             }
+        }
+
+        /* estilo fila suspendida: fondo rosado y barra izquierda roja (como en tu ejemplo) */
+        tr.row-suspendido {
+            background: #fff1f2; /* rosa suave */
+        }
+        tr.row-suspendido td {
+            /* texto por defecto se mantiene; puedes ajustar color si quieres más contraste */
+        }
+        /* barra roja a la izquierda */
+        tr.row-suspendido td:first-child {
+            position: relative;
+            padding-left: 12px;
+        }
+        tr.row-suspendido td:first-child::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 10px;
+            bottom: 10px;
+            width: 4px;
+            background: #ef4444; /* rojo */
+            border-radius: 2px;
         }
     </style>
 </head>
@@ -438,6 +464,7 @@
                             <th>Nombre</th>
                             <th>Rol</th>
                             <th>Teléfono</th>
+                            <th>Fecha</th> <!-- nueva columna -->
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
