@@ -69,7 +69,7 @@ html {
 
 body {
   min-height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
@@ -194,16 +194,20 @@ a.btn-secondary,
 }
 
 .btn-secondary {
-  background: #f5f8fb;
+  background: #c2ffe4;
   color: var(--text);
   border: 1px solid var(--border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #e8f0f7;
+  background: #78e7b5;
   transform: translateY(-0.0625rem);
 }
 
+.remove-item:hover:not(:disabled) {
+  background: #ff00009e;
+  transform: translateY(-0.0625rem);
+}
 /* Botones especiales del header */
 .cart-btn {
   background: transparent;
@@ -1116,6 +1120,8 @@ a.btn-secondary,
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   min-height: 2.75rem; /* 44px */
+  background: #ff4b4b9e;
+  color: #430909;
 }
 
 /* Resumen del carrito */
@@ -1239,7 +1245,7 @@ a.btn-secondary,
 .checkout-form label {
   font-weight: 700;
   font-size: 1.03rem;
-  color: #222B3A;
+  color: #222b3a;
   margin-bottom: 0;
   letter-spacing: 0;
   background: none;
@@ -1250,7 +1256,7 @@ a.btn-secondary,
 
 /* REQUIRE ASTERISK */
 .req {
-  color: #EF4444;
+  color: #ef4444;
   font-weight: 700;
 }
 
@@ -1266,7 +1272,7 @@ a.btn-secondary,
   font-size: 1.07rem;
   color: #1d2a3b;
   box-sizing: border-box;
-  transition: border-color .18s;
+  transition: border-color 0.18s;
   outline: none;
   min-height: 3.1rem;
 }
@@ -1293,11 +1299,11 @@ a.btn-secondary,
 
 /* ERROR FIELD:  rojo, debajo del input */
 .field-err {
-  color: #EF4444;
+  color: #ef4444;
   margin-top: -0.25rem;
   margin-bottom: 0.15rem;
   min-height: 1.2em;
-  font-size: .99rem;
+  font-size: 0.99rem;
   font-weight: 500;
   line-height: 1.4;
 }
@@ -1321,9 +1327,9 @@ a.btn-secondary,
 
 .age-phone-row label {
   font-weight: 600;
-  color: #222B3A;
+  color: #222b3a;
   font-size: 1rem;
-  margin-bottom: .15rem;
+  margin-bottom: 0.15rem;
   letter-spacing: 0;
 }
 
@@ -1348,7 +1354,7 @@ a.btn-secondary,
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0;
-  gap: .4rem;
+  gap: 0.4rem;
   position: relative;
 }
 
@@ -1385,7 +1391,7 @@ a.btn-secondary,
   margin-top: 0.07rem;
   margin-left: 0.3rem;
   margin-bottom: 0;
-  font-size: .93rem;
+  font-size: 0.93rem;
 }
 
 /* ==== RESPONSIVE Mobile First ==== */
@@ -1404,7 +1410,7 @@ a.btn-secondary,
   #btnGeoLocation {
     right: 0.3rem;
     top: 1.88rem;
-    font-size: .96rem;
+    font-size: 0.96rem;
     padding: 0.38rem 1.2rem;
   }
 }
@@ -1413,12 +1419,12 @@ a.btn-secondary,
   .checkout-form input,
   .age-phone-row input,
   .checkout-form textarea {
-    font-size: .99rem;
-    padding: .8rem .7rem;
+    font-size: 0.99rem;
+    padding: 0.8rem 0.7rem;
     min-height: 2.2rem;
   }
   #btnGeoLocation {
-    font-size: .94rem;
+    font-size: 0.94rem;
     top: -0.65rem;
     padding: 0.29rem 1.13rem;
   }
@@ -1930,4 +1936,62 @@ a:focus-visible {
     background: white;
     padding-top: 0;
   }
+}
+/* Ocultar por defecto en móviles */
+.section-divider {
+  display: none;
+}
+
+/* Mostrar solo en Desktop (pantallas mayores a 900px) */
+@media (min-width: 901px) {
+  .section-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 30px 0 20px 0;
+    color: var(--muted); /* Usando variable de tus estilos */
+    font-size: 24px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .section-divider::before,
+  .section-divider::after {
+    content: "";
+    flex: 1;
+    border-bottom: 1px solid var(--border); /* Usando variable de tus estilos */
+  }
+
+  .section-divider:not(:empty)::before {
+    margin-right: 15px;
+  }
+
+  .section-divider:not(:empty)::after {
+    margin-left: 15px;
+  }
+}
+
+.carousel-title-container {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 20px 0; /* Espacio alrededor del título */
+}
+
+.carousel-title-text {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--muted); /* Usa el color de texto de tu app */
+  text-transform: uppercase;
+  padding: 0 15px;
+  white-space: nowrap;
+}
+
+/* Líneas a los costados */
+.carousel-title-container::before,
+.carousel-title-container::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--border); /* Usa el color de borde de tu app */
 }
