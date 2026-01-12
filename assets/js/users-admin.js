@@ -213,13 +213,17 @@ function renderTable() {
         const tdPhone = document.createElement('td');
         tdPhone.textContent = u.phone || '';
 
-        // Nueva columna: Fecha (createdAt por defecto, si está suspendido muestra updatedAt si existe)
+        // Nueva columna: Fecha -> muestra FC: (createdAt) y si existe FS: (updatedAt) cuando está suspendido
         const tdDate = document.createElement('td');
-        let dateToShow = u.createdAt || null;
-        if ((u.status || '').toLowerCase() === 'suspendido') {
-            dateToShow = u.updatedAt || u.createdAt || null;
+        const createdStr = u.createdAt ? formatTimestamp(u.createdAt) : '';
+        const updatedStr = u.updatedAt ? formatTimestamp(u.updatedAt) : '';
+        // Construimos HTML con etiquetas FC: y FS:
+        let dateHtml = `<div class="date-cell"><div><strong>FC:</strong> ${escapeHtml(createdStr)}</div>`;
+        if ((u.status || '').toLowerCase() === 'suspendido' && updatedStr) {
+            dateHtml += `<div><strong>FS:</strong> ${escapeHtml(updatedStr)}</div>`;
         }
-        tdDate.textContent = dateToShow ? formatTimestamp(dateToShow) : '';
+        dateHtml += `</div>`;
+        tdDate.innerHTML = dateHtml;
 
         const tdStatus = document.createElement('td');
         tdStatus.innerHTML = `<span class="status-badge ${statusClass(u.status)}">${escapeHtml(u.status || 'Activo')}</span>`;
@@ -266,7 +270,7 @@ function renderTable() {
             const id = e.currentTarget.getAttribute('data-id');
             if (!confirm('¿Suspender usuario? Esto marcará su estado como "Suspendido".')) return;
             try {
-                // Ahora guardamos updatedAt para poder mostrar la fecha de suspensión
+                // Ahora guardamos updatedAt para poder mostrar la fecha de suspensión (FS)
                 await updateDoc(doc(db, 'users', id), { status: 'Suspendido', updatedAt: serverTimestamp() });
                 showToast('Usuario suspendido.');
                 await loadUsers();
