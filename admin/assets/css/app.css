@@ -1763,3 +1763,22 @@ table#ordersTable tbody td {
         display: none !important;
     }
 }
+
+.btn-small, .btn-secondary, .btn-primary {
+    display: inline-flex;    /* Alinea el icono y el texto internamente */
+    align-items: center;     /* Centra verticalmente el contenido */
+    justify-content: center; /* Centra horizontalmente el contenido */
+    height: 38px;            /* Altura fija para que sean idénticos */
+    padding: 0 16px;         /* Espaciado lateral consistente */
+    box-sizing: border-box;  /* Incluye el borde en el cálculo de la altura */
+    text-decoration: none;   /* Quita el subrayado del enlace */
+    font-size: 13px;         /* Tamaño de fuente igual para todos */
+    line-height: 1;          /* Evita que el interlineado afecte la altura */
+}
+
+/* Ajuste específico para el contenedor de acciones */
+.history-header .actions {
+    display: flex;
+    align-items: center;     /* Alinea los botones entre sí en el eje vertical */
+    gap: 8px;                /* Espacio entre botones */
+}
