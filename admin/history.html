@@ -18,6 +18,35 @@
             margin-bottom: 12px;
         }
 
+        .history-kpis {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .kpi-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            min-width: 160px;
+            box-shadow: var(--shadow-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .kpi-card .kpi-label {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .kpi-card .kpi-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
         .history-filters {
             display: flex;
             gap: 12px;
@@ -53,11 +82,13 @@
             color: #fff;
         }
 
-        .history-grid {
-            display: grid;
-            grid-template-columns: 1fr 360px;
-            gap: 16px;
-            align-items: start;
+        .btn-secondary {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            cursor: pointer;
         }
 
         .orders-list {
@@ -65,13 +96,8 @@
             border-radius: 8px;
             padding: 12px;
             background: var(--card-bg);
-        }
-
-        .products-movement {
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px;
-            background: var(--card-bg);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .small-muted {
@@ -82,33 +108,11 @@
         table.history-table {
             width: 100%;
             border-collapse: collapse;
-        }
-
-        table.history-table th,
-        table.history-table td {
-            padding: 8px 10px;
-            border-bottom: 1px solid var(--border);
-            font-size: 13px;
-            text-align: left;
-        }
-
-        .history-header .actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        /* history-table: responsive, no fuerza min-width */
-        table.history-table {
-            width: 100%;
-            border-collapse: collapse;
             table-layout: auto;
-            /* permite que las celdas se envuelvan */
             word-break: break-word;
             max-width: 100%;
         }
 
-        /* Asegurar que th/td en history se adapten y se puedan envolver */
         table.history-table th,
         table.history-table td {
             padding: 8px 10px;
@@ -119,80 +123,32 @@
             vertical-align: middle;
         }
 
-        /* Evitar overflow horizontal en contenedores de listas */
-        .orders-list,
-        .products-movement {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Ajustes visuales para los headers de la sección */
-        .history-header h3 {
-            margin: 0;
-            font-size: 18px;
-            letter-spacing: 0.1px;
-        }
-
-        /* Botón volver: más visible y con texto. Usar .btn-back para ajustes */
-        .btn-back {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: #fff;
-            color: var(--text);
-            font-weight: 700;
-            text-decoration: none;
-            transition: transform 120ms ease, box-shadow 120ms ease;
-        }
-
-        .btn-back svg {
-            flex: 0 0 auto;
-        }
-
-        .btn-back .btn-back-text {
-            font-size: 13px;
-        }
-
-        /* Hover / focus states coherentes */
-        .btn-back:hover,
-        .btn-back:focus {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-subtle);
+        table.history-table thead th {
             background: #fbfdff;
+            font-weight: 700;
         }
 
-        /* Hacer export CSV más prominente */
-        #exportCsv {
-            padding: 8px 12px;
+        .total-summary {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(0,0,0,0.02);
             border-radius: 8px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* Asegurar que history-grid se apile correctamente en pantallas pequeñas */
-        .history-grid {
-            display: grid;
-            grid-template-columns: 1fr 360px;
-            gap: 16px;
-            align-items: start;
+        .nota-pago {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px;
         }
 
-        /* Mobile: stack panels y ajustar paddings */
+        /* Mobile */
         @media (max-width: 900px) {
-            .history-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .orders-list,
-            .products-movement {
-                padding: 12px;
-                margin: 0;
-            }
-
-            /* aseguramos que botones del header no rebasen */
-            .history-header .actions {
-                gap: 8px;
+            .history-kpis {
+                flex-direction: column;
             }
 
             .history-filters {
@@ -200,42 +156,11 @@
             }
         }
 
-        /* Small devices: pequeños ajustes de tipografía y espaciado */
-        @media (max-width: 420px) {
-            .history-header h3 {
-                font-size: 16px;
-            }
-
-            .history-filters label {
-                font-size: 12px;
-            }
-
-            .history-filters input {
-                padding: 8px;
-            }
-
-            .btn-back .btn-back-text {
-                display: inline-block;
-            }
-        }
-
-        /* Pequeña mejora: resaltado de filas al pasar el ratón para history tables */
+        /* Small hover visual */
         table.history-table tbody tr:hover {
             background: linear-gradient(180deg, #fff, #fcfdff);
         }
-
-        /* Mantener tablas accesibles: data-label used for stacked mobile */
-        table.history-table td[data-label]::before {
-            /* No hacemos nada por defecto aquí (la regla de apilado ya existe para orders/products),
-       pero dejamos espacio para que los td mantengan atributo data-label si se muestran como cards.*/
-            display: inline-block;
-            font-weight: 700;
-            margin-right: 8px;
-            color: var(--muted);
-            text-transform: none;
-        }
-
-        /* Si quieres, puedes añadir aquí más reglas estéticas (colores, sombras) sin romper layout. */
+        /* Forzamos que tanto 'a' como 'button' se comporten igual */
     </style>
 </head>
 
@@ -258,7 +183,6 @@
             <label for="q" class="sr-only">Buscar</label>
             <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
 
-            <!-- dentro de .topbar, a la derecha del contenido -->
             <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
                 <span class="dot"></span>
                 <span class="label">Desconectado</span>
@@ -274,7 +198,6 @@
             <div class="history-header">
                 <h3>Historial de Compras</h3>
                 <div class="actions">
-                    <!-- New button that redirects back to orders.html -->
                     <a href="orders.html" class="btn-small btn-suspender" title="Volver a Pedidos">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                             class="bi bi-arrow-90deg-left" viewBox="0 0 16 16">
@@ -284,6 +207,22 @@
                         Regresar
                     </a>
                     <button id="exportCsv" class="btn-secondary">Exportar CSV</button>
+                </div>
+            </div>
+
+            <!-- KPIs: colocadas arriba de los filtros como solicitaste -->
+            <div class="history-kpis" id="kpiContainer" aria-live="polite">
+                <div class="kpi-card">
+                    <div class="kpi-label">Veces que ha comprado</div>
+                    <div id="kpi-purchases" class="kpi-value">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Monto total gastado</div>
+                    <div id="kpi-total" class="kpi-value">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Cantidad total de productos</div>
+                    <div id="kpi-products" class="kpi-value">—</div>
                 </div>
             </div>
 
@@ -306,16 +245,10 @@
                 </div>
             </div>
 
-            <div class="history-grid">
-                <div class="orders-list">
-                    <h4>Pedidos</h4>
-                    <div id="histOrdersContainer" style="margin-top:8px;"></div>
-                </div>
-
-                <div class="products-movement">
-                    <h4>Movimiento de Productos</h4>
-                    <div id="movementContainer"></div>
-                </div>
+            <div class="orders-list">
+                <h4>Pedidos</h4>
+                <div id="histOrdersContainer" style="margin-top:8px;"></div>
+                <div class="nota-pago">Los totales muestran solo órdenes pagadas.</div>
             </div>
         </section>
     </main>
