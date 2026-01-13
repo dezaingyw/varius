@@ -4,14 +4,9 @@
 // - Carga motorizados & productos disponibles.
 // - Edit: ver, editar items, asignar motorizado (con comentario obligatorio si cambia), suspender.
 // - Inline field errors y eliminación de producto de availableProducts al agregar.
-// - Cambios solicitados:
-//   * Si shippingStatus === 'entregado' en la columna de acciones se muestra: <span class="badge delivered">Entregado</span> + botón Historial.
-//   * Si status === 'asignado', se muestra paymentStatus (p. ej. "Pagado") cuando exista.
-//   * Todos los estatus se muestran en español (mapeo/normalización).
-//   * Roles: admin ve todo; vendedor ve solo sus pedidos (assignedSeller == uid); motorizado ve solo sus pedidos (assignedMotor == uid) y no ve columna de chat ni botón flotante.
-//   * Al asignar un motorizado se guarda: assignedMotor (uid), assignedMotorName (correo), assignedMotorizedName (nombre) y assignedMotorizedAt (timestamp).
-//   * Si se usa la entrada libre (edit-motorizado-free) intentamos derivar nombre/email; preferimos datos del usuario seleccionado (id) cuando exista.
-// - Corregido bug moneyView -> money en vista detalle y subscribeMessages para usar orderId.
+// - Chat removido por petición.
+// - Añadido: slider de imágenes dentro del modal "Ver detalle" (solo modal).
+// - Mejora: si el item no tiene imágenes intenta obtenerlas desde el documento `product/{productId}`.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -41,9 +36,6 @@ const db = getFirestore(app);
 /* ================= DOM REFS ================= */
 const tbody = document.getElementById('ordersTbody');
 const ordersCards = document.getElementById('ordersCards');
-let chatList = document.getElementById('chatList');
-const chatColumn = document.getElementById('chatColumn');
-const floatingChatBtn = document.getElementById('floatingChatBtn');
 const toastEl = document.getElementById('toast');
 
 const filterStatus = document.getElementById('filter-status');
@@ -64,7 +56,6 @@ const editClose = document.getElementById('edit-close');
 const cancelEditBtn = document.getElementById('cancelEditBtn');
 const editCustomer = document.getElementById('edit-customer');
 const editMotorizadoSelect = document.getElementById('edit-motorizado');
-const editMotorizadoFree = document.getElementById('edit-motorizado-free'); // opcional libre
 const editMotComment = document.getElementById('edit-motorizado-comment');
 const itemsList = document.getElementById('items-list');
 const editItemsArea = document.getElementById('edit-items-area'); // contenedor de items + productos disponibles
@@ -74,23 +65,21 @@ const newItemPrice = document.getElementById('new-item-price');
 const newItemQty = document.getElementById('new-item-qty');
 const editTotal = document.getElementById('edit-total');
 
-const chatModal = document.getElementById('chat-modal');
-const chatTitle = document.getElementById('chat-title');
-const chatBody = document.getElementById('chat-body');
-
 /* ================= STATE ================= */
 let orders = [];
 let filteredOrders = [];
 let ordersUnsubscribe = null;
-let messagesUnsubscribe = null;
 let currentUser = null;
 let currentUserRole = 'vendedor'; // 'admin' | 'vendedor' | 'motorizado'
 let currentEditOrder = null;
 let currentViewOrder = null;
-let activeChatOrderId = null;
 
 let motorizados = []; // [{ id, name, email, ... }]
 let availableProducts = [];
+
+/* ================= Modal rotator state (for view modal only) ================= */
+// Map of sliderElement -> { intervalId, imgs, imgEl, idx }
+const modalRotators = new Map();
 
 /* ================= HELPERS ================= */
 function showToast(text, timeout = 3000) {
@@ -174,7 +163,7 @@ function getIconSvg(name, size = 16) {
     switch ((name || '').toLowerCase()) {
         case 'eye': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></svg>`;
         case 'pencil': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>`;
-        case 'clock': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.350-.378l.758.653a8 8 0 0 1-.401.432z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/></svg>`;
+        case 'clock': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/></svg>`;
         case 'x-circle': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>`;
         default: return '';
     }
@@ -205,9 +194,6 @@ function showFieldError(element, message) {
 }
 
 /* ================= NAV TO HISTORY HELPERS ================= */
-/* Build history.html URL with query params extracted from order object.
-   Keeps behavior safe: if no params available, redirects to plain history.html.
-*/
 function buildHistoryUrlFromOrder(order) {
     try {
         const od = order && order.data ? order.data : order || {};
@@ -227,12 +213,81 @@ function buildHistoryUrlFromOrder(order) {
     }
 }
 
+/* ================= MODAL ROTATOR HELPERS ================= */
+/* Small fade helper used by modal rotator */
+function fadeImageToModal(imgEl, newSrc, dur = 240) {
+    if (!imgEl) return;
+    imgEl.style.transition = `opacity ${dur}ms ease`;
+    imgEl.style.opacity = '0';
+    setTimeout(() => { imgEl.src = newSrc; imgEl.style.opacity = '1'; }, dur);
+}
+
+/* Initialize simple rotators inside the view modal only.
+   Structure expected:
+   <div class="mini-slider"><div class="mini-track">
+       <img src="..."> ... multiple imgs
+   </div></div>
+   Will replace track contents with a single display img and cycle through the list.
+*/
+function initModalRotators(root = document) {
+    // clear previous (if any) before starting new ones
+    clearModalRotators();
+
+    if (!root) return;
+    const sliders = Array.from(root.querySelectorAll('.mini-slider'));
+    sliders.forEach(slider => {
+        try {
+            const track = slider.querySelector('.mini-track');
+            if (!track) return;
+            const imgs = Array.from(track.querySelectorAll('img')).map(i => i.src).filter(Boolean);
+            // if no imgs but there are div placeholders, ignore
+            if (!imgs.length) return;
+
+            // clear track and create display
+            track.innerHTML = '';
+            const displayWrap = document.createElement('div');
+            displayWrap.className = 'mini-display';
+            displayWrap.style.width = '56px';
+            displayWrap.style.height = '56px';
+            displayWrap.style.overflow = 'hidden';
+            const displayImg = document.createElement('img');
+            displayImg.className = 'mini-current';
+            displayImg.src = imgs[0];
+            displayImg.style.width = '100%';
+            displayImg.style.height = '100%';
+            displayImg.style.objectFit = 'cover';
+            displayImg.style.borderRadius = '6px';
+            displayImg.style.transition = 'opacity 240ms ease';
+            displayWrap.appendChild(displayImg);
+            track.appendChild(displayWrap);
+
+            let idx = 0;
+            let intervalId = null;
+            if (imgs.length > 1) {
+                intervalId = setInterval(() => {
+                    idx = (idx + 1) % imgs.length;
+                    fadeImageToModal(displayImg, imgs[idx], 240);
+                }, 2000);
+            }
+
+            modalRotators.set(slider, { intervalId, imgs, imgEl: displayImg, idx });
+        } catch (e) {
+            console.error('initModalRotators error', e);
+        }
+    });
+}
+
+function clearModalRotators() {
+    for (const [el, info] of modalRotators.entries()) {
+        try { if (info.intervalId) clearInterval(info.intervalId); } catch (e) { }
+        modalRotators.delete(el);
+    }
+}
+
 /* ================= RENDERERS ================= */
 function render(list) {
     renderTable(list);
     renderCards(list);
-    if (!isMobileViewport()) renderChatSidebarList();
-    else if (chatColumn) chatColumn.style.display = 'none';
 }
 
 /* Table */
@@ -297,7 +352,6 @@ function renderTable(list) {
             deliveredSpan.textContent = 'Entregado';
             rowActions.appendChild(deliveredSpan);
 
-            // History button (siempre mostrar) -> ahora envía parámetros
             const histBtn = document.createElement('button');
             histBtn.className = 'btn-small btn-history';
             histBtn.title = 'Historial de Cliente';
@@ -414,50 +468,6 @@ function renderCards(list) {
     });
 }
 
-/* Chat column list */
-function renderChatColumn(list) {
-    // Motorizado no debe ver la columna de chat
-    if (currentUserRole === 'motorizado') {
-        if (chatColumn) chatColumn.style.display = 'none';
-        return;
-    }
-    if (isMobileViewport()) {
-        if (chatColumn) chatColumn.style.display = 'none';
-        return;
-    }
-    if (!chatList) renderChatSidebarList();
-    if (!chatList) return;
-    chatList.innerHTML = '';
-    list.forEach(o => {
-        const entry = document.createElement('div'); entry.className = 'chat-item';
-        const cname = (o.data && o.data.customerData && (o.data.customerData.Customname || o.data.customerData.name)) || 'Sin nombre';
-        const last = (o.data && o.data.lastMessage && o.data.lastMessage.text) || (o.data && o.data.items && o.data.items[0] && o.data.items[0].name) || '';
-        entry.innerHTML = `
-      <div class="chat-item-left"><div class="thumb"></div></div>
-      <div class="chat-item-body">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-weight:700">${escapeHtml(cname)}</div>
-          <div class="small-muted">${formatDateFlexible(o.data && (o.data.orderDate || o.data.timestamp))}</div>
-        </div>
-        <div class="small-muted">${escapeHtml(String(last)).slice(0, 60)}</div>
-      </div>
-    `;
-        entry.addEventListener('click', () => openChatForOrder(o));
-        chatList.appendChild(entry);
-    });
-}
-
-/* Recreate sidebar list structure and bind chatList ref */
-function renderChatSidebarList() {
-    if (!chatColumn) return;
-    if (currentUserRole === 'motorizado') { chatColumn.style.display = 'none'; return; }
-    if (isMobileViewport()) { chatColumn.style.display = 'none'; return; }
-    chatColumn.style.display = '';
-    chatColumn.innerHTML = `<h3>Mensajes de Clientes</h3><div id="chatList" class="chat-list"></div>`;
-    chatList = document.getElementById('chatList');
-    renderChatColumn(filteredOrders.length ? filteredOrders : orders);
-}
-
 /* ================= FILTERS ================= */
 function applyFilters() {
     const s = (filterStatus && filterStatus.value) || '';
@@ -512,7 +522,6 @@ function listenOrders() {
             return (bt || 0) - (at || 0);
         });
         applyFilters();
-        if (!isMobileViewport()) renderChatSidebarList();
         showToast(`Pedidos cargados: ${orders.length}`, 900);
     }, err => {
         console.error('onSnapshot error:', err);
@@ -521,19 +530,60 @@ function listenOrders() {
 }
 
 /* ================= VIEW / EDIT / SUSPEND ================= */
-function openViewModal(order) {
+/* openViewModal made async so we can fetch images from product docs if item lacks images */
+async function openViewModal(order) {
     currentViewOrder = order;
     const o = order.data || {};
     const cname = (o.customerData && (o.customerData.Customname || o.customerData.name)) || 'Sin nombre';
     const address = (o.customerData && o.customerData.address) || o.readable_address || '';
-    const items = o.items || [];
+    const items = Array.isArray(o.items) ? o.items.slice() : [];
 
     if (!viewBody) return;
 
-    // Build products table
+    // For each item, try to collect images:
+    // priority: item.imageUrls (array) -> item.imageUrl / item.image (single) -> product doc imageUrls
+    const itemsWithImgs = [];
+    for (let i = 0; i < items.length; i++) {
+        const it = items[i] || {};
+        let imgs = [];
+        try {
+            if (Array.isArray(it.imageUrls) && it.imageUrls.length) imgs.push(...it.imageUrls.map(x => String(x).trim()).filter(Boolean));
+            if (it.imageUrl && String(it.imageUrl).trim()) imgs.push(String(it.imageUrl).trim());
+            if (it.image && String(it.image).trim()) imgs.push(String(it.image).trim());
+        } catch (e) {
+            console.warn('item image normalization error', e);
+        }
+        // If still empty and we have a productId, try to fetch product doc for imageUrls
+        if (!imgs.length && (it.productId || it.product_id || it.product)) {
+            const pid = it.productId || it.product_id || it.product;
+            if (pid) {
+                try {
+                    const pSnap = await getDoc(doc(db, 'product', pid));
+                    if (pSnap.exists()) {
+                        const pdata = pSnap.data() || {};
+                        if (Array.isArray(pdata.imageUrls) && pdata.imageUrls.length) imgs.push(...pdata.imageUrls.map(x => String(x).trim()).filter(Boolean));
+                        else if (pdata.imageUrl && String(pdata.imageUrl).trim()) imgs.push(String(pdata.imageUrl).trim());
+                    }
+                } catch (err) {
+                    console.warn('Error fetching product for images:', pid, err);
+                }
+            }
+        }
+        // dedupe & keep valid urls
+        imgs = imgs.filter(Boolean).map(s => String(s));
+        // Log for debugging if no images found
+        if (!imgs.length) {
+            console.debug('No images for item', it.name || it.productId || '(no id)');
+        } else {
+            console.debug('Images for item', it.name || it.productId || '(no name)', imgs);
+        }
+        itemsWithImgs.push({ ...it, imgs });
+    }
+
+    // Build products table - image column now supports a simple mini-slider per product.
     const productsHtml = `
       <div class="card products-card" style="border-radius:8px;padding:12px;">
-        <h4 style="margin:0 0 10px 0;font-size:16px;">Productos (${items.length})</h4>
+        <h4 style="margin:0 0 10px 0;font-size:16px;">Productos (${itemsWithImgs.length})</h4>
         <div style="overflow:auto;">
           <table style="width:100%;border-collapse:collapse;">
             <thead>
@@ -546,17 +596,24 @@ function openViewModal(order) {
               </tr>
             </thead>
             <tbody>
-              ${items.map(it => {
+              ${itemsWithImgs.map(it => {
         const qty = Number(it.quantity || it.qty || 1);
         const price = Number(it.price || it.unitPrice || it.subtotal || 0);
         const subtotal = qty * price;
-        const imgSrc = (it.imageUrl && String(it.imageUrl).trim()) || (it.image && String(it.image).trim()) || '';
-        const hasImg = /^https?:\/\//i.test(imgSrc);
-        const imgHtml = hasImg
-            ? `<img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(it.name || '')}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;">`
-            : `<div style="width:56px;height:56px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#9aa0a6;font-weight:700;font-size:12px;">${escapeHtml((it.name || '').slice(0, 2).toUpperCase() || 'IMG')}</div>`;
+        const imgs = Array.isArray(it.imgs) ? it.imgs : [];
+        let imgCellHtml = '';
+        if (imgs.length) {
+            // Build mini-slider markup expected by initModalRotators
+            const imgsHtml = imgs.map(src => `<img src="${escapeHtml(src)}" alt="${escapeHtml(it.name || '')}" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-right:6px;">`).join('');
+            imgCellHtml = `<div class="mini-slider" style="display:flex;align-items:center;"><div class="mini-track">${imgsHtml}</div></div>`;
+        } else {
+            // placeholder with initials (like product table)
+            const initials = escapeHtml(((it.name || '').slice(0,2) || 'IMG').toUpperCase());
+            imgCellHtml = `<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:#f3f4f6;color:#9aa0a6;font-weight:700">${initials}</div>`;
+        }
+
         return `<tr style="border-bottom:1px solid #eef2f6;">
-                            <td style="padding:10px 6px;vertical-align:middle;">${imgHtml}</td>
+                            <td style="padding:10px 6px;vertical-align:middle;">${imgCellHtml}</td>
                             <td style="padding:10px 6px;vertical-align:middle;"><div style="font-weight:700">${escapeHtml(it.name || 'Producto')}</div></td>
                             <td style="padding:10px 6px;vertical-align:middle;text-align:center;">${escapeHtml(String(qty))}</td>
                             <td style="padding:10px 6px;vertical-align:middle;text-align:right;color:#111;">${money(price)}</td>
@@ -594,6 +651,9 @@ function openViewModal(order) {
     ${productsHtml}
     `;
 
+    // initialize rotators inside the newly injected viewBody
+    initModalRotators(viewBody);
+
     viewModal && viewModal.classList.remove('hidden');
     viewModal && viewModal.setAttribute('aria-hidden', 'false');
 }
@@ -602,6 +662,8 @@ function closeViewModal() {
     viewModal && viewModal.classList.add('hidden');
     viewModal && viewModal.setAttribute('aria-hidden', 'true');
     currentViewOrder = null;
+    // clear modal rotators to avoid intervals running in background
+    clearModalRotators();
 }
 
 /* Abre editor: prepara select de motorizados y lista de items */
@@ -619,13 +681,11 @@ function openEditModal(order) {
         if (assignedMotorId) {
             editMotorizadoSelect.value = assignedMotorId;
         } else {
-            // attempt to find matching motorizado by email or name and set value to their id
             const found = motorizados.find(m => (m.email && String(m.email) === String(assignedMotorEmail)) || (m.name && String(m.name) === String(assignedMotorNameVal)));
             if (found) editMotorizadoSelect.value = found.id;
             else editMotorizadoSelect.value = '';
         }
     }
-    if (editMotorizadoFree) editMotorizadoFree.value = '';
     if (editMotComment) editMotComment.value = '';
     buildItemsList(o.items || []);
     computeEditTotal();
@@ -934,9 +994,9 @@ async function saveEditForm(e) {
     const original = orders.find(x => x.id === currentEditOrder.id);
     if (!original) { showToast('Pedido no encontrado'); return; }
 
-    // Determinar motorizado seleccionado: preferir select (uid), si hay entrada libre usarla.
+    // Determinar motorizado seleccionado: preferir select (uid)
     const selectedMotorId = editMotorizadoSelect ? (editMotorizadoSelect.value || '') : '';
-    const freeEntry = editMotorizadoFree ? (editMotorizadoFree.value || '').trim() : '';
+    const freeEntryName = ''; // input libre eliminado en UI, mantenemos por compatibilidad futura
     let newAssignedMotorUid = '';
     let newAssignedMotorEmail = '';
     let newAssignedMotorName = '';
@@ -948,19 +1008,11 @@ async function saveEditForm(e) {
             newAssignedMotorEmail = found.email || '';
             newAssignedMotorName = found.name || found.email || found.id || '';
         } else {
-            // selected id but not found in local cache; still set uid
             newAssignedMotorUid = selectedMotorId;
-            newAssignedMotorName = editMotorizadoFree && editMotorizadoFree.value ? editMotorizadoFree.value.trim() : '';
+            newAssignedMotorName = '';
         }
-    } else if (freeEntry) {
-        // If free entry looks like an email, store in email; treat name as the same freeEntry if it doesn't look like email
-        const looksLikeEmail = /\S+@\S+\.\S+/.test(freeEntry);
-        if (looksLikeEmail) {
-            newAssignedMotorEmail = freeEntry;
-            newAssignedMotorName = freeEntry.split('@')[0]; // fallback name
-        } else {
-            newAssignedMotorName = freeEntry;
-        }
+    } else if (freeEntryName) {
+        newAssignedMotorName = freeEntryName;
     }
 
     // old motor identity to compare (prefer uid, otherwise email/name)
@@ -976,7 +1028,7 @@ async function saveEditForm(e) {
     );
 
     if (isMotorChanged && !(editMotComment && editMotComment.value.trim())) {
-        showFieldError(editMotComment || (editMotorizadoSelect || editMotorizadoFree), 'Debes justificar el cambio de motorizado.');
+        showFieldError(editMotComment || (editMotorizadoSelect), 'Debes justificar el cambio de motorizado.');
         showToast('Falta justificar el cambio de motorizado.');
         return;
     }
@@ -1054,232 +1106,6 @@ async function suspendOrder(order) {
     }
 }
 
-/* ================= CHAT (messages subcollection) ================= */
-function clearMessagesUnsubscribe() {
-    if (messagesUnsubscribe) { messagesUnsubscribe(); messagesUnsubscribe = null; }
-}
-
-function appendMessageBubble(container, text, own = false, timestamp = null) {
-    if (!container) return;
-    const wrap = document.createElement('div');
-    wrap.style.display = 'flex';
-    wrap.style.justifyContent = own ? 'flex-end' : 'flex-start';
-    wrap.style.padding = '0 6px';
-    const bubble = document.createElement('div');
-    bubble.className = own ? 'msg-bubble msg-own' : 'msg-bubble msg-other';
-    bubble.style.maxWidth = '78%';
-    bubble.style.padding = '8px 12px';
-    bubble.style.borderRadius = '14px';
-    bubble.style.background = own ? 'linear-gradient(180deg,#7c3aed,#5b21b6)' : '#f1f5f9';
-    bubble.style.color = own ? '#fff' : '#0f172a';
-    bubble.style.fontSize = '14px';
-    bubble.textContent = text;
-    if (timestamp) {
-        const ts = document.createElement('div');
-        ts.style.fontSize = '11px';
-        ts.style.marginTop = '6px';
-        ts.style.opacity = '0.7';
-        ts.style.textAlign = 'right';
-        try {
-            const d = timestamp && typeof timestamp.toDate === 'function' ? timestamp.toDate() : new Date(timestamp);
-            ts.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } catch { }
-        bubble.appendChild(ts);
-    }
-    wrap.appendChild(bubble);
-    container.appendChild(wrap);
-    container.scrollTop = container.scrollHeight;
-}
-
-function subscribeMessages(orderId, onMessages) {
-    clearMessagesUnsubscribe();
-    try {
-        const msgsCol = collection(db, 'orders', orderId, 'messages');
-        const q = query(msgsCol, orderBy('ts', 'asc'));
-        messagesUnsubscribe = onSnapshot(q, snap => {
-            const arr = [];
-            snap.forEach(s => {
-                const d = s.data();
-                arr.push({ id: s.id, text: d.text, from: d.from, fromName: d.fromName, ts: d.ts });
-            });
-            onMessages && onMessages(arr);
-        }, err => {
-            console.error('messages onSnapshot error', err);
-            onMessages && onMessages([]);
-        });
-    } catch (err) {
-        console.error('subscribeMessages error', err);
-        onMessages && onMessages([]);
-    }
-}
-
-/* Abrir conversación para un pedido: en desktop abre panel en sidebar, en mobile abre modal */
-function openChatForOrder(order) {
-    if (!order) return;
-    // motorizado no debe abrir chats
-    if (currentUserRole === 'motorizado') return;
-    if (isMobileViewport()) {
-        renderChatUIForOrderModal(order);
-    } else {
-        renderChatPanelInSidebar(order);
-    }
-}
-
-/* Sidebar panel conversation (desktop) */
-function renderChatPanelInSidebar(order) {
-    if (!chatColumn) return;
-    if (currentUserRole === 'motorizado') { chatColumn.style.display = 'none'; return; }
-    if (isMobileViewport()) { renderChatUIForOrderModal(order); return; }
-    chatColumn.innerHTML = '';
-    const panel = document.createElement('div');
-    panel.style.display = 'flex';
-    panel.style.flexDirection = 'column';
-    panel.style.height = '100%';
-    panel.style.gap = '8px';
-
-    const header = document.createElement('div');
-    header.style.display = 'flex'; header.style.alignItems = 'center'; header.style.justifyContent = 'space-between';
-
-    const left = document.createElement('div'); left.style.display = 'flex'; left.style.gap = '8px'; left.style.alignItems = 'center';
-    const backBtn = document.createElement('button'); backBtn.className = 'icon-btn'; backBtn.textContent = '← Volver'; backBtn.title = 'Volver';
-    backBtn.addEventListener('click', () => { renderChatSidebarList(); clearMessagesUnsubscribe(); });
-    const avatar = document.createElement('div'); avatar.className = 'thumb'; avatar.style.width = '40px'; avatar.style.height = '40px'; avatar.style.borderRadius = '999px'; avatar.style.background = '#e6e9ed';
-    const cname = (order.data && order.data.customerData && (order.data.customerData.Customname || order.data.customerData.name)) || 'Sin nombre';
-    avatar.textContent = (cname || ' ')[0].toUpperCase();
-    const meta = document.createElement('div'); meta.innerHTML = `<div style="font-weight:700">${escapeHtml(cname)}</div><div class="small-muted" style="font-size:12px">${escapeHtml(order.id)}</div>`;
-    left.appendChild(backBtn); left.appendChild(avatar); left.appendChild(meta);
-    header.appendChild(left);
-    panel.appendChild(header);
-
-    const messagesWrap = document.createElement('div'); messagesWrap.id = 'chat-messages-sidebar';
-    messagesWrap.style.flex = '1'; messagesWrap.style.overflow = 'auto'; messagesWrap.style.display = 'flex'; messagesWrap.style.flexDirection = 'column'; messagesWrap.style.gap = '8px'; messagesWrap.style.padding = '8px';
-    panel.appendChild(messagesWrap);
-
-    const inputRow = document.createElement('div'); inputRow.style.display = 'flex'; inputRow.style.gap = '8px'; inputRow.style.alignItems = 'center';
-    const input = document.createElement('input'); input.placeholder = 'Escribe un mensaje...'; input.style.flex = '1'; input.style.padding = '8px'; input.style.borderRadius = '20px'; input.style.border = '1px solid var(--border)';
-    const sendBtn = document.createElement('button'); sendBtn.className = 'btn-apply'; sendBtn.textContent = 'Enviar';
-    sendBtn.addEventListener('click', () => sendChatMessageSidebar(order, input, messagesWrap));
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessageSidebar(order, input, messagesWrap); } });
-    inputRow.appendChild(input); inputRow.appendChild(sendBtn);
-    panel.appendChild(inputRow);
-
-    chatColumn.appendChild(panel);
-
-    subscribeMessages(order.id, (msgs) => {
-        messagesWrap.innerHTML = '';
-        if (!msgs || msgs.length === 0) {
-            const intro = document.createElement('div'); intro.className = 'small-muted'; intro.textContent = `Hola ${cname}. Aquí puedes comunicarte sobre tu pedido ${order.id}.`; messagesWrap.appendChild(intro);
-        } else msgs.forEach(m => appendMessageBubble(messagesWrap, m.text, m.from === (currentUser && currentUser.uid), m.ts));
-    });
-}
-
-/* Modal chat (mobile) */
-function renderChatUIForOrderModal(order) {
-    if (currentUserRole === 'motorizado') return;
-    activeChatOrderId = order.id;
-    if (!chatModal || !chatBody || !chatTitle) return;
-    if (chatColumn) chatColumn.style.display = 'none';
-
-    chatTitle.textContent = (order.data && order.data.customerData && (order.data.customerData.Customname || order.data.customerData.name)) || 'Chat';
-    chatBody.innerHTML = '';
-
-    const header = document.createElement('div'); header.style.display = 'flex'; header.style.alignItems = 'center'; header.style.justifyContent = 'space-between'; header.style.marginBottom = '8px';
-    const left = document.createElement('div'); left.style.display = 'flex'; left.style.alignItems = 'center'; left.style.gap = '10px';
-    const backBtn = document.createElement('button'); backBtn.type = 'button'; backBtn.className = 'icon-btn'; backBtn.textContent = '← Volver'; backBtn.title = 'Volver'; backBtn.addEventListener('click', () => openChatListInModal());
-    const avatar = document.createElement('div'); avatar.className = 'thumb'; avatar.style.width = '44px'; avatar.style.height = '44px'; avatar.style.borderRadius = '999px'; avatar.style.background = '#e6e9ed';
-    const cname = (order.data && order.data.customerData && (order.data.customerData.Customname || order.data.customerData.name)) || 'Sin nombre';
-    avatar.textContent = (cname || ' ')[0].toUpperCase();
-    const meta = document.createElement('div'); meta.innerHTML = `<div style="font-weight:700">${escapeHtml(cname)}</div><div class="small-muted" style="font-size:12px">${escapeHtml(order.id)}</div>`;
-    left.appendChild(backBtn); left.appendChild(avatar); left.appendChild(meta); header.appendChild(left); chatBody.appendChild(header);
-
-    const messagesWrap = document.createElement('div'); messagesWrap.id = 'chat-messages'; messagesWrap.style.maxHeight = '50vh'; messagesWrap.style.overflow = 'auto'; messagesWrap.style.display = 'flex'; messagesWrap.style.flexDirection = 'column'; messagesWrap.style.gap = '8px'; messagesWrap.style.padding = '8px 6px';
-    chatBody.appendChild(messagesWrap);
-
-    subscribeMessages(order.id, (msgs) => {
-        messagesWrap.innerHTML = '';
-        if (!msgs || msgs.length === 0) {
-            const intro = document.createElement('div'); intro.className = 'small-muted'; intro.textContent = `Hola ${cname}. Aquí puedes comunicarte sobre tu pedido ${order.id}.`; messagesWrap.appendChild(intro);
-        } else msgs.forEach(m => appendMessageBubble(messagesWrap, m.text, m.from === (currentUser && currentUser.uid), m.ts));
-    });
-
-    const inputRow = document.createElement('div'); inputRow.style.display = 'flex'; inputRow.style.gap = '8px'; inputRow.style.alignItems = 'center'; inputRow.style.marginTop = '8px';
-    const input = document.createElement('input'); input.id = 'chat-input'; input.placeholder = 'Escribe un mensaje...'; input.style.flex = '1'; input.style.padding = '10px'; input.style.borderRadius = '20px'; input.style.border = '1px solid var(--border)';
-    const sendBtn = document.createElement('button'); sendBtn.id = 'chat-send'; sendBtn.className = 'btn-apply'; sendBtn.textContent = 'Enviar';
-    sendBtn.addEventListener('click', () => sendChatMessageForOrderModal(order, input, messagesWrap));
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessageForOrderModal(order, input, messagesWrap); } });
-    inputRow.appendChild(input); inputRow.appendChild(sendBtn); chatBody.appendChild(inputRow);
-
-    chatModal.classList.remove('hidden'); chatModal.setAttribute('aria-hidden', 'false');
-}
-
-/* Open chat list in modal (mobile) */
-function openChatListInModal() {
-    clearMessagesUnsubscribe();
-    if (currentUserRole === 'motorizado') return; // motorizado no ve chats
-    if (!chatModal || !chatBody || !chatTitle) return;
-    activeChatOrderId = null;
-    chatTitle.textContent = 'Chats';
-    chatBody.innerHTML = '';
-    const listWrap = document.createElement('div'); listWrap.style.display = 'flex'; listWrap.style.flexDirection = 'column'; listWrap.style.gap = '8px'; listWrap.style.maxHeight = '60vh'; listWrap.style.overflow = 'auto'; listWrap.style.padding = '6px 2px';
-    const source = filteredOrders && filteredOrders.length ? filteredOrders : orders;
-    if (!source || source.length === 0) {
-        const empty = document.createElement('div'); empty.className = 'small-muted'; empty.textContent = 'No hay pedidos/clientes disponibles.'; chatBody.appendChild(empty); chatModal.classList.remove('hidden'); chatModal.setAttribute('aria-hidden', 'false'); return;
-    }
-    source.forEach(o => {
-        const item = document.createElement('button'); item.type = 'button'; item.className = 'chat-list-item'; item.style.display = 'flex'; item.style.gap = '12px'; item.style.alignItems = 'center'; item.style.padding = '10px'; item.style.border = '1px solid var(--border)'; item.style.borderRadius = '8px'; item.style.background = '#fff'; item.style.cursor = 'pointer';
-        const cname = (o.data && o.data.customerData && (o.data.customerData.Customname || o.data.customerData.name)) || (o.data && o.data.customer && o.data.customer.name) || 'Sin nombre';
-        const snippet = (o.data && o.data.items && o.data.items[0] && o.data.items[0].name) || '';
-        const when = formatDateFlexible(o.data && (o.data.orderDate || o.data.timestamp));
-        item.innerHTML = `
-      <div class="thumb" style="width:44px;height:44px;border-radius:50%;background:#e6e9ed;display:flex;align-items:center;justify-content:center;font-weight:700;">${escapeHtml((cname || ' ')[0] || 'C')}</div>
-      <div style="flex:1;text-align:left;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-weight:700">${escapeHtml(cname)}</div>
-          <div class="small-muted" style="font-size:12px">${escapeHtml(when)}</div>
-        </div>
-        <div class="small-muted" style="margin-top:6px;font-size:13px;">${escapeHtml(snippet)}</div>
-      </div>
-    `;
-        item.addEventListener('click', () => openChatForOrder(o));
-        listWrap.appendChild(item);
-    });
-    chatBody.appendChild(listWrap);
-    chatModal.classList.remove('hidden'); chatModal.setAttribute('aria-hidden', 'false');
-}
-
-/* Sending messages */
-async function sendChatMessageSidebar(order, inputEl, messagesWrap) {
-    if (!inputEl || !inputEl.value.trim()) return;
-    const text = inputEl.value.trim();
-    appendMessageBubble(messagesWrap, text, true, new Date());
-    inputEl.value = '';
-    try {
-        if (currentUser && order && order.id) {
-            const messagesCol = collection(db, 'orders', order.id, 'messages');
-            await addDoc(messagesCol, { text, from: currentUser.uid, fromName: currentUser.email || '', ts: serverTimestamp() });
-        }
-    } catch (err) {
-        console.error('Error guardando mensaje (sidebar):', err);
-        showToast('No se pudo guardar el mensaje en servidor.');
-    }
-}
-
-async function sendChatMessageForOrderModal(order, inputEl, messagesWrap) {
-    if (!inputEl || !inputEl.value.trim()) return;
-    const text = inputEl.value.trim();
-    appendMessageBubble(messagesWrap, text, true, new Date());
-    inputEl.value = '';
-    try {
-        if (currentUser && order && order.id) {
-            const messagesCol = collection(db, 'orders', order.id, 'messages');
-            await addDoc(messagesCol, { text, from: currentUser.uid, fromName: currentUser.email || '', ts: serverTimestamp() });
-        }
-    } catch (err) {
-        console.error('Error guardando mensaje (modal):', err);
-        showToast('No se pudo guardar el mensaje en servidor.');
-    }
-}
-
 /* ================= EVENT WIRING & RESPONSIVE ================= */
 if (btnFilter) btnFilter.addEventListener('click', applyFilters);
 if (btnClear) btnClear.addEventListener('click', () => { filterStatus.value = ''; filterDate.value = ''; filterClient.value = ''; applyFilters(); });
@@ -1306,34 +1132,15 @@ if (addItemBtn) addItemBtn.addEventListener('click', () => {
 });
 if (editForm) editForm.addEventListener('submit', saveEditForm);
 
-if (floatingChatBtn) {
-    const updateFloating = () => {
-        // Motorizado no debe ver el botón flotante
-        if (currentUserRole === 'motorizado') {
-            floatingChatBtn.style.display = 'none';
-            return;
-        }
-        floatingChatBtn.style.display = isMobileViewport() ? 'block' : 'none';
-    };
-    window.addEventListener('resize', updateFloating);
-    updateFloating();
-    floatingChatBtn.addEventListener('click', () => openChatListInModal());
-}
-if (chatModal) {
-    const closeBtn = document.getElementById('chat-close');
-    if (closeBtn) closeBtn.addEventListener('click', () => { chatModal.classList.add('hidden'); chatModal.setAttribute('aria-hidden', 'true'); clearMessagesUnsubscribe(); });
-}
 window.addEventListener('resize', () => {
-    if (!chatColumn) return;
-    if (isMobileViewport()) chatColumn.style.display = 'none';
-    else renderChatSidebarList();
+    // No chat sidebar/responsive logic needed anymore
 });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         viewModal && viewModal.classList.add('hidden');
         editModal && editModal.classList.add('hidden');
-        if (chatModal) { chatModal.classList.add('hidden'); chatModal.setAttribute('aria-hidden', 'true'); }
-        clearMessagesUnsubscribe();
+        // ensure rotators cleared too
+        clearModalRotators();
     }
 });
 
@@ -1346,7 +1153,6 @@ onAuthStateChanged(auth, async (user) => {
         listenOrders();
         loadMotorizados();
         loadAvailableProducts();
-        if (chatColumn) updateSidebarVisibility();
         return;
     }
     currentUser = user;
@@ -1360,15 +1166,7 @@ onAuthStateChanged(auth, async (user) => {
     listenOrders();
     loadMotorizados();
     loadAvailableProducts();
-    if (chatColumn) updateSidebarVisibility();
 });
-
-function updateSidebarVisibility() {
-    if (!chatColumn) return;
-    if (currentUserRole === 'motorizado') { chatColumn.style.display = 'none'; if (floatingChatBtn) floatingChatBtn.style.display = 'none'; return; }
-    if (isMobileViewport()) chatColumn.style.display = 'none';
-    else renderChatSidebarList();
-}
 
 /* ================= EXPORTS (optional) ================= */
 export { listenOrders, render };
