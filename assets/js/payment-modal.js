@@ -1,7 +1,16 @@
 // assets/js/payment-modal.js
 // Modal de cobro — soporta múltiples métodos y conversión USD/EUR <> Bs
-// Actualizaciones: formateo numérico en inputs ("," separador miles, "." separador decimal).
-// Mantengo la funcionalidad existente y agrego limpieza/format helpers.
+// Actualizaciones:
+// - Formato numérico en inputs: "." = separador de miles, "," = separador decimal.
+// - Al activar un método de pago el input correspondiente recibe foco y selecciona todo.
+// - El checkbox USD (BCV) queda seleccionado por defecto al abrir el modal.
+// - Los montos resultantes de la conversión (pmTotalBs) se muestran en negrita.
+// - Forzar coma como separador decimal en inputs (reemplaza '.' por ',' mientras escribe).
+// - Resalta en negrita las tasas dentro de pmConvInfo.
+// - Soporta selección de múltiples métodos: cuando hay un faltante, se fracciona
+//   automáticamente entre los métodos seleccionados (respetando campos editados por el usuario).
+// - Distribución en tiempo real: al seleccionar/desmarcar métodos o al editar cualquier campo
+//   se recalcula y redistribuye el faltante entre los campos elegibles (no marcados como userEdited).
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -59,31 +68,72 @@ onAuthStateChanged(auth, (u) => { currentUser = u; });
 /* ---------------- Helpers de formato ---------------- */
 
 /**
- * Limpia una cadena numérica quitando separadores de miles (",") y espacios.
- * Devuelve cadena que puede parsearse con parseFloat.
+ * Limpia una cadena numérica quitando separadores de miles y adaptando la coma decimal.
+ * Acepta formatos:
+ *  - "1.234.567,89" (puntos miles, coma decimal) => "1234567.89"
+ *  - "1234567.89" (punto decimal) => "1234567.89"
+ *  - "1,234,567.89" (coma thousands usado en algunos locales) => "1234567.89"
  */
 function cleanNumberString(str) {
     if (str == null) return '';
-    return String(str).replace(/\s+/g, '').replace(/,/g, '');
+    let s = String(str).trim();
+    s = s.replace(/\s+/g, ''); // quitar espacios
+
+    // Si contiene ambos separadores '.' y ',' asumimos '.' = miles y ',' = decimal
+    if (s.indexOf('.') !== -1 && s.indexOf(',') !== -1) {
+        s = s.replace(/\./g, '').replace(',', '.');
+        return s;
+    }
+
+    // Si solo contiene coma y no punto => asumimos coma decimal
+    if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) {
+        return s.replace(',', '.');
+    }
+
+    // En otro caso, remover comas (posibles thousands en formato anglo) y dejar puntos como decimal
+    s = s.replace(/,/g, '');
+    return s;
 }
 
 /**
- * Formatea un número para mostrar en input con separador de miles "," y separador decimal "."
+ * Formatea un número para mostrar en input con separador de miles "." y separador decimal ","
  * decimals: número de decimales a mostrar (por defecto 2)
  */
 function formatNumberForInput(value, decimals = 2) {
     if (value === null || value === undefined || value === '') return '';
     const num = Number(value);
     if (isNaN(num)) return '';
-    // Mostrar con el número de decimales solicitado (si decimals es null, mostrar sin forzar)
     const fixed = (typeof decimals === 'number') ? num.toFixed(decimals) : String(num);
     const parts = fixed.split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return parts.join('.');
+    // Insertar separador de miles "."
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    // Unir con coma decimal
+    return parts.length > 1 ? `${parts[0]},${parts[1]}` : parts[0];
 }
 
 function isBlank(str) {
     return !str || String(str).trim().length === 0;
+}
+
+/* Reemplaza puntos por comas en el valor visible del input mientras se escribe,
+   y trata de mantener la posición del cursor. */
+function enforceCommaDecimalInput(inputEl) {
+    if (!inputEl) return;
+    try {
+        const start = inputEl.selectionStart;
+        const before = inputEl.value;
+        // Reemplazar todos los puntos por comas (evita introducir punto decimal)
+        const after = before.replace(/\./g, ',');
+        if (after === before) return; // no hay cambios
+        inputEl.value = after;
+        // restaurar cursor en una posición aproximada
+        const diff = after.length - before.length; // normalmente 0 (reemplazo 1:1)
+        const newPos = Math.max(0, (start || 0) + diff);
+        inputEl.setSelectionRange(newPos, newPos);
+    } catch (e) {
+        // si algo falla, no bloquear la entrada
+        console.warn('enforceCommaDecimalInput error', e);
+    }
 }
 
 /* ---------------- UI helpers ---------------- */
@@ -128,7 +178,7 @@ function cleanup() {
     pmTotalBs.textContent = '';
     // ensure mobile details hidden and not required
     setMobileRequired(false);
-    // reset user-edited flags and format amounts to default 0.00
+    // reset user-edited flags and format amounts to default 0,00 (con coma decimal)
     document.querySelectorAll('.pm-amount').forEach(inp => {
         delete inp.dataset.userEdited;
         inp.value = formatNumberForInput(0, 2);
@@ -251,9 +301,11 @@ function getActiveRate() {
 }
 
 function formatBs(v) {
-    return `Bs. ${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    // For Bs formatting use Spanish locale to get "." thousands and "," decimals
+    return `Bs. ${Number(v || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/* computeTotalsAndUI ahora también devuelve remainingUSD para distribución */
 function computeTotalsAndUI() {
     pmErrorEl.style.display = 'none';
     pmErrorEl.textContent = '';
@@ -295,21 +347,23 @@ function computeTotalsAndUI() {
     pmRemainingEl.textContent = `Resto: $. ${remainingUSD.toFixed(2)}`;
 
     const sel = getSelectedConversion();
+    // Show bold amount for pmTotalBs where appropriate and bold rates in pmConvInfo
     if ((sel === 'usd_bcv' && rates.usd_bcv) || (sel === 'eur_bcv' && rates.eur_bcv) || sel === 'assign') {
         if (mobileChecked || cashChecked) {
             if (sel === 'usd_bcv' && rates.usd_bcv) {
-                pmTotalBs.textContent = `≈ ${formatBs(totalUSD * rates.usd_bcv)} (tasa ${rates.usd_bcv} Bs/USD, fecha ${rates.date})`;
-                pmConvInfo.textContent = `Tasa activa: ${rates.usd_bcv} Bs por USD (fecha ${rates.date})`;
-                if (rates.isTomorrow) pmConvInfo.textContent += ' — la tasa corresponde al día siguiente.';
+                const bsVal = totalUSD * rates.usd_bcv;
+                pmTotalBs.innerHTML = `≈ <strong>${formatBs(bsVal)}</strong> (tasa <strong>${rates.usd_bcv}</strong> Bs/USD, fecha ${rates.date})`;
+                pmConvInfo.innerHTML = `Tasa activa: <strong>${rates.usd_bcv}</strong> Bs por USD (fecha ${rates.date})${rates.isTomorrow ? ' — la tasa corresponde al día siguiente.' : ''}`;
             } else if (sel === 'eur_bcv' && rates.eur_bcv) {
-                pmTotalBs.textContent = `≈ ${formatBs(totalUSD * rates.eur_bcv)} (tasa ${rates.eur_bcv} Bs/EUR, fecha ${rates.date})`;
-                pmConvInfo.textContent = `Tasa activa: ${rates.eur_bcv} Bs por EUR (fecha ${rates.date})`;
-                if (rates.isTomorrow) pmConvInfo.textContent += ' — la tasa corresponde al día siguiente.';
+                const bsVal = totalUSD * rates.eur_bcv;
+                pmTotalBs.innerHTML = `≈ <strong>${formatBs(bsVal)}</strong> (tasa <strong>${rates.eur_bcv}</strong> Bs/EUR, fecha ${rates.date})`;
+                pmConvInfo.innerHTML = `Tasa activa: <strong>${rates.eur_bcv}</strong> Bs por EUR (fecha ${rates.date})${rates.isTomorrow ? ' — la tasa corresponde al día siguiente.' : ''}`;
             } else if (sel === 'assign') {
                 const v = Number(cleanNumberString(pmAssignRate.value || '0'));
                 if (v > 0) {
-                    pmTotalBs.textContent = `≈ ${formatBs(totalUSD * v)} (tasa asignada ${v} Bs/USD)`;
-                    pmConvInfo.textContent = `Tasa asignada: ${v} Bs por USD`;
+                    const bsVal = totalUSD * v;
+                    pmTotalBs.innerHTML = `≈ <strong>${formatBs(bsVal)}</strong> (tasa asignada <strong>${formatNumberForInput(v, 2)}</strong> Bs/USD)`;
+                    pmConvInfo.innerHTML = `Tasa asignada: <strong>${formatNumberForInput(v, 2)}</strong> Bs por USD`;
                 } else {
                     pmTotalBs.textContent = '';
                     pmConvInfo.textContent = 'Ingresa una tasa personalizada válida.';
@@ -341,63 +395,109 @@ function bsToUsd(bs, rate) {
     return rate ? Number(bs / rate) : NaN;
 }
 
-/* ---------------- Auto-llenado inteligente ---------------- */
+/* ---------------- Distribución del faltante entre métodos ----------------
+   Estrategia:
+   - Calcula remainingUSD.
+   - Encuentra métodos seleccionados (checked) cuyos inputs no hayan sido editados manualmente
+     (dataset.userEdited !== 'true') y cuyo valor numérico actual sea 0 (campo vacío o 0).
+   - Si no hay tasa y hay métodos Bs entre los elegibles, se priorizan los métodos USD.
+   - Divide remainingUSD en partes iguales entre los métodos elegibles.
+   - Para métodos Bs, convierte la porción USD a Bs con la tasa activa.
+*/
+function distributeRemaining() {
+    try {
+        const { remainingUSD, rate } = computeTotalsAndUI();
+        if (!remainingUSD || remainingUSD <= 0) return;
+
+        const methodEls = Array.from(document.querySelectorAll(pmChecksSelector)).map(chk => {
+            const method = chk.dataset.method;
+            const amountInput = document.querySelector(`.pm-amount[data-method="${method}"]`);
+            return { chk, method, amountInput };
+        }).filter(x => x.chk && x.chk.checked && x.amountInput);
+
+        // Eligible: checked && input exists && not userEdited (or dataset.userEdited === 'false') && numeric value == 0
+        const eligible = methodEls.filter(({ amountInput }) => {
+            const isUserEdited = amountInput.dataset && amountInput.dataset.userEdited === 'true';
+            const val = Number(cleanNumberString(amountInput.value || '0')) || 0;
+            return !isUserEdited && val === 0;
+        });
+
+        if (!eligible.length) return;
+
+        // Separate by currency
+        const usdEligible = eligible.filter(e => e.method === 'usd' || e.method === 'paypal');
+        const bsEligible = eligible.filter(e => ['cash', 'mobile', 'other'].includes(e.method));
+
+        // If bsEligible present but no rate -> avoid filling bs; if no usdEligible either, show message and return
+        if ((!rate || !isFinite(rate)) && bsEligible.length && !usdEligible.length) {
+            // can't convert, abort
+            pmErrorEl.textContent = 'No hay tasa disponible para convertir USD a Bs. Asigna una tasa o edita manualmente los montos en Bs.';
+            pmErrorEl.style.display = 'block';
+            return;
+        }
+
+        // Build final list to distribute across:
+        // If both USD and Bs eligible, distribute across all eligible (convert Bs share using rate).
+        // If rate not available, prefer USDEligible only.
+        let finalEligible = [];
+        if (rate && isFinite(rate)) {
+            finalEligible = eligible;
+        } else {
+            finalEligible = usdEligible;
+        }
+
+        if (!finalEligible.length) return;
+
+        const parts = finalEligible.length;
+        const perUsd = remainingUSD / parts;
+
+        finalEligible.forEach((entry) => {
+            const { method, amountInput } = entry;
+            if (!amountInput) return;
+            if (method === 'usd' || method === 'paypal') {
+                // assign USD share
+                amountInput.value = formatNumberForInput(perUsd, 2);
+                amountInput.disabled = false;
+                amountInput.dataset.userEdited = 'false';
+            } else {
+                // Bs method: convert perUsd to Bs using active rate
+                const bsAmount = rate && isFinite(rate) ? Number((perUsd * rate).toFixed(2)) : 0;
+                amountInput.value = formatNumberForInput(bsAmount, 2);
+                amountInput.disabled = false;
+                amountInput.dataset.userEdited = 'false';
+                if (method === 'mobile') setMobileRequired(true);
+            }
+        });
+
+        // focus + select first filled input
+        const firstFilled = finalEligible[0];
+        if (firstFilled && firstFilled.amountInput) {
+            setTimeout(() => {
+                try {
+                    firstFilled.amountInput.focus();
+                    if (typeof firstFilled.amountInput.select === 'function') firstFilled.amountInput.select();
+                } catch (e) { }
+            }, 0);
+        }
+
+        // recompute UI after assignment
+        computeTotalsAndUI();
+    } catch (err) {
+        console.warn('distributeRemaining error', err);
+    }
+}
+
+/* ---------------- Auto-llenado inteligente (mantiene compatibilidad) ---------------- */
 
 function autoFillBsIfNeeded() {
     const sel = getSelectedConversion();
     const rate = getActiveRate();
-    console.debug('autoFillBsIfNeeded: sel, rate', sel, rate);
-    if (!sel || !rate) {
-        console.debug('autoFillBsIfNeeded: no hay conversion seleccionada o rate inválida, saliendo');
-        return;
-    }
-
+    if (!sel || !rate) return;
     const { remainingUSD } = computeTotalsAndUI();
-    if (remainingUSD <= 0) {
-        console.debug('autoFillBsIfNeeded: no hay resto a convertir', remainingUSD);
-        return;
-    }
+    if (remainingUSD <= 0) return;
 
-    const mobileChk = document.querySelector('.pm-check[data-method="mobile"]');
-    const cashChk = document.querySelector('.pm-check[data-method="cash"]');
-    const mobileInput = document.querySelector('.pm-amount[data-method="mobile"]');
-    const cashInput = document.querySelector('.pm-amount[data-method="cash"]');
-
-    const mobileSelected = Boolean(mobileChk && mobileChk.checked);
-    const cashSelected = Boolean(cashChk && cashChk.checked);
-
-    if (!mobileSelected && !cashSelected) {
-        console.debug('autoFillBsIfNeeded: ni mobile ni cash seleccionados');
-        return;
-    }
-
-    const bsAmount = Number(usdToBs(remainingUSD, rate).toFixed(2));
-    console.debug('autoFillBsIfNeeded: remainingUSD, rate, bsAmount', remainingUSD, rate, bsAmount);
-
-    const isUserEdited = (inp) => inp && inp.dataset && inp.dataset.userEdited === 'true';
-
-    if (mobileSelected && mobileInput && !isUserEdited(mobileInput)) {
-        mobileChk.checked = true;
-        mobileInput.disabled = false;
-        mobileInput.value = formatNumberForInput(bsAmount, 2);
-        mobileInput.dataset.userEdited = 'false';
-        setMobileRequired(true);
-        computeTotalsAndUI();
-        console.debug('autoFillBsIfNeeded: rellenado mobile con', bsAmount);
-        return;
-    }
-
-    if (cashSelected && cashInput && !isUserEdited(cashInput)) {
-        cashChk.checked = true;
-        cashInput.disabled = false;
-        cashInput.value = formatNumberForInput(bsAmount, 2);
-        cashInput.dataset.userEdited = 'false';
-        computeTotalsAndUI();
-        console.debug('autoFillBsIfNeeded: rellenado cash con', bsAmount);
-        return;
-    }
-
-    console.debug('autoFillBsIfNeeded: no se rellenó (campos user-edited o no disponibles)');
+    // If there are eligible fields, prefer distributeRemaining (it will split across multiple methods)
+    distributeRemaining();
 }
 
 /* ---------------- Events ---------------- */
@@ -410,7 +510,17 @@ document.addEventListener('change', (e) => {
             if (!amountInput) return;
             if (chk === e.target && chk.checked) {
                 amountInput.disabled = false;
-                amountInput.dataset.userEdited = 'false';
+                // only set dataset.userEdited=false if it didn't come with a user edit
+                if (!amountInput.dataset || amountInput.dataset.userEdited !== 'true') amountInput.dataset.userEdited = 'false';
+                // Focus y seleccionar todo para que el usuario pueda escribir inmediatamente
+                setTimeout(() => {
+                    try {
+                        amountInput.focus();
+                        if (typeof amountInput.select === 'function') amountInput.select();
+                    } catch (err) {
+                        console.warn('No fue posible seleccionar el campo de monto', err);
+                    }
+                }, 0);
             } else {
                 amountInput.disabled = !chk.checked;
             }
@@ -434,7 +544,8 @@ document.addEventListener('change', (e) => {
         }
 
         computeTotalsAndUI();
-        autoFillBsIfNeeded();
+        // after recomputing, try to distribute remaining among eligible fields (real-time)
+        setTimeout(() => distributeRemaining(), 0);
     }
 
     if (e.target && e.target.matches(convChecksSelector)) {
@@ -449,20 +560,20 @@ document.addEventListener('change', (e) => {
         if ((sel === 'usd_bcv' && !rates.usd_bcv) || (sel === 'eur_bcv' && !rates.eur_bcv) || !rates.date) {
             fetchRates().then(() => {
                 computeTotalsAndUI();
-                autoFillBsIfNeeded();
+                distributeRemaining();
             }).catch(() => {
                 computeTotalsAndUI();
-                autoFillBsIfNeeded();
+                distributeRemaining();
             });
         } else {
             computeTotalsAndUI();
-            autoFillBsIfNeeded();
+            distributeRemaining();
         }
     }
 
     if (e.target && e.target.id === 'pmAssignRate') {
         computeTotalsAndUI();
-        autoFillBsIfNeeded();
+        distributeRemaining();
     }
 });
 
@@ -498,6 +609,8 @@ if (pmApplyConversion) {
             mobileInput.dataset.userEdited = 'false';
             setMobileRequired(true);
             computeTotalsAndUI();
+            // focus and select to allow immediate editing
+            setTimeout(() => { try { mobileInput.focus(); mobileInput.select(); } catch (e) { } }, 0);
             return;
         }
         if (cashChk && cashChk.checked && cashInput) {
@@ -506,6 +619,7 @@ if (pmApplyConversion) {
             cashInput.value = formatNumberForInput(bsAmount, 2);
             cashInput.dataset.userEdited = 'false';
             computeTotalsAndUI();
+            setTimeout(() => { try { cashInput.focus(); cashInput.select(); } catch (e) { } }, 0);
             return;
         }
 
@@ -515,34 +629,41 @@ if (pmApplyConversion) {
 }
 
 // input events: detectar cuando el usuario edita manualmente un campo (para no sobrescribirlo)
-// y recalcular totales; si el usuario cambia USD/paypal, intentar auto-llenar Bs (si el target no fue editado manualmente)
+// y recalcular totales; si el usuario cambia cualquier monto, redistribuir el faltante en tiempo real
 document.addEventListener('input', (e) => {
+    if (!e.target) return;
+
+    // Forzar coma como separador decimal en inputs de monto y en tasa asignada
+    if (e.target.matches(pmAmountSelector) || e.target.id === 'pmAssignRate') {
+        enforceCommaDecimalInput(e.target);
+    }
+
     if (e.target && e.target.matches(pmAmountSelector)) {
         // mark this field as user-edited
         e.target.dataset.userEdited = 'true';
         // Do not format on each keystroke to avoid caret issues; compute totals
         computeTotalsAndUI();
-        const isUsdField = e.target.matches('.pm-amount[data-method="usd"]') || e.target.matches('.pm-amount[data-method="paypal"]');
-        if (isUsdField) {
-            autoFillBsIfNeeded();
-        }
+        // When the user types in any amount field, redistribute remainingUSD across other eligible fields in real time
+        setTimeout(() => distributeRemaining(), 0);
         return;
     }
 
     if (e.target && (e.target.matches('#pmAssignRate') || e.target.matches(convChecksSelector))) {
         computeTotalsAndUI();
-        autoFillBsIfNeeded();
+        distributeRemaining();
     }
 });
 
-// Formatear inputs al perder foco para mostrar separadores
+// Formatear inputs al perder foco para mostrar separadores (puntos miles, coma decimales)
 document.addEventListener('blur', (e) => {
     if (e.target && e.target.matches(pmAmountSelector)) {
-        // formatear con 2 decimales
+        // formatear con 2 decimales usando el nuevo formato
         const cleaned = cleanNumberString(e.target.value || '0');
         const num = Number(cleaned || 0);
         e.target.value = formatNumberForInput(num, 2);
         computeTotalsAndUI();
+        // after formatting, redistribute if needed
+        setTimeout(() => distributeRemaining(), 0);
     }
 }, true);
 
@@ -557,7 +678,7 @@ if (pmAssignRate) {
             pmAssignRate.value = '';
         }
         computeTotalsAndUI();
-        autoFillBsIfNeeded();
+        distributeRemaining();
     });
 }
 
@@ -578,8 +699,25 @@ export async function openPaymentModal(orderObj) {
     pmTotal.textContent = `$. ${Number(total).toFixed(2)}`;
 
     cleanup();
-    fetchRates().then(() => computeTotalsAndUI()).catch(() => computeTotalsAndUI());
-    computeTotalsAndUI();
+
+    // Por defecto seleccionar la conversión BCV USD
+    const usdConvChk = document.querySelector('.pm-conv-check[data-conv="usd_bcv"]');
+    if (usdConvChk) {
+        usdConvChk.checked = true;
+        usdConvChk.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+        pmAssignRateWrap.style.display = 'none';
+    }
+
+    // Cargar tasas y actualizar UI
+    fetchRates().then(() => {
+        computeTotalsAndUI();
+        distributeRemaining();
+    }).catch(() => {
+        computeTotalsAndUI();
+        distributeRemaining();
+    });
+
     showModal();
 
     const mobileChkInit = document.querySelector(`.pm-check[data-method="mobile"]`);
@@ -705,7 +843,7 @@ export async function openPaymentModal(orderObj) {
                 conversionRate: effectiveRate,
                 conversionRateDate: rateDate,
                 conversionRateSource: rateSource,
-                rateSnapshot: rateSnapshot,
+                rateSnapshot: rate_snapshot_safe(rateSnapshot),
                 confirmedBy: currentUser.uid,
                 confirmedByEmail: currentUser.email || '',
                 paidAt: serverTimestamp()
@@ -788,4 +926,15 @@ export async function openPaymentModal(orderObj) {
 if (pmCancelBtn) pmCancelBtn.addEventListener('click', () => closeModal());
 if (document.getElementById('paymentModalClose')) {
     document.getElementById('paymentModalClose').addEventListener('click', () => closeModal());
+}
+
+/* ---------------- Helpers finales ---------------- */
+
+// small helper to keep rateSnapshot safe (avoid circular structures)
+function rate_snapshot_safe(snap) {
+    try {
+        return JSON.parse(JSON.stringify(snap));
+    } catch (e) {
+        return { usd_bcv: rates.usd_bcv, eur_bcv: rates.eur_bcv, date: rates.date, source: rates.apiSource };
+    }
 }
