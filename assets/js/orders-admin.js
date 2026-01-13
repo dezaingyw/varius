@@ -28,6 +28,8 @@ import {
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
+import { openPaymentModal } from './payment-modal.js'; // <-- añadido: abrir modal de cobranza
+
 /* ================= INIT ================= */
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -165,6 +167,12 @@ function getIconSvg(name, size = 16) {
         case 'pencil': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>`;
         case 'clock': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/></svg>`;
         case 'x-circle': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>`;
+        case 'cash-coin':
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-coin" viewBox="0 0 16 16">
+                    <path d="M5.5 9.511c.076.954.83 1.697 2.182 1.785V12h.6v-.709c1.4-.098 2.218-.846 2.218-1.932 0-.987-.626-1.496-1.745-1.76l-.473-.112V5.57c.6.068.982.396 1.074.85h1.052c-.076-.919-.864-1.638-2.126-1.716V4h-.6v.719c-1.195.117-2.01.836-2.01 1.853 0 .9.606 1.472 1.613 1.707l.397.098v2.034c-.615-.093-1.022-.43-1.114-.9zm2.177-2.166c-.59-.137-.91-.416-.91-.836 0-.47.345-.822.915-.925v1.76h-.005zm.692 1.193c.717.166 1.048.435 1.048.91 0 .542-.412.914-1.135.982V8.518z"/>
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                    <path d="M8 13.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11m0 .5A6 6 0 1 0 8 2a6 6 0 0 0 0 12"/>
+                    </svg>`;
         default: return '';
     }
 }
@@ -343,9 +351,13 @@ function renderTable(list) {
         const actionsTd = document.createElement('td');
         const rowActions = document.createElement('div'); rowActions.className = 'row-actions';
 
+        // determine if current user role can see cobranza button (administrador | admin | motorizado)
+        const roleLc = String(currentUserRole || '').toLowerCase();
+        const isAllowedToCharge = (roleLc === 'administrador' || roleLc === 'admin' || roleLc === 'motorizado');
+
         // Actions behavior:
         // - Si entregado: mostrar badge 'Entregado' y el botón Historial
-        // - Si no entregado: mostrar View, Edit, History, Suspend
+        // - Si no entregado: mostrar View, Edit, History, Suspend, y (si corresponde) Cobranza (solo admin/motorizado y si no está pagado)
         if (isDelivered) {
             const deliveredSpan = document.createElement('span');
             deliveredSpan.className = 'badge delivered';
@@ -389,6 +401,27 @@ function renderTable(list) {
             });
             rowActions.appendChild(histBtn);
 
+            // Cobranza button: solo si rol permitido y pedido NO está pagado
+            const paymentLower = String(rawPayment || '').toLowerCase();
+            const isPaid = paymentLower === 'pagado' || paymentLower === 'paid';
+            if (isAllowedToCharge && !isPaid) {
+                const cobrarBtn = document.createElement('button');
+                cobrarBtn.className = 'btn-small btn-cobrar';
+                cobrarBtn.title = 'Registrar cobranza';
+                cobrarBtn.innerHTML = `${getIconSvg('cash-coin', 14)}`;
+                cobrarBtn.addEventListener('click', () => {
+                    // openPaymentModal expects an object with order fields at top level
+                    const orderObj = { id: o.id, ...(o.data || {}) };
+                    try {
+                        openPaymentModal(orderObj);
+                    } catch (err) {
+                        console.error('Error abriendo modal de cobranza:', err);
+                        showToast('No se pudo abrir modal de cobranza. Revisa la consola.');
+                    }
+                });
+                rowActions.appendChild(cobrarBtn);
+            }
+
             // Suspend button
             const suspBtn = document.createElement('button');
             suspBtn.className = 'btn-small btn-suspender';
@@ -423,13 +456,27 @@ function renderCards(list) {
         }
         const isDelivered = rawShipping && (String(rawShipping).toLowerCase() === 'entregado' || String(rawShipping).toLowerCase() === 'delivered');
 
+        // determine if current user role can see cobranza button (administrador | admin | motorizado)
+        const roleLc = String(currentUserRole || '').toLowerCase();
+        const isAllowedToCharge = (roleLc === 'administrador' || roleLc === 'admin' || roleLc === 'motorizado');
+        const paymentLower = String(rawPayment || '').toLowerCase();
+        const isPaid = paymentLower === 'pagado' || paymentLower === 'paid';
+
         // Buttons with icons
         const viewBtnHtml = `<button class="order-card-btn" data-action="view" data-id="${o.id}" title="Ver">${getIconSvg('eye', 14)} <span style="margin-left:6px">Ver</span></button>`;
         const editBtnHtml = `<button class="order-card-btn" data-action="edit" data-id="${o.id}" title="Editar">${getIconSvg('pencil', 14)} <span style="margin-left:6px">Editar</span></button>`;
         const histBtnHtml = `<button class="order-card-btn" data-action="history" data-id="${o.id}" title="Historial">${getIconSvg('clock', 14)} <span style="margin-left:6px">Historial</span></button>`;
+        const cobrarBtnHtml = `<button class="order-card-btn" data-action="cobrar" data-id="${o.id}" title="Cobrar">${getIconSvg('cash-coin',14)} <span style="margin-left:6px">Cobrar</span></button>`;
 
         // If delivered, keep only history button
-        const actionsHtml = isDelivered ? `${histBtnHtml}` : `${viewBtnHtml}${editBtnHtml}${histBtnHtml}`;
+        let actionsHtml = '';
+        if (isDelivered) {
+            actionsHtml = `${histBtnHtml}`;
+        } else {
+            // include cobrar if allowed and not paid
+            if (isAllowedToCharge && !isPaid) actionsHtml = `${viewBtnHtml}${editBtnHtml}${cobrarBtnHtml}${histBtnHtml}`;
+            else actionsHtml = `${viewBtnHtml}${editBtnHtml}${histBtnHtml}`;
+        }
 
         card.innerHTML = `
       <div class="order-card-header">
@@ -461,6 +508,16 @@ function renderCards(list) {
                 if (a === 'history') {
                     const url = buildHistoryUrlFromOrder(o);
                     window.location.href = url;
+                }
+                if (a === 'cobrar') {
+                    // open payment modal with merged object (same behavior que motorizado-orders)
+                    const orderObj = { id: o.id, ...(o.data || {}) };
+                    try {
+                        openPaymentModal(orderObj);
+                    } catch (err) {
+                        console.error('Error abriendo modal de cobranza (cards):', err);
+                        showToast('No se pudo abrir modal de cobranza. Revisa la consola.');
+                    }
                 }
             });
         });
@@ -1141,6 +1198,16 @@ document.addEventListener('keydown', (e) => {
         editModal && editModal.classList.add('hidden');
         // ensure rotators cleared too
         clearModalRotators();
+    }
+});
+
+/* Listen to payment confirmed events (dispatched by payment-modal) to improve UX */
+document.addEventListener('payment:confirmed', (e) => {
+    const orderId = e?.detail?.orderId;
+    if (orderId) {
+        showToast('Cobranza registrada correctamente.');
+        // onSnapshot listener hará la actualización, pero podemos forzar re-render de filtros actuales
+        applyFilters();
     }
 });
 
