@@ -315,9 +315,21 @@ async function init() {
     }
 
     function setRestrictedNavVisibility(role) {
-        const isAdmin = role === 'administrador';
+        // Normalize role to lowercase to be robust against capitalization
+        const r = (role || '').toString().toLowerCase();
+
+        const isAdmin = r === 'administrador';
+        const isVendedor = r === 'vendedor';
+        const isMotorizado = r === 'motorizado';
+
+        // "Cierre de Caja" should be visible ONLY to administrador
+        setNavVisibilityByFragment('cierre-caja.html', isAdmin);
+
+        // "Productos" (product.html) visible to administrador and vendedor, hidden for motorizado/guests
+        setNavVisibilityByFragment('product.html', isAdmin || isVendedor);
+
+        // "Usuarios" remains admin-only (previous behavior)
         setNavVisibilityByFragment('usuarios.html', isAdmin);
-        setNavVisibilityByFragment('cxc.html', isAdmin);
     }
 
     function setSidebar(name, role) {
