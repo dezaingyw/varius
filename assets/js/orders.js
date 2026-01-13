@@ -12,6 +12,7 @@
 //   * Al asignar un motorizado se guarda: assignedMotor (uid), assignedMotorName (correo), assignedMotorizedName (nombre) y assignedMotorizedAt (timestamp).
 //   * Si se usa la entrada libre (edit-motorizado-free) intentamos derivar nombre/email; preferimos datos del usuario seleccionado (id) cuando exista.
 // - Corregido bug moneyView -> money en vista detalle y subscribeMessages para usar orderId.
+// - Añadido: mostrar imágenes de productos en el modal "Ver detalle" (mini-slider por producto). Si el item no trae imágenes intenta obtenerlas del documento product/{productId}.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -91,6 +92,67 @@ let activeChatOrderId = null;
 
 let motorizados = []; // [{ id, name, email, ... }]
 let availableProducts = [];
+
+/* ================ MODAL ROTATOR HELPERS ================ */
+/* Minimal modal-only rotator helpers reused from product/other code.
+   They only operate inside the view modal and are cleaned when the modal closes.
+*/
+const modalRotators = new Map();
+
+function fadeImageToModal(imgEl, newSrc, dur = 240) {
+    if (!imgEl) return;
+    imgEl.style.transition = `opacity ${dur}ms ease`;
+    imgEl.style.opacity = '0';
+    setTimeout(() => { imgEl.src = newSrc; imgEl.style.opacity = '1'; }, dur);
+}
+
+function initModalRotators(root = document) {
+    clearModalRotators();
+    if (!root) return;
+    const sliders = Array.from(root.querySelectorAll('.mini-slider'));
+    sliders.forEach(slider => {
+        try {
+            const track = slider.querySelector('.mini-track');
+            if (!track) return;
+            const imgs = Array.from(track.querySelectorAll('img')).map(i => i.src).filter(Boolean);
+            if (!imgs.length) return;
+            track.innerHTML = '';
+            const displayWrap = document.createElement('div');
+            displayWrap.className = 'mini-display';
+            displayWrap.style.width = '56px';
+            displayWrap.style.height = '56px';
+            displayWrap.style.overflow = 'hidden';
+            const displayImg = document.createElement('img');
+            displayImg.className = 'mini-current';
+            displayImg.src = imgs[0];
+            displayImg.style.width = '100%';
+            displayImg.style.height = '100%';
+            displayImg.style.objectFit = 'cover';
+            displayImg.style.borderRadius = '6px';
+            displayImg.style.transition = 'opacity 240ms ease';
+            displayWrap.appendChild(displayImg);
+            track.appendChild(displayWrap);
+            let idx = 0;
+            let intervalId = null;
+            if (imgs.length > 1) {
+                intervalId = setInterval(() => {
+                    idx = (idx + 1) % imgs.length;
+                    fadeImageToModal(displayImg, imgs[idx], 240);
+                }, 2000);
+            }
+            modalRotators.set(slider, { intervalId, imgs, imgEl: displayImg, idx });
+        } catch (e) {
+            console.error('initModalRotators error', e);
+        }
+    });
+}
+
+function clearModalRotators() {
+    for (const [el, info] of modalRotators.entries()) {
+        try { if (info.intervalId) clearInterval(info.intervalId); } catch (e) { }
+        modalRotators.delete(el);
+    }
+}
 
 /* ================= HELPERS ================= */
 function showToast(text, timeout = 3000) {
@@ -521,19 +583,55 @@ function listenOrders() {
 }
 
 /* ================= VIEW / EDIT / SUSPEND ================= */
-function openViewModal(order) {
+/* openViewModal is async so we can fetch product doc images when item lacks images */
+async function openViewModal(order) {
     currentViewOrder = order;
     const o = order.data || {};
     const cname = (o.customerData && (o.customerData.Customname || o.customerData.name)) || 'Sin nombre';
     const address = (o.customerData && o.customerData.address) || o.readable_address || '';
-    const items = o.items || [];
+    const items = Array.isArray(o.items) ? o.items.slice() : [];
 
     if (!viewBody) return;
 
-    // Build products table
+    // For each item, gather images (item.imageUrls[] | item.imageUrl | item.image) else try product doc by productId
+    const itemsWithImgs = [];
+    for (let i = 0; i < items.length; i++) {
+        const it = items[i] || {};
+        let imgs = [];
+        try {
+            if (Array.isArray(it.imageUrls) && it.imageUrls.length) imgs.push(...it.imageUrls.map(x => String(x).trim()).filter(Boolean));
+            if (it.imageUrl && String(it.imageUrl).trim()) imgs.push(String(it.imageUrl).trim());
+            if (it.image && String(it.image).trim()) imgs.push(String(it.image).trim());
+        } catch (e) { /* ignore */ }
+
+        // If still no images and productId present, try to fetch product doc
+        if (!imgs.length && (it.productId || it.product_id || it.product)) {
+            const pid = it.productId || it.product_id || it.product;
+            if (pid) {
+                try {
+                    const pSnap = await getDoc(doc(db, 'product', pid));
+                    if (pSnap.exists()) {
+                        const pdata = pSnap.data() || {};
+                        if (Array.isArray(pdata.imageUrls) && pdata.imageUrls.length) imgs.push(...pdata.imageUrls.map(x => String(x).trim()).filter(Boolean));
+                        else if (pdata.imageUrl && String(pdata.imageUrl).trim()) imgs.push(String(pdata.imageUrl).trim());
+                    }
+                } catch (err) {
+                    console.warn('Error fetching product for images:', pid, err);
+                }
+            }
+        }
+
+        // dedupe & keep valid urls
+        imgs = imgs.filter(Boolean).map(s => String(s));
+        if (!imgs.length) console.debug('No images for item', it.name || it.productId || '(no id)');
+        else console.debug('Images for item', it.name || it.productId || '(found)', imgs);
+        itemsWithImgs.push({ ...it, imgs });
+    }
+
+    // Build products table - image column supports mini-slider markup
     const productsHtml = `
       <div class="card products-card" style="border-radius:8px;padding:12px;">
-        <h4 style="margin:0 0 10px 0;font-size:16px;">Productos (${items.length})</h4>
+        <h4 style="margin:0 0 10px 0;font-size:16px;">Productos (${itemsWithImgs.length})</h4>
         <div style="overflow:auto;">
           <table style="width:100%;border-collapse:collapse;">
             <thead>
@@ -546,17 +644,22 @@ function openViewModal(order) {
               </tr>
             </thead>
             <tbody>
-              ${items.map(it => {
+              ${itemsWithImgs.map(it => {
         const qty = Number(it.quantity || it.qty || 1);
         const price = Number(it.price || it.unitPrice || it.subtotal || 0);
         const subtotal = qty * price;
-        const imgSrc = (it.imageUrl && String(it.imageUrl).trim()) || (it.image && String(it.image).trim()) || '';
-        const hasImg = /^https?:\/\//i.test(imgSrc);
-        const imgHtml = hasImg
-            ? `<img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(it.name || '')}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;">`
-            : `<div style="width:56px;height:56px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#9aa0a6;font-weight:700;font-size:12px;">${escapeHtml((it.name || '').slice(0, 2).toUpperCase() || 'IMG')}</div>`;
+        const imgs = Array.isArray(it.imgs) ? it.imgs : [];
+        let imgCellHtml = '';
+        if (imgs.length) {
+            const imgsHtml = imgs.map(src => `<img src="${escapeHtml(src)}" alt="${escapeHtml(it.name || '')}" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-right:6px;">`).join('');
+            imgCellHtml = `<div class="mini-slider" style="display:flex;align-items:center;"><div class="mini-track">${imgsHtml}</div></div>`;
+        } else {
+            const initials = escapeHtml(((it.name || '').slice(0,2) || 'IMG').toUpperCase());
+            imgCellHtml = `<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:#f3f4f6;color:#9aa0a6;font-weight:700">${initials}</div>`;
+        }
+
         return `<tr style="border-bottom:1px solid #eef2f6;">
-                            <td style="padding:10px 6px;vertical-align:middle;">${imgHtml}</td>
+                            <td style="padding:10px 6px;vertical-align:middle;">${imgCellHtml}</td>
                             <td style="padding:10px 6px;vertical-align:middle;"><div style="font-weight:700">${escapeHtml(it.name || 'Producto')}</div></td>
                             <td style="padding:10px 6px;vertical-align:middle;text-align:center;">${escapeHtml(String(qty))}</td>
                             <td style="padding:10px 6px;vertical-align:middle;text-align:right;color:#111;">${money(price)}</td>
@@ -594,6 +697,9 @@ function openViewModal(order) {
     ${productsHtml}
     `;
 
+    // initialize rotators inside the newly injected viewBody
+    initModalRotators(viewBody);
+
     viewModal && viewModal.classList.remove('hidden');
     viewModal && viewModal.setAttribute('aria-hidden', 'false');
 }
@@ -602,6 +708,7 @@ function closeViewModal() {
     viewModal && viewModal.classList.add('hidden');
     viewModal && viewModal.setAttribute('aria-hidden', 'true');
     currentViewOrder = null;
+    clearModalRotators();
 }
 
 /* Abre editor: prepara select de motorizados y lista de items */
@@ -1334,6 +1441,7 @@ document.addEventListener('keydown', (e) => {
         editModal && editModal.classList.add('hidden');
         if (chatModal) { chatModal.classList.add('hidden'); chatModal.setAttribute('aria-hidden', 'true'); }
         clearMessagesUnsubscribe();
+        clearModalRotators();
     }
 });
 
