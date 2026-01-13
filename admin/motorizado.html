@@ -8,7 +8,7 @@
 
   <!-- Estilos compartidos ya presentes en el proyecto -->
   <link rel="stylesheet" href="assets/css/style.css">
-        <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/app.css">
   <link rel="stylesheet" href="assets/css/order-management.css">
   <link rel="stylesheet" href="assets/css/payment-modal.css">
   <link rel="stylesheet" href="../assets/css/presence.css">
@@ -19,27 +19,27 @@
 
   <!-- Top bar -->
   <header class="topbar">
-        <div class="top-left">
-            <label for="nav-toggle" class="hamburger" aria-hidden="true">
-                <span class="hamburger-box"><span class="hamburger-inner"></span></span>
-            </label>
-            <a class="brand" href="./" aria-label="Dashboard">
-                <img src="assets/img/logo.png" alt="Varius" width="14%">
-                <span class="brand-text">VARIUS</span>
-            </a>
-        </div>
+    <div class="top-left">
+      <label for="nav-toggle" class="hamburger" aria-hidden="true">
+        <span class="hamburger-box"><span class="hamburger-inner"></span></span>
+      </label>
+      <a class="brand" href="./" aria-label="Dashboard">
+        <img src="assets/img/logo.png" alt="Varius" width="14%">
+        <span class="brand-text">VARIUS</span>
+      </a>
+    </div>
 
-        <div class="top-search">
-            <label for="q" class="sr-only">Buscar</label>
-            <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
+    <div class="top-search">
+      <label for="q" class="sr-only">Buscar</label>
+      <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
 
-            <!-- dentro de .topbar, a la derecha del contenido -->
-            <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
-                <span class="dot"></span>
-                <span class="label">Desconectado</span>
-            </div>
-        </div>
-    </header>
+      <!-- dentro de .topbar, a la derecha del contenido -->
+      <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
+        <span class="dot"></span>
+        <span class="label">Desconectado</span>
+      </div>
+    </div>
+  </header>
 
   <div id="app-sidebar"></div>
 
@@ -81,16 +81,6 @@
         </div>
       </article>
 
-      <article class="card kpi-card">
-        <div class="kpi-info">
-          <div class="kpi-title">Caja</div>
-          <div class="kpi-value">Abierta</div>
-          <div class="kpi-meta muted">Estado actual</div>
-        </div>
-        <div class="kpi-icon" aria-hidden="true">
-          <div class="icon-square">🏧</div>
-        </div>
-      </article>
     </section>
 
     <!-- Quick actions -->
@@ -103,156 +93,154 @@
           <span class="action-icon">🗺️</span>
           <span>Ver ruta</span>
         </button>
-
-        <button class="action-btn" data-action="inventario" onclick="window.location.href='product.html'">
-          <span class="action-icon">🏬</span>
-          <span>Inventario</span>
-        </button>
-
-        <button class="action-btn" data-action="cierre-caja" onclick="window.location.href='cxc.html'">
-          <span class="action-icon">🧾</span>
-          <span>Cierre de caja</span>
-        </button>
       </div>
     </section>
 
     <!-- Filters -->
-    <section class="filters-card card" aria-label="Filtros de pedidos" style="margin-top:16px;">
-      <div class="table-header" style="padding: 0 6px 12px;">
-        <h3>Filtros</h3>
-      </div>
-
-      <form class="filters-grid" id="ordersFilters" style="gap:12px; align-items:end;">
-        <div class="filter-field">
-          <label for="fechaInicio">Fecha inicio</label>
-          <input id="fechaInicio" name="fechaInicio" type="date" />
-        </div>
-
-        <div class="filter-field">
-          <label for="fechaFin">Fecha fin</label>
-          <input id="fechaFin" name="fechaFin" type="date" />
-        </div>
-
-        <div class="filter-field">
-          <label for="productoFiltro">Producto</label>
-          <select id="productoFiltro" name="productoFiltro">
-            <option value="">Todos</option>
-          </select>
-        </div>
-
-        <div class="filter-field">
-          <label for="estadoPago">Estado de pago</label>
-          <select id="estadoPago" name="estadoPago">
-            <option value="">Todos</option>
-            <option value="pagado">Pagado</option>
-            <option value="pendiente">Pendiente</option>
-          </select>
-        </div>
-
-        <div class="filter-field">
-          <label for="estadoEnvio">Estado de envío</label>
-          <select id="estadoEnvio" name="estadoEnvio">
+    <section class="card filters-card" aria-label="Filtros" style="margin-top: 16px;">
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items: flex-end;">
+        <div class="filter-field" style="min-width:220px;">
+          <label for="filter-status">Estado del Pedido</label>
+          <select id="filter-status">
             <option value="">Todos</option>
             <option value="pendiente">Pendiente</option>
-            <option value="enviado">Enviado</option>
+            <option value="asignado">Asignado</option>
+            <option value="en camino">En camino</option>
             <option value="entregado">Entregado</option>
+            <option value="cancelado">Cancelado</option>
+            <option value="suspendido">Suspendido</option>
           </select>
         </div>
 
-        <div style="grid-column: 1 / -1; display:flex; justify-content:flex-start; margin-top:4px;">
-          <button type="button" class="btn-apply" id="applyFilters">Aplicar filtros</button>
-          <button type="button" class="btn-secondary" id="resetFilters" style="margin-left:8px;">Limpiar</button>
+        <div class="filter-field" style="min-width:220px;">
+          <label for="filter-date">Fecha</label>
+          <input id="filter-date" type="date" />
         </div>
-      </form>
+
+        <div class="filter-field" style="flex:1;min-width:200px;">
+          <label for="filter-client">Buscar cliente</label>
+          <input id="filter-client" type="search" placeholder="Buscar cliente..." />
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:end;">
+          <button id="btnFilter" class="btn-apply">Buscar</button>
+          <button id="btnClear" class="icon-btn">Limpiar</button>
+        </div>
+      </div>
     </section>
 
-    <!-- Orders table -->
-    <section class="table-wrap card" style="margin-top:16px;">
-      <div class="table-header">
-        <h3>Pedidos asignados</h3>
-        <a class="view-all admin-only" href="#" id="downloadCsv">Exportar CSV</a>
+    <section class="table-wrap card" style="display:flex;gap:16px;margin-top:16px;">
+      <div style="flex:1;min-width:0;">
+        <div class="table-header">
+          <h3>Lista de Pedidos</h3>
+        </div>
+
+        <div class="table-scroll" id="orders-area">
+          <!-- Desktop / tablet table -->
+          <table id="ordersTable" class="orders-table" aria-label="Tabla de pedidos">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Fecha</th>
+                <th>Total</th>
+                <th>Vendedor</th>
+                <th>Motorizado</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTbody">
+              <!-- Rows injected by JS -->
+            </tbody>
+          </table>
+
+          <!-- Mobile: cards -->
+          <div id="ordersCards" aria-live="polite"></div>
+        </div>
       </div>
-      <div class="table-scroll">
-        <table id="ordersTable" class="products-table orders-table" role="table" aria-label="Tabla de pedidos">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>CLIENTE</th>
-              <th>PRODUCTO</th>
-              <th>FECHA</th>
-              <th>TOTAL</th>
-              <th>ESTADO PAGO</th>
-              <th>ESTADO ENVÍO</th>
-              <th>VENDEDOR</th>
-              <th>MOTORIZADO</th>
-              <th>ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="ordersTbody"></tbody>
-        </table>
-      </div>
+
+      <!-- Chat removed per request -->
     </section>
   </main>
 
-  <!-- Assign Modal (se conserva si quieres) -->
-  <div id="assignModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true"
-    aria-labelledby="assignModalTitle">
-    <div class="modal-content" role="document">
+
+  <!-- View Modal -->
+  <div id="order-view-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-content modal-lg" role="document">
       <div class="modal-header">
-        <h2 id="assignModalTitle">Asignar personal al pedido</h2>
-        <button class="close-btn" id="assignModalClose" aria-label="Cerrar">×</button>
+        <h2 id="view-order-title">Detalle del Pedido</h2>
+        <button class="close-btn" id="view-close" aria-label="Cerrar">&times;</button>
       </div>
-
-      <div class="modal-body" style="padding:12px 0;">
-        <div>
-          <h3 style="margin:0 0 8px 0;">Vendedores activos y online</h3>
-          <table class="table-card small" id="vendedoresList">
-            <thead>
-              <tr>
-                <th style="width:48px;"></th>
-                <th>Nombre</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-
-        <hr style="margin:12px 0;" />
-
-        <div>
-          <h3 style="margin:0 0 8px 0;">Motorizados activos y online</h3>
-          <table class="table-card small" id="motorizadosList">
-            <thead>
-              <tr>
-                <th style="width:48px;"></th>
-                <th>Nombre</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
+      <div class="modal-body" id="view-order-body">
+        <!-- Injected -->
       </div>
-
-      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding-top:12px;">
-        <button class="btn-secondary admin-only" id="assignCancel">Cancelar</button>
-        <button class="btn-primary admin-only" id="assignConfirm">Asignarlos</button>
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+        <button id="view-history" class="btn-small btn-history" title="Historial del cliente">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock-history"
+            viewBox="0 0 16 16">
+            <path
+              d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z" />
+            <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z" />
+            <path
+              d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5" />
+          </svg>
+        </button>
+        <button id="view-close-bottom" class="btn-small btn-suspender">Cerrar</button>
       </div>
     </div>
   </div>
 
-  <!-- Order view modal (detalles) -->
-  <div id="viewModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true"
-    aria-labelledby="viewModalTitle">
-    <div class="modal-content" role="document">
+  <!-- Edit Modal -->
+  <div id="order-edit-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-content modal-lg">
       <div class="modal-header">
-        <h2 id="viewModalTitle">Estado del pedido</h2>
-        <button class="close-btn" id="viewModalClose" aria-label="Cerrar">×</button>
+        <h2 id="edit-order-title">Editar Pedido</h2>
+        <button class="close-btn" id="edit-close" aria-label="Cerrar">&times;</button>
       </div>
-      <div class="modal-body" id="viewModalBody" style="padding:12px 0;">
-        <div id="orderTimeline"></div>
-      </div>
-      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding-top:12px;">
-        <button class="btn-secondary" id="viewCloseBtn">Cerrar</button>
+      <div class="modal-body" id="edit-order-body">
+        <!-- Form -->
+        <form id="edit-order-form">
+          <div class="form-row">
+            <label>Cliente</label>
+            <div id="edit-customer" class="small-muted"></div>
+          </div>
+
+          <div class="form-row inline" style="margin-top:8px;">
+            <div>
+              <label>Motorizado asignado</label>
+              <select id="edit-motorizado">
+                <option value="">-- POR ASIGNAR --</option>
+                <!-- opciones pobladas por JS (usuarios con role == "motorizado") -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top:8px;">
+            <label>Comentario (obligatorio si cambia motorizado)</label>
+            <textarea id="edit-motorizado-comment" rows="3" placeholder="Justifique el cambio..."></textarea>
+          </div>
+
+          <hr style="margin:12px 0;" />
+
+          <div id="edit-items-area">
+            <label>Items</label>
+            <div id="items-list"></div>
+
+            <!-- Inputs removidos: ahora la adición se realiza desde la lista de productos disponibles -->
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+            <div>
+              <span class="small-muted">Total:</span>
+              <strong id="edit-total">$0.00</strong>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button id="saveEditBtn" class="btn-apply" type="submit">Guardar</button>
+              <button id="cancelEditBtn" class="btn btn-suspender" type="button">Cancelar</button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -320,19 +308,24 @@
             <select id="pmMobileBank"
               style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); margin-bottom:8px;">
               <option value="">Selecciona banco</option>
-              <option value="banco_de_venezuela" data-logo="../assets/img/bdv.png">Banco de Venezuela</option>
+              <option value="banco_de_venezuela" data-logo="../assets/img/bdv.png">Banco de Venezuela
+              </option>
               <option value="banesco" data-logo="../assets/img/banesco.png">Banesco</option>
               <option value="mercantil" data-logo="../assets/img/mercantil.png">Mercantil</option>
-              <option value="provincial" data-logo="../assets/img/provincial.png">Banco Provincial</option>
-              <option value="bicentenario" data-logo="../assets/img/bicentenario.png">Banco Bicentenario</option>
-              <option value="bnc" data-logo="../assets/img/bnc.png">Banco Nacional de Crédito (BNC)</option>
+              <option value="provincial" data-logo="../assets/img/provincial.png">Banco Provincial
+              </option>
+              <option value="bicentenario" data-logo="../assets/img/bicentenario.png">Banco Bicentenario
+              </option>
+              <option value="bnc" data-logo="../assets/img/bnc.png">Banco Nacional de Crédito (BNC)
+              </option>
               <option value="exterior" data-logo="../assets/img/exterior.png">Banco Exterior</option>
               <option value="bancamiga" data-logo="../assets/img/bancamiga.png">Banca Amiga</option>
               <option value="others" data-logo="../assets/img/others.png">Otros</option>
             </select>
 
             <label for="pmMobileRef"
-              style="font-size:13px; color:var(--muted); display:block; margin-bottom:4px;">Referencia / Nº</label>
+              style="font-size:13px; color:var(--muted); display:block; margin-bottom:4px;">Referencia /
+              Nº</label>
             <input id="pmMobileRef" type="text" placeholder="Número de referencia"
               style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border);">
           </div>
@@ -351,7 +344,7 @@
             style="display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--border); border-radius:8px; margin-bottom:10px;">
             <label style="display:flex; gap:8px; align-items:center;">
               <input type="checkbox" class="pm-check" data-method="other">
-              <span>Otro (Bs.)</span>
+              <span>Otros</span>
             </label>
             <input type="text" inputmode="decimal" class="pm-amount" data-method="other" value="0"
               style="margin-left:auto; width:140px;" disabled>
@@ -359,7 +352,8 @@
 
           <!-- Conversión: 3 opciones excluyentes -->
           <div class="card" style="padding:12px; margin-bottom:10px;">
-            <div style="font-weight:600; margin-bottom:8px;">Conversión / tasa (para convertir USD ↔ Bs)</div>
+            <div style="font-weight:600; margin-bottom:8px;">Conversión / tasa (para convertir USD ↔ Bs)
+            </div>
 
             <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
               <label style="display:flex; gap:8px; align-items:center;">
@@ -380,13 +374,15 @@
 
             <div id="pmAssignRateWrap" style="display:none; margin-top:6px;">
               <label for="pmAssignRate"
-                style="font-size:13px; color:var(--muted); display:block; margin-bottom:4px;">Tasa personalizada (Bs por
+                style="font-size:13px; color:var(--muted); display:block; margin-bottom:4px;">Tasa
+                personalizada (Bs por
                 USD)</label>
               <input id="pmAssignRate" type="text" inputmode="decimal" min="0" step="0.01" placeholder="Ej. 12.34"
                 style="width:160px;">
             </div>
 
             <div id="pmConvInfo" style="margin-top:8px; font-size:13px; color:var(--muted);"></div>
+
             <div style="margin-top:8px;">
               <button type="button" id="pmApplyConversion" class="btn-secondary" style="width:100%;">Convertir resto a
                 Pago Móvil / Efectivo (Bs)</button>
@@ -401,7 +397,8 @@
             <div style="margin-top:8px; display:flex; justify-content:space-between; gap:8px; align-items:center;">
               <div>
                 <input type="checkbox" id="pmAmountCorrect" checked>
-                <label for="pmAmountCorrect" style="color:var(--muted); font-size:13px;">Monto correcto</label>
+                <label for="pmAmountCorrect" style="color:var(--muted); font-size:13px;">Monto
+                  correcto</label>
               </div>
               <div id="pmRemaining" style="font-size:13px; color:var(--muted);">Resto: $. 0.00</div>
             </div>
@@ -417,6 +414,7 @@
     </div>
   </div>
 
+
   <!-- Toast -->
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
@@ -426,9 +424,9 @@
   <!-- App scripts -->
   <script type="module" src="../assets/js/bank-select.js"></script>
   <script type="module" src="../assets/js/order-view-modal.js"></script>
-  <script type="module" src="../assets/js/payment-modal.js"></script>
+
   <script type="module" src="../assets/js/motorizado-kpis.js"></script>
-  <script type="module" src="../assets/js/motorizado-orders.js"></script>
+  <script type="module" src="../assets/js/orders-admin.js"></script>
 </body>
 
 </html>
