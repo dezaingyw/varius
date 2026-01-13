@@ -13,6 +13,8 @@
 //   * Si se usa la entrada libre (edit-motorizado-free) intentamos derivar nombre/email; preferimos datos del usuario seleccionado (id) cuando exista.
 // - Corregido bug moneyView -> money en vista detalle y subscribeMessages para usar orderId.
 // - Añadido: mostrar imágenes de productos en el modal "Ver detalle" (mini-slider por producto). Si el item no trae imágenes intenta obtenerlas del documento product/{productId}.
+// - Sincronizado con comportamiento de orders-admin en cuanto a botones (cobranza, marcar enviado) y permisos.
+// - Integra apertura de payment-modal para registrar cobranza (si existe).
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -31,8 +33,19 @@ import {
     getDoc,
     updateDoc,
     addDoc,
-    serverTimestamp
+    serverTimestamp,
+    runTransaction
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+// Intentar importar el modal de pago (si existe). Si no está disponible, las funciones que lo usan capturarán errores.
+let openPaymentModal = null;
+try {
+    // dynamic import for environments that support modules
+    // Note: si la ruta no existe en tu proyecto, esto lanzará y seguiremos sin bloqueo
+    import('./payment-modal.js').then(mod => { openPaymentModal = mod.openPaymentModal; }).catch(() => { /* no payment modal */ });
+} catch (e) {
+    // ignore
+}
 
 /* ================= INIT ================= */
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
@@ -65,7 +78,7 @@ const editClose = document.getElementById('edit-close');
 const cancelEditBtn = document.getElementById('cancelEditBtn');
 const editCustomer = document.getElementById('edit-customer');
 const editMotorizadoSelect = document.getElementById('edit-motorizado');
-const editMotorizadoFree = document.getElementById('edit-motorizado-free'); // opcional libre
+const editMotorizadoFree = document.getElementById('edit-motorizado-free'); // opcional libre (si existe en UI)
 const editMotComment = document.getElementById('edit-motorizado-comment');
 const itemsList = document.getElementById('items-list');
 const editItemsArea = document.getElementById('edit-items-area'); // contenedor de items + productos disponibles
@@ -238,6 +251,16 @@ function getIconSvg(name, size = 16) {
         case 'pencil': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>`;
         case 'clock': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.350-.378l.758.653a8 8 0 0 1-.401.432z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/></svg>`;
         case 'x-circle': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>`;
+        case 'cash-coin':
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-coin" viewBox="0 0 16 16">
+                    <path d="M5.5 9.511c.076.954.83 1.697 2.182 1.785V12h.6v-.709c1.4-.098 2.218-.846 2.218-1.932 0-.987-.626-1.496-1.745-1.76l-.473-.112V5.57c.6.068.982.396 1.074.85h1.052c-.076-.919-.864-1.638-2.126-1.716V4h-.6v.719c-1.195.117-2.01.836-2.01 1.853 0 .9.606 1.472 1.613 1.707l.397.098v2.034c-.615-.093-1.022-.43-1.114-.9zm2.177-2.166c-.59-.137-.91-.416-.91-.836 0-.47.345-.822.915-.925v1.76h-.005zm.692 1.193c.717.166 1.048.435 1.048.91 0 .542-.412.914-1.135.982V8.518z"/>
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                    <path d="M8 13.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11m0 .5A6 6 0 1 0 8 2a6 6 0 0 0 0 12"/>
+                    </svg>`;
+        case 'delivery-truck':
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-truck" viewBox="0 0 16 16">
+                    <path d="M0 3.5A1.5 1.5 0 0 1 1.5 2h9A1.5 1.5 0 0 1 12 3.5V5h1.02a1.5 1.5 0 0 1 1.17.563l1.481 1.85a1.5 1.5 0 0 1 .329.938V10.5a1.5 1.5 0 0 1-1.5 1.5H14a2 2 0 1 1-4 0H5a2 2 0 1 1-3.998-.085A1.5 1.5 0 0 1 0 10.5zm1.294 7.456A2 2 0 0 1 4.732 11h5.536a2 2 0 0 1 .732-.732V3.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .294.456M12 10a2 2 0 0 1 1.732 1h.768a.5.5 0 0 0 .5-.5V8.35a.5.5 0 0 0-.11-.312l-1.48-1.85A.5.5 0 0 0 13.02 6H12zm-9 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2m9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/>
+                    </svg>`;
         default: return '';
     }
 }
@@ -350,60 +373,138 @@ function renderTable(list) {
         const actionsTd = document.createElement('td');
         const rowActions = document.createElement('div'); rowActions.className = 'row-actions';
 
+        // determine roles/permissions (mirror orders-admin)
+        const roleLc = String(currentUserRole || '').toLowerCase();
+        const isAllowedToCharge = (roleLc === 'administrador' || roleLc === 'admin' || roleLc === 'motorizado');
+        const canMarkSent = (roleLc === 'vendedor' || roleLc === 'administrador' || roleLc === 'admin');
+        const isMotorizado = (roleLc === 'motorizado');
+
         // Actions behavior:
-        // - Si entregado: mostrar badge 'Entregado' y el botón Historial
-        // - Si no entregado: mostrar View, Edit, History, Suspend
+        // - For motorizado: ONLY show View and Cobranza (if applicable). No Edit / Suspend / History / Mark as enviado.
+        // - For others: previous behavior
         if (isDelivered) {
+            // Delivered: show delivered badge; for motorizado show only 'Ver', for others show delivered + historial
             const deliveredSpan = document.createElement('span');
             deliveredSpan.className = 'badge delivered';
             deliveredSpan.textContent = 'Entregado';
             rowActions.appendChild(deliveredSpan);
 
-            // History button (siempre mostrar) -> ahora envía parámetros
-            const histBtn = document.createElement('button');
-            histBtn.className = 'btn-small btn-history';
-            histBtn.title = 'Historial de Cliente';
-            histBtn.innerHTML = `${getIconSvg('clock', 14)}`;
-            histBtn.addEventListener('click', () => {
-                const url = buildHistoryUrlFromOrder(o);
-                window.location.href = url;
-            });
-            rowActions.appendChild(histBtn);
+            if (isMotorizado) {
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'btn-small btn-view';
+                viewBtn.title = 'Ver detalles';
+                viewBtn.innerHTML = `${getIconSvg('eye', 14)}`;
+                viewBtn.addEventListener('click', () => openViewModal(o));
+                rowActions.appendChild(viewBtn);
+            } else {
+                const histBtn = document.createElement('button');
+                histBtn.className = 'btn-small btn-history';
+                histBtn.title = 'Historial de Cliente';
+                histBtn.innerHTML = `${getIconSvg('clock', 14)}`;
+                histBtn.addEventListener('click', () => {
+                    const url = buildHistoryUrlFromOrder(o);
+                    window.location.href = url;
+                });
+                rowActions.appendChild(histBtn);
+            }
         } else {
-            // View button
-            const viewBtn = document.createElement('button');
-            viewBtn.className = 'btn-small btn-view';
-            viewBtn.title = 'Ver detalles';
-            viewBtn.innerHTML = `${getIconSvg('eye', 14)}`;
-            viewBtn.addEventListener('click', () => openViewModal(o));
-            rowActions.appendChild(viewBtn);
+            // Non-delivered
+            if (isMotorizado) {
+                // Motorizado: only View + Cobranza (if not paid)
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'btn-small btn-view';
+                viewBtn.title = 'Ver detalles';
+                viewBtn.innerHTML = `${getIconSvg('eye', 14)}`;
+                viewBtn.addEventListener('click', () => openViewModal(o));
+                rowActions.appendChild(viewBtn);
 
-            // Edit button
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn-small btn-assign';
-            editBtn.title = 'Editar Pedido';
-            editBtn.innerHTML = `${getIconSvg('pencil', 14)}`;
-            editBtn.addEventListener('click', () => openEditModal(o));
-            rowActions.appendChild(editBtn);
+                const paymentLower = String(rawPayment || '').toLowerCase();
+                const isPaid = paymentLower === 'pagado' || paymentLower === 'paid';
+                if (isAllowedToCharge && !isPaid) {
+                    const cobrarBtn = document.createElement('button');
+                    cobrarBtn.className = 'btn-small btn-cobrar';
+                    cobrarBtn.title = 'Registrar cobranza';
+                    cobrarBtn.innerHTML = `${getIconSvg('cash-coin', 14)}`;
+                    cobrarBtn.addEventListener('click', () => {
+                        const orderObj = { id: o.id, ...(o.data || {}) };
+                        try {
+                            if (openPaymentModal) openPaymentModal(orderObj);
+                            else showToast('Modal de cobranza no disponible.');
+                        } catch (err) {
+                            console.error('Error abriendo modal de cobranza:', err);
+                            showToast('No se pudo abrir modal de cobranza. Revisa la consola.');
+                        }
+                    });
+                    rowActions.appendChild(cobrarBtn);
+                }
+            } else {
+                // Non-motorizado: previous full set of actions
+                // View button
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'btn-small btn-view';
+                viewBtn.title = 'Ver detalles';
+                viewBtn.innerHTML = `${getIconSvg('eye', 14)}`;
+                viewBtn.addEventListener('click', () => openViewModal(o));
+                rowActions.appendChild(viewBtn);
 
-            // History button -> ahora envía parámetros
-            const histBtn = document.createElement('button');
-            histBtn.className = 'btn-small btn-history';
-            histBtn.title = 'Historial de Cliente';
-            histBtn.innerHTML = `${getIconSvg('clock', 14)}`;
-            histBtn.addEventListener('click', () => {
-                const url = buildHistoryUrlFromOrder(o);
-                window.location.href = url;
-            });
-            rowActions.appendChild(histBtn);
+                // Edit button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'btn-small btn-assign';
+                editBtn.title = 'Editar Pedido';
+                editBtn.innerHTML = `${getIconSvg('pencil', 14)}`;
+                editBtn.addEventListener('click', () => openEditModal(o));
+                rowActions.appendChild(editBtn);
 
-            // Suspend button
-            const suspBtn = document.createElement('button');
-            suspBtn.className = 'btn-small btn-suspender';
-            suspBtn.title = 'Suspender este pedido';
-            suspBtn.innerHTML = `${getIconSvg('x-circle', 14)}`;
-            suspBtn.addEventListener('click', () => suspendOrder(o));
-            rowActions.appendChild(suspBtn);
+                // If user can mark as enviado, show send button (vendedor/admin)
+                if (canMarkSent) {
+                    const sendBtn = document.createElement('button');
+                    sendBtn.className = 'btn-small btn-send';
+                    sendBtn.title = 'Marcar como enviado';
+                    sendBtn.innerHTML = `${getIconSvg('delivery-truck', 14)}`;
+                    sendBtn.addEventListener('click', () => markAsSent(o));
+                    rowActions.appendChild(sendBtn);
+                }
+
+                // History button -> ahora envía parámetros
+                const histBtn = document.createElement('button');
+                histBtn.className = 'btn-small btn-history';
+                histBtn.title = 'Historial de Cliente';
+                histBtn.innerHTML = `${getIconSvg('clock', 14)}`;
+                histBtn.addEventListener('click', () => {
+                    const url = buildHistoryUrlFromOrder(o);
+                    window.location.href = url;
+                });
+                rowActions.appendChild(histBtn);
+
+                // Cobranza button: solo si rol permitido y pedido NO está pagado
+                const paymentLower = String(rawPayment || '').toLowerCase();
+                const isPaid = paymentLower === 'pagado' || paymentLower === 'paid';
+                if (isAllowedToCharge && !isPaid) {
+                    const cobrarBtn = document.createElement('button');
+                    cobrarBtn.className = 'btn-small btn-cobrar';
+                    cobrarBtn.title = 'Registrar cobranza';
+                    cobrarBtn.innerHTML = `${getIconSvg('cash-coin', 14)}`;
+                    cobrarBtn.addEventListener('click', () => {
+                        const orderObj = { id: o.id, ...(o.data || {}) };
+                        try {
+                            if (openPaymentModal) openPaymentModal(orderObj);
+                            else showToast('Modal de cobranza no disponible.');
+                        } catch (err) {
+                            console.error('Error abriendo modal de cobranza:', err);
+                            showToast('No se pudo abrir modal de cobranza. Revisa la consola.');
+                        }
+                    });
+                    rowActions.appendChild(cobrarBtn);
+                }
+
+                // Suspend button
+                const suspBtn = document.createElement('button');
+                suspBtn.className = 'btn-small btn-suspender';
+                suspBtn.title = 'Suspender este pedido';
+                suspBtn.innerHTML = `${getIconSvg('x-circle', 14)}`;
+                suspBtn.addEventListener('click', () => suspendOrder(o));
+                rowActions.appendChild(suspBtn);
+            }
         }
 
         actionsTd.appendChild(rowActions); tr.appendChild(actionsTd);
@@ -431,13 +532,46 @@ function renderCards(list) {
         }
         const isDelivered = rawShipping && (String(rawShipping).toLowerCase() === 'entregado' || String(rawShipping).toLowerCase() === 'delivered');
 
+        // determine roles/permissions (mirror table)
+        const roleLc = String(currentUserRole || '').toLowerCase();
+        const isAllowedToCharge = (roleLc === 'administrador' || roleLc === 'admin' || roleLc === 'motorizado');
+        const paymentLower = String(rawPayment || '').toLowerCase();
+        const isPaid = paymentLower === 'pagado' || paymentLower === 'paid';
+        const canMarkSent = (roleLc === 'vendedor' || roleLc === 'administrador' || roleLc === 'admin');
+        const isMotorizado = (roleLc === 'motorizado');
+
         // Buttons with icons
         const viewBtnHtml = `<button class="order-card-btn" data-action="view" data-id="${o.id}" title="Ver">${getIconSvg('eye', 14)} <span style="margin-left:6px">Ver</span></button>`;
         const editBtnHtml = `<button class="order-card-btn" data-action="edit" data-id="${o.id}" title="Editar">${getIconSvg('pencil', 14)} <span style="margin-left:6px">Editar</span></button>`;
         const histBtnHtml = `<button class="order-card-btn" data-action="history" data-id="${o.id}" title="Historial">${getIconSvg('clock', 14)} <span style="margin-left:6px">Historial</span></button>`;
+        const cobrarBtnHtml = `<button class="order-card-btn" data-action="cobrar" data-id="${o.id}" title="Cobrar">${getIconSvg('cash-coin', 14)} <span style="margin-left:6px">Cobrar</span></button>`;
+        const sendBtnHtml = `<button class="order-card-btn" data-action="enviado" data-id="${o.id}" title="Marcar como enviado">🚚 <span style="margin-left:6px">Enviar</span></button>`;
 
-        // If delivered, keep only history button
-        const actionsHtml = isDelivered ? `${histBtnHtml}` : `${viewBtnHtml}${editBtnHtml}${histBtnHtml}`;
+        // Build actionsHtml depending on role
+        let actionsHtml = '';
+        if (isDelivered) {
+            // delivered: motorizado -> only view; others -> history
+            if (isMotorizado) {
+                actionsHtml = `${viewBtnHtml}`;
+            } else {
+                actionsHtml = `${histBtnHtml}`;
+            }
+        } else {
+            if (isMotorizado) {
+                // Motorizado: only view and cobrar (if not paid)
+                actionsHtml = `${viewBtnHtml}`;
+                if (isAllowedToCharge && !isPaid) actionsHtml += `${cobrarBtnHtml}`;
+            } else {
+                // Non-motorizado: previous behavior
+                if (isAllowedToCharge && !isPaid) actionsHtml = `${viewBtnHtml}${editBtnHtml}${cobrarBtnHtml}${histBtnHtml}`;
+                else actionsHtml = `${viewBtnHtml}${editBtnHtml}${histBtnHtml}`;
+
+                // insert send button for roles allowed (vendedor/admin) next to edit
+                if (canMarkSent) {
+                    actionsHtml = actionsHtml.replace(editBtnHtml, editBtnHtml + sendBtnHtml);
+                }
+            }
+        }
 
         card.innerHTML = `
       <div class="order-card-header">
@@ -469,6 +603,20 @@ function renderCards(list) {
                 if (a === 'history') {
                     const url = buildHistoryUrlFromOrder(o);
                     window.location.href = url;
+                }
+                if (a === 'cobrar') {
+                    // open payment modal with merged object (same behavior que orders-admin)
+                    const orderObj = { id: o.id, ...(o.data || {}) };
+                    try {
+                        if (openPaymentModal) openPaymentModal(orderObj);
+                        else showToast('Modal de cobranza no disponible.');
+                    } catch (err) {
+                        console.error('Error abriendo modal de cobranza (cards):', err);
+                        showToast('No se pudo abrir modal de cobranza. Revisa la consola.');
+                    }
+                }
+                if (a === 'enviado') {
+                    markAsSent(o);
                 }
             });
         });
@@ -1161,6 +1309,26 @@ async function suspendOrder(order) {
     }
 }
 
+/* ================= MARCAR COMO ENVIADO ================= */
+async function markAsSent(order) {
+    if (!order || !order.id) return;
+    const conf = window.confirm('¿Deseas marcar este pedido como "enviado"?');
+    if (!conf) return;
+    const docRef = doc(db, 'orders', order.id);
+    try {
+        // Actualizamos status y shippingStatus a 'enviado' y timestamp de actualización
+        await updateDoc(docRef, {
+            status: 'enviado',
+            shippingStatus: 'enviado',
+            updatedAt: serverTimestamp()
+        });
+        showToast('Pedido marcado como enviado.');
+    } catch (err) {
+        console.error('markAsSent error', err, order.id);
+        showToast('No se pudo marcar como enviado. Revisa la consola.');
+    }
+}
+
 /* ================= CHAT (messages subcollection) ================= */
 function clearMessagesUnsubscribe() {
     if (messagesUnsubscribe) { messagesUnsubscribe(); messagesUnsubscribe = null; }
@@ -1477,6 +1645,16 @@ function updateSidebarVisibility() {
     if (isMobileViewport()) chatColumn.style.display = 'none';
     else renderChatSidebarList();
 }
+
+/* ================= PAYMENT CONFIRMED LISTENER (from payment-modal) ================= */
+document.addEventListener('payment:confirmed', (e) => {
+    const orderId = e?.detail?.orderId;
+    if (orderId) {
+        showToast('Cobranza registrada correctamente.');
+        // onSnapshot listener hará la actualización, pero podemos forzar re-render de filtros actuales
+        applyFilters();
+    }
+});
 
 /* ================= EXPORTS (optional) ================= */
 export { listenOrders, render };
