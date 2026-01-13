@@ -464,7 +464,7 @@ nav .nav-list {
     border: 1px solid var(--border);
     background: #fff;
     color: var(--text);
-    font-weight: 600;
+    font-weight: 400;
     font-size: 14px;
     cursor: pointer;
     transition: transform 160ms var(--easing), box-shadow 160ms var(--easing),
@@ -1467,6 +1467,12 @@ table#ordersTable tbody td {
     border: 1px solid rgba(16, 185, 129, 0.08);
 }
 
+.badge.enviado {
+    background: #feffdf;
+    color: #a39a16;
+    border: 1px solid rgba(16, 185, 129, 0.08);
+}
+
 .badge.asignado {
     background: #f6ecfd;
     color: #8615d1;
@@ -1540,6 +1546,12 @@ table#ordersTable tbody td {
     border-color: rgba(6, 182, 212, 0.06);
 }
 
+.btn-send {
+    background: linear-gradient(180deg, #fffee9, #fffce0);
+    color: #756e0f;
+    border-color: rgba(6, 182, 212, 0.06);
+}
+
 .btn-confirm {
     background: #ecfdf5;
     color: #064e3b;
@@ -1549,6 +1561,12 @@ table#ordersTable tbody td {
 .btn-history {
     background: linear-gradient(180deg, #fff8f3, #fff2ea);
     color: #7a4b3b;
+    border-color: rgba(245, 158, 11, 0.04);
+}
+
+.btn-cobrar {
+    background: linear-gradient(180deg, #f3fbff, #edeaff);
+    color: #3b3f7a;
     border-color: rgba(245, 158, 11, 0.04);
 }
 
