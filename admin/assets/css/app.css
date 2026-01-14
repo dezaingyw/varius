@@ -238,7 +238,7 @@ nav .nav-list {
 
 /* sidebar user */
 .sidebar-user {
-  margin-top: 450px;
+  margin-top: 430px;
   padding-top: 12px;
   border-top: 1px dashed var(--border);
   display: flex;
@@ -1804,4 +1804,5 @@ table#ordersTable tbody td {
   align-items: center; /* Alinea los botones entre sí en el eje vertical */
   gap: 8px; /* Espacio entre botones */
 }
+
 
