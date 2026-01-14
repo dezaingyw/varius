@@ -9,6 +9,276 @@
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
+    <style>
+        /* ===== CONFIGURACIÓN BASE ===== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --color-primario: #7E3FF0;
+            --color-secundario: #4CAF50;
+            --color-pendiente: #FF9800;
+            --color-email: #2196F3;
+            --color-texto: #2D2D2D;
+            --color-texto-secundario: #757575;
+            --color-gris-claro: #F8F9FA;
+            --color-borde: #E0E0E0;
+            --color-blanco: #FFFFFF;
+        }
+
+        /* ===== HEADER ===== */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* ===== TABS ===== */
+        .tabs {
+            display: flex;
+            background: var(--color-gris-claro);
+            padding: 0 24px;
+        }
+
+        .tab {
+            padding: 16px 24px;
+            cursor: pointer;
+            color: var(--color-texto-secundario);
+        }
+
+        .tab.active {
+            color: var(--color-primario);
+            border-bottom: 3px solid var(--color-primario);
+        }
+
+        /* ===== FILTROS GLOBALES ===== */
+        .filters-bar {
+            background: var(--color-gris-claro);
+            padding: 16px;
+            margin: 0 24px 24px;
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 12px;
+            border: 1px solid var(--color-borde);
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .btn-filter {
+            background: var(--color-primario);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            height: 44px;
+        }
+
+        /* ===== CONTENIDO PRINCIPAL ===== */
+        .main-content {
+            padding: 0 24px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ===== CARDS Y MÉTRICAS ===== */
+        .form-card {
+            background: var(--color-gris-claro);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        .form-card h3 {
+            margin-bottom: 16px;
+            color: var(--color-texto);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .metrics-row {
+            display: flex;
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .metric-card {
+            background: var(--color-gris-claro);
+            padding: 16px;
+            border-radius: 12px;
+            flex: 1;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        /* ===== LISTAS ===== */
+        .data-list {
+            margin-top: 16px;
+        }
+
+        .list-item {
+            border: 1px solid var(--color-borde);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .list-item:hover {
+            background: var(--color-gris-claro);
+        }
+
+        .list-item.expanded {
+            background: var(--color-gris-claro);
+        }
+
+        .item-header {
+            display: flex;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--color-primario);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .product-img {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            background: #eee;
+        }
+
+        .item-body {
+            flex: 1;
+        }
+
+        .item-actions {
+            margin-top: 12px;
+            color: var(--color-primario);
+        }
+
+        .item-actions a {
+            margin-right: 12px;
+            text-decoration: none;
+        }
+
+        .expanded-content {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1;
+            px solid var(--color-borde);
+            display: none;
+        }
+
+        .expanded-content.active {
+            display: block;
+        }
+
+        /* ===== BOTONES ===== */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--color-secundario);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--color-primario);
+            border: 1px solid var(--color-primario);
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--color-secundario);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+            z-index: 1000;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .metrics-row {
+                flex-direction: column;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filters-bar {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            .tab {
+                min-width: 120px;
+                text-align: center;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -42,13 +312,254 @@
 
     <!-- Main content -->
     <main class="main">
+        <section class="table-wrap card">
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" data-tab="clientes">👥 Clientes</div>
+                <div class="tab" data-tab="pedidos">🛍️ Pedidos</div>
+                <div class="tab" data-tab="productos">📦 Productos</div>
+                <div class="tab" data-tab="comunicaciones">📞 Comunicaciones</div>
+                <div class="tab" data-tab="agenda">📅 Agenda</div>
+            </div>
 
+            <!-- Filtros Globales -->
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <label>Rango de fechas</label>
+                    <input type="date" id="fechaDesde">
+                </div>
+                <div class="filter-group">
+                    <label>Estado de pedido</label>
+                    <select>
+                        <option>Todos</option>
+                        <option>Pendiente</option>
+                        <option>Pagado</option>
+                        <option>Entregado</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Motorizado</label>
+                    <select>
+                        <option>Todos</option>
+                        <option>Juan Pérez</option>
+                        <option>María López</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Método de contacto</label>
+                    <select>
+                        <option>Todos</option>
+                        <option>WhatsApp</option>
+                        <option>Email</option>
+                        <option>Llamada</option>
+                    </select>
+                </div>
+                <button class="btn-filter">Aplicar filtros</button>
+            </div>
 
+            <!-- Contenido -->
+            <div class="main-content">
+                <!-- CLIENTES -->
+                <div class="tab-content active" id="clientes">
+                    <!-- Formulario Nuevo Cliente -->
+                    <div class="form-card">
+                        <h3>➕ Nuevo cliente</h3>
+                        <div class="form-grid">
+                            <div class="filter-group">
+                                <label>Nombre completo *</label>
+                                <input type="text" id="nombreCliente" placeholder="Ej: Ana Martínez">
+                            </div>
+                            <div class="filter-group">
+                                <label>Teléfono *</label>
+                                <input type="tel" id="telefonoCliente" placeholder="+58 412 1234567">
+                            </div>
+                            <div class="filter-group">
+                                <label>Email</label>
+                                <input type="email" id="emailCliente" placeholder="ana@email.com">
+                            </div>
+                        </div>
+                        <button class="btn-primary" id="btnGuardarCliente">✅ Guardar cliente</button>
+                    </div>
 
+                    <!-- Métricas -->
+                    <div class="metrics-row">
+                        <div class="metric-card">
+                            <div>Cantidad Ventas Realizadas</div>
+                            <div class="metric-value">120</div>
+                        </div>
+                        <div class="metric-card">
+                            <div>Monto de Ventas Realizadas</div>
+                            <div class="metric-value">$3.598.800</div>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Clientes -->
+                    <div class="data-list" id="listaClientes">
+                        <!-- Clientes simulados -->
+                        <div class="list-item" data-cliente="1">
+                            <div class="item-header">
+                                <div class="avatar">A</div>
+                                <div class="item-body">
+                                    <div><strong>Ana Martínez</strong></div>
+                                    <div>📱 +58 412 1234567</div>
+                                    <div>ana@email.com</div>
+                                    <div>10/04/2025 • $149.970</div>
+                                    <div>
+                                        <span style="color:var(--color-primario)">📱 10/04 14:30</span> "Pedido
+                                        confirmado"
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="item-actions">
+                                <a href="#">✏️ Editar</a>
+                                <a href="#">➕ Actividad</a>
+                                <a href="#">📱 WhatsApp</a>
+                            </div>
+                            <div class="expanded-content" id="cliente-1-expanded">
+                                <h4>Historial de pedidos</h4>
+                                <ul>
+                                    <li>PED-101: Camisa X, Pantalón Y - $149.970</li>
+                                </ul>
+                                <h4>Productos comprados</h4>
+                                <ul>
+                                    <li>Camisa Varius (3 veces)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PEDIDOS -->
+                <div class="tab-content" id="pedidos">
+                    <div class="metrics-row">
+                        <div class="metric-card">
+                            <div>Pedidos hoy</div>
+                            <div class="metric-value">5</div>
+                        </div>
+                        <div class="metric-card">
+                            <div>Por cobrar</div>
+                            <div class="metric-value">$200.000</div>
+                        </div>
+                    </div>
+                    <div class="data-list">
+                        <div class="list-item">
+                            <div><strong>PED-101</strong></div>
+                            <div>👤 Ana Martínez</div>
+                            <div>10/04/2025</div>
+                            <div>Camisa X, Pantalón Y</div>
+                            <div><strong>$149.970</strong></div>
+                            <div style="color:var(--color-secundario)">✅ Entregado</div>
+                            <div style="color:var(--color-primario)">Efectivo + Pago Móvil</div>
+                            <div>Juan Pérez</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PRODUCTOS -->
+                <div class="tab-content" id="productos">
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Nombre del producto</label>
+                            <input type="text" placeholder="Buscar por nombre...">
+                        </div>
+                        <div class="filter-group">
+                            <label>Fecha de venta (desde)</label>
+                            <input type="date">
+                        </div>
+                        <div class="filter-group">
+                            <label>Fecha de venta (hasta)</label>
+                            <input type="date">
+                        </div>
+                        <button class="btn-filter">Filtrar</button>
+                    </div>
+                    <div class="data-list">
+                        <div class="list-item">
+                            <div class="item-header">
+                                <div class="product-img"></div>
+                                <div class="item-body">
+                                    <div><strong>Camisa Varius</strong></div>
+                                    <div>$29.990</div>
+                                    <div>12 unidades</div>
+                                    <div style="color:var(--color-primario)">Fecha de Última Venta: 10/04/2025</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COMUNICACIONES -->
+                <div class="tab-content" id="comunicaciones">
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Cliente</label>
+                            <select>
+                                <option>Todos</option>
+                                <option>Ana Martínez</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Tipo</label>
+                            <select>
+                                <option>Todos</option>
+                                <option>WhatsApp</option>
+                                <option>Email</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="data-list">
+                        <div class="list-item">
+                            <div>10/04 14:30</div>
+                            <div><strong>Ana Martínez</strong></div>
+                            <div style="color:var(--color-primario)">📱 WhatsApp</div>
+                            <div>Pedido PED-101 confirmado</div>
+                            <div style="color:var(--color-secundario)">✅ Enviado</div>
+                            <div style="margin-top: 8px; color:var(--color-primario)"><a href="#">🔁 Reenviar</a></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AGENDA -->
+                <div class="tab-content" id="agenda">
+                    <h3 style="text-align:center; margin: 0 0 16px;">Semana del 14 al 20 de abril</h3>
+                    <div
+                        style="display:grid; grid-template-columns: repeat(7, 1fr); text-align:center; gap:8px; margin-bottom:24px;">
+                        <div>L</div>
+                        <div>M</div>
+                        <div>M</div>
+                        <div>J</div>
+                        <div>V</div>
+                        <div>S</div>
+                        <div>D</div>
+                        <!-- Días simulados -->
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div>18</div>
+                        <div style="background:var(--color-secundario);color:white;border-radius:50%;">19</div>
+                        <div>20</div>
+                    </div>
+                    <div class="data-list">
+                        <div class="list-item"
+                            style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border:none;">
+                            <span>⏰ En 1 hora: Demostración con Ana Martínez</span>
+                            <span>
+                                <a href="#" style="color:var(--color-primario);margin-right:12px;">✅ Completar</a>
+                                <a href="#" style="color:var(--color-primario);">🔁 Posponer</a>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast -->
+            <div class="toast" id="toast">✅ Cliente guardado</div>
+        </section>
     </main>
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script type="module" src="../assets/js/sidebar-loader.js"></script>
+    <script type="module" src="../assets/js/customer-relationship-management.js"></script>
 </body>
 
 </html>
