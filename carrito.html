@@ -27,6 +27,7 @@
       </div>
       <div class="carousel" id="carousel" aria-roledescription="carousel">
         <div class="carousel-track" id="carouselTrack" aria-live="polite"></div>
+        <div class="carousel-indicators" id="carouselIndicators" aria-hidden="true"></div>
         <button class="carousel-btn prev" id="carouselPrev" aria-label="Anterior">‹</button>
         <button class="carousel-btn next" id="carouselNext" aria-label="Siguiente">›</button>
       </div>
@@ -84,8 +85,9 @@
 
           <div class="form-row">
             <label for="cust_phone">Teléfono <span class="req">*</span></label>
+            <!-- inputmode y pattern ayudan en mobile; sanitización en JS asegura sólo dígitos -->
             <input id="cust_phone" name="phone" type="text" placeholder="Ej: 04121234567" required autocomplete="tel"
-              inputmode="tel" maxlength="16">
+              inputmode="numeric" pattern="\d*" maxlength="15">
             <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
           </div>
 
@@ -98,7 +100,8 @@
 
           <div class="form-row">
             <label for="cust_age">Edad</label>
-            <input id="cust_age" name="age" type="number" min="0" max="120" placeholder="Edad">
+            <!-- usar text + inputmode para controlar mejor la sanitización; maxlength evita valores grandes -->
+            <input id="cust_age" name="age" type="text" inputmode="numeric" pattern="\d*" maxlength="3" placeholder="Edad">
             <div id="cust_age_err" class="field-err" aria-live="polite"></div>
           </div>
 
