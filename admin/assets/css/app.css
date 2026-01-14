@@ -221,7 +221,7 @@ nav .nav-list {
 }
 
 .nav-item.active .nav-link {
-  background: #eef6ff;
+  background: #2786f3;
   color: var(--accent);
   box-shadow: inset 0 0 0 1px rgba(43, 110, 246, 0.06);
 }
@@ -1804,3 +1804,4 @@ table#ordersTable tbody td {
   align-items: center; /* Alinea los botones entre sí en el eje vertical */
   gap: 8px; /* Espacio entre botones */
 }
+
