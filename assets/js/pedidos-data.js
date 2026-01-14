@@ -167,11 +167,44 @@ async function resolveProductImages(product) {
 }
 
 /* ---------------------- Utilidades UI ---------------------- */
+// Formateador actualizado: dólares, formato venezolano (coma decimal), siempre mostrar decimales:
+// - si el número es entero se muestran 2 decimales (,00)
+// - si tiene decimales se respetan (hasta 6 decimales)
 function formatCurrency(n) {
+    if (n === null || typeof n === 'undefined' || n === '') return '';
+    const num = Number(n);
+    if (!isFinite(num)) return String(n);
+
+    // Intentamos detectar la cantidad de decimales "reales" del valor original
+    let s = (typeof n === 'string') ? n.trim() : String(num);
+    let decimals = 0;
+    if (s.indexOf('.') >= 0) {
+        decimals = s.split('.')[1].length;
+    } else {
+        if (num !== Math.trunc(num)) {
+            const fracStr = String(num).split('.')[1] || '';
+            decimals = Math.min(6, fracStr.length || 6);
+        } else {
+            decimals = 0;
+        }
+    }
+
+    const fractionDigits = Math.max(2, Math.min(6, decimals));
+
     try {
-        return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n);
-    } catch (err) { return `$${n}`; }
+        // Usamos Intl para formatear número con configuración de Venezuela (coma decimal),
+        // pero no usamos la opción 'currency' directamente para evitar el prefijo "US$" en algunos navegadores.
+        const nf = new Intl.NumberFormat('es-VE', {
+            minimumFractionDigits: fractionDigits,
+            maximumFractionDigits: fractionDigits
+        }).format(num);
+        return `$${nf}`;
+    } catch (err) {
+        const fixed = num.toFixed(fractionDigits);
+        return `$${fixed.replace('.', ',')}`;
+    }
 }
+
 function isProductVisible(p) {
     if (!p || !p.status) return true;
     const s = String(p.status).toLowerCase().trim();
@@ -384,11 +417,28 @@ function renderCartPanel() {
             const resolved = (p.__resolvedImages && p.__resolvedImages[0]) || p.image || '';
             const div = document.createElement('div');
             div.className = 'avail-item';
+
+            // Construir HTML de precio con estilo claro (antes) y nuevo más grande (descuento)
+            let priceHtml = '';
+            if (p.discountPrice && Number(p.discountPrice) < Number(p.price)) {
+                priceHtml = `
+                  <span class="price-old" style="font-size:0.9rem;color:#9aa1ab;text-decoration:line-through;margin-right:6px;">
+                    ${formatCurrency(p.price)}
+                  </span>
+                  <span style="color:#9aa1ab;margin-right:6px;">→</span>
+                  <span class="price-new" style="font-size:1.05rem;color:#111;font-weight:700;">
+                    ${formatCurrency(p.discountPrice)}
+                  </span>
+                `;
+            } else {
+                priceHtml = `<span class="price-new" style="font-size:1.03rem;color:#111;font-weight:700;">${formatCurrency(p.price)}</span>`;
+            }
+
             div.innerHTML = `
               <img src="${escapeHtml(resolved)}" alt="${escapeHtml(p.name)}">
               <div style="flex:1">
                 <div style="font-weight:700">${escapeHtml(p.name)}</div>
-                <div style="color:#94a3b8">${p.discountPrice ? `<span class="old">${formatCurrency(p.price)}</span> <strong>${formatCurrency(p.discountPrice)}</strong>` : `<strong>${formatCurrency(p.price)}</strong>`}</div>
+                <div style="color:#94a3b8">${priceHtml}</div>
                 <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
                   <div class="qty-controls" style="align-items:center">
                     <button class="qty-decr avail-decr" data-id="${escapeHtml(p.id)}" aria-label="Disminuir">−</button>
@@ -462,9 +512,20 @@ function renderCartPanel() {
    ---------------------- */
 function createProductCardHtml(p, resolvedImages = []) {
     const isOffer = !!(p.isOnSale || (p.discountPrice && p.discountPrice < p.price));
-    const priceHtml = isOffer
-        ? `<span class="old" aria-hidden="true">${formatCurrency(p.price)}</span><span class="current">${formatCurrency(p.discountPrice)}</span>`
-        : `<span class="current">${formatCurrency(p.price)}</span>`;
+    let priceHtml = '';
+    if (isOffer) {
+        priceHtml = `
+          <span class="price-old" aria-hidden="true" style="font-size:0.9rem;color:#9aa1ab;text-decoration:line-through;margin-right:6px;">
+            ${formatCurrency(p.price)}
+          </span>
+          <span style="color:#9aa1ab;margin-right:6px;">→</span>
+          <span class="price-new" style="font-size:1.05rem;color:#111;font-weight:700;">
+            ${formatCurrency(p.discountPrice)}
+          </span>
+        `;
+    } else {
+        priceHtml = `<span class="price-new" style="font-size:1.03rem;color:#111;font-weight:700;">${formatCurrency(p.price)}</span>`;
+    }
     const sliderHtml = `<div class="card-slider" role="img" aria-label="${escapeHtml(p.name)}">${resolvedImages.length ? resolvedImages.map((u, i) => `<img src="${escapeHtml(u)}" alt="${escapeHtml(p.name)} ${i + 1}" style="opacity:${i === 0 ? 1 : 0}">`).join('') : `<img src="${escapeHtml(p.image || '')}" alt="${escapeHtml(p.name)}">`}</div>`;
     return `
       ${isOffer ? `<div class="offer-badge" aria-hidden="true">Oferta</div>` : ''}
@@ -534,24 +595,41 @@ async function renderProductsGrid() {
     });
 }
 
-/* Carousel */
+/* Carousel: versión infinito mediante clones de los slides */
 async function setupCarousel() {
     const track = document.getElementById('carouselTrack');
     const indicators = document.getElementById('carouselIndicators');
-    const prev = document.getElementById('carouselPrev');
-    const next = document.getElementById('carouselNext');
+    const prevBtn = document.getElementById('carouselPrev');
+    const nextBtn = document.getElementById('carouselNext');
     if (!track) return;
-    const slides = PRODUCTS.filter(p => isProductVisible(p) && (p.isOnSale || (p.discountPrice && Number(p.discountPrice) < Number(p.price))));
-    if (!slides.length) { track.innerHTML = '<div style="padding:12px">No hay ofertas disponibles.</div>'; if (indicators) indicators.innerHTML = ''; return; }
-    await Promise.all(slides.map(p => resolveProductImages(p)));
-    track.innerHTML = '';
-    if (indicators) indicators.innerHTML = '';
-    slides.forEach((s, idx) => {
+
+    const slidesData = PRODUCTS.filter(p => isProductVisible(p) && (p.isOnSale || (p.discountPrice && Number(p.discountPrice) < Number(p.price))));
+    if (!slidesData.length) { track.innerHTML = '<div style="padding:12px">No hay ofertas disponibles.</div>'; if (indicators) indicators.innerHTML = ''; return; }
+
+    await Promise.all(slidesData.map(p => resolveProductImages(p)));
+
+    // Crear elementos slide originales
+    const originalSlideEls = slidesData.map((s) => {
         const imgUrl = (s.__resolvedImages && s.__resolvedImages[0]) || s.image || '';
         const isOffer = !!(s.isOnSale || (s.discountPrice && s.discountPrice < s.price));
-        const priceHtml = isOffer ? `<span class="price-old">${formatCurrency(s.price)}</span><span class="price-pill">${formatCurrency(s.discountPrice)}</span>` : `<span class="price-pill">${formatCurrency(s.price)}</span>`;
+        let priceHtml = '';
+        if (isOffer) {
+            priceHtml = `
+              <span class="price-old" style="font-size:0.9rem;color:#9aa1ab;text-decoration:line-through;margin-right:6px;">
+                ${formatCurrency(s.price)}
+              </span>
+              <span style="color:#9aa1ab;margin-right:6px;">→</span>
+              <span class="price-new" style="font-size:1.05rem;color:#111;font-weight:700;">
+                ${formatCurrency(s.discountPrice)}
+              </span>
+            `;
+        } else {
+            priceHtml = `<span class="price-new" style="font-size:1.03rem;color:#111;font-weight:700;">${formatCurrency(s.price)}</span>`;
+        }
+
         const slide = document.createElement('div');
         slide.className = 'carousel-slide';
+        slide.dataset.productId = s.id;
         slide.innerHTML = `
           ${isOffer ? `<div class="offer-badge">Oferta</div>` : ''}
           <div class="card-slider" aria-hidden="false">
@@ -562,7 +640,7 @@ async function setupCarousel() {
             <div class="product-title">${escapeHtml(s.name)}</div>
             <div class="product-meta">${escapeHtml(s.category || '')}</div>
             <div class="product-price">${priceHtml}</div>
-            <div class="carousel-controls">
+            <div class="carousel-controls" style="margin-top:8px;display:flex;gap:8px;align-items:center">
               <button class="btn-primary add-btn" data-id="${escapeHtml(s.id)}" aria-label="Agregar ${escapeHtml(s.name)}">Agregar</button>
               <button class="btn-secondary view-btn" data-id="${escapeHtml(s.id)}" aria-label="Ver ${escapeHtml(s.name)}">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
@@ -573,70 +651,122 @@ async function setupCarousel() {
             </div>
           </div>
         `;
-        track.appendChild(slide);
-        if (indicators) {
+        return slide;
+    });
+
+    // Limpiar track y armar clones antes+originales+clones despues
+    track.innerHTML = '';
+    const total = originalSlideEls.length;
+    const clonesBefore = originalSlideEls.map(el => el.cloneNode(true));
+    const clonesAfter = originalSlideEls.map(el => el.cloneNode(true));
+
+    // Append: clonesBefore, originals, clonesAfter
+    for (const c of clonesBefore) track.appendChild(c);
+    for (const s of originalSlideEls) track.appendChild(s);
+    for (const c of clonesAfter) track.appendChild(c);
+
+    // indicadores (si aplica)
+    if (indicators) {
+        indicators.innerHTML = '';
+        for (let i = 0; i < total; i++) {
             const ind = document.createElement('button');
             ind.className = 'indicator';
-            ind.dataset.index = idx;
-            ind.addEventListener('click', () => { goToSlide(idx); });
+            ind.dataset.index = i;
+            ind.addEventListener('click', () => {
+                // llevar al slide central + index
+                carouselIndex = baseIndex + i;
+                update();
+            });
             indicators.appendChild(ind);
+        }
+    }
+
+    // delegación para botones dentro del track (funciona también con clones)
+    track.addEventListener('click', (e) => {
+        const addBtn = e.target.closest('.add-btn');
+        if (addBtn) {
+            const id = addBtn.dataset.id;
+            addToCart(id, 1);
+            renderCartPanel();
+            return;
+        }
+        const viewBtn = e.target.closest('.view-btn');
+        if (viewBtn) {
+            (async () => {
+                const id = viewBtn.dataset.id;
+                let p = PRODUCTS_BY_ID.get(id);
+                if (!p) p = await fetchProductByIdOrSlug(id);
+                if (!p) { showToast('Producto no encontrado'); return; }
+                await resolveProductImages(p);
+                openProductModal(p);
+            })();
+            return;
         }
     });
 
-    document.querySelectorAll('.carousel-slide .card-slider').forEach(slider => {
-        const imgs = Array.from(slider.querySelectorAll('img'));
-        if (imgs.length <= 1) return;
-        let idx = 0;
-        setInterval(() => {
-            const prev = idx;
-            idx = (idx + 1) % imgs.length;
-            imgs[prev].style.opacity = '0';
-            imgs[idx].style.opacity = '1';
-        }, 2400);
-    });
+    // Preparar lógica de index y animación: arrancamos en la "tercera" sección central
+    const slideElSample = track.querySelector('.carousel-slide');
+    if (!slideElSample) return;
+    track.style.display = 'flex';
+    track.style.willChange = 'transform';
+    track.style.transition = 'transform 400ms ease';
 
-    track.querySelectorAll('.add-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            addToCart(id, 1);
-            renderCartPanel();
-        });
-    });
+    let baseIndex = total; // la "primera" original en el conjunto central
+    let carouselIndex = baseIndex; // actual index dentro del track (0..(total*3-1))
+    const fullCount = total * 3;
 
-    track.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const id = e.currentTarget.dataset.id;
-            let p = PRODUCTS_BY_ID.get(id);
-            if (!p) p = await fetchProductByIdOrSlug(id);
-            if (!p) { showToast('Producto no encontrado'); return; }
-            await resolveProductImages(p);
-            openProductModal(p);
-        });
-    });
-
-    let carouselIndex = 0;
-    let carouselTimer = null;
-    function update() {
-        const slideEl = track.querySelector('.carousel-slide');
-        if (!slideEl) return;
+    function getGapPx() {
         const style = getComputedStyle(track);
-        const gapPx = parseFloat(style.gap || 16);
-        const slideWidth = slideEl.clientWidth + gapPx;
-        const offset = -carouselIndex * slideWidth;
-        track.style.transform = `translateX(${offset}px)`;
-        if (indicators) Array.from(indicators.children).forEach((el, i) => el.classList.toggle('active', i === carouselIndex));
+        return parseFloat(style.gap || 16) || 0;
     }
+
+    function update() {
+        // calcular ancho del slide (considerando gap)
+        const slideWidth = slideElSample.clientWidth + getGapPx();
+        const offset = -carouselIndex * slideWidth;
+        track.style.transition = track.style.transition || 'transform 400ms ease';
+        track.style.transform = `translateX(${offset}px)`;
+        // actualizar indicadores
+        if (indicators) {
+            const idx = ((carouselIndex - baseIndex) % total + total) % total;
+            Array.from(indicators.children).forEach((el, i) => el.classList.toggle('active', i === idx));
+        }
+    }
+
+    // Después de transicionar, "teletransportar" si estamos en clones
+    track.addEventListener('transitionend', () => {
+        if (carouselIndex >= total * 2) {
+            // saltó al bloque de clones final -> reposicionar al bloque central equivalente
+            track.style.transition = 'none';
+            carouselIndex = baseIndex + ((carouselIndex - baseIndex) % total);
+            update();
+            // restaurar transition en el siguiente frame
+            requestAnimationFrame(() => { requestAnimationFrame(() => { track.style.transition = 'transform 400ms ease'; }); });
+        } else if (carouselIndex < total) {
+            // saltó al bloque de clones inicial -> reposicionar al bloque central equivalente
+            track.style.transition = 'none';
+            carouselIndex = baseIndex + ((carouselIndex - baseIndex + total) % total);
+            update();
+            requestAnimationFrame(() => { requestAnimationFrame(() => { track.style.transition = 'transform 400ms ease'; }); });
+        }
+    });
+
     function prevSlide() { carouselIndex = Math.max(0, carouselIndex - 1); update(); }
-    function nextSlide() { carouselIndex = Math.min(Math.max(0, slides.length - 1), carouselIndex + 1); update(); }
-    function goToSlide(i) { carouselIndex = Math.max(0, Math.min(slides.length - 1, i)); update(); }
+    function nextSlide() { carouselIndex = Math.min(fullCount - 1, carouselIndex + 1); update(); }
+    function goToSlide(i) { carouselIndex = baseIndex + (i % total); update(); }
+
     window.goToSlide = goToSlide;
-    prev?.addEventListener('click', prevSlide);
-    next?.addEventListener('click', nextSlide);
-    function startAuto() { stopAuto(); carouselTimer = setInterval(() => { carouselIndex = (carouselIndex + 1) % slides.length; update(); }, 3600); }
+    prevBtn?.addEventListener('click', prevSlide);
+    nextBtn?.addEventListener('click', nextSlide);
+
+    // autoplay
+    let carouselTimer = null;
+    function startAuto() { stopAuto(); carouselTimer = setInterval(() => { nextSlide(); }, 3600); }
     function stopAuto() { if (carouselTimer) clearInterval(carouselTimer); carouselTimer = null; }
     track.parentElement?.addEventListener('mouseenter', stopAuto);
     track.parentElement?.addEventListener('mouseleave', startAuto);
 
+    // touch / pointer drag to swipe
     let startX = 0, deltaX = 0, isDown = false;
     track.addEventListener('pointerdown', (e) => { isDown = true; startX = e.clientX; stopAuto(); });
     window.addEventListener('pointermove', (e) => { if (!isDown) return; deltaX = e.clientX - startX; });
@@ -647,7 +777,9 @@ async function setupCarousel() {
         deltaX = 0; startAuto();
     });
 
-    update(); startAuto();
+    // iniciar en la posición central
+    update();
+    startAuto();
 }
 
 /* ----------------------
@@ -690,9 +822,17 @@ function openProductModal(product) {
     if (prices) {
         const isOffer = (product.isOnSale || (product.discountPrice && product.discountPrice < product.price));
         if (isOffer) {
-            prices.innerHTML = `<span class="old">${formatCurrency(product.price)}</span><strong>${formatCurrency(product.discountPrice)}</strong>`;
+            prices.innerHTML = `
+              <span class="price-old" style="font-size:0.95rem;color:#9aa1ab;text-decoration:line-through;margin-right:6px;">
+                ${formatCurrency(product.price)}
+              </span>
+              <span style="color:#9aa1ab;margin-right:6px;">→</span>
+              <strong class="price-new" style="font-size:1.05rem;color:#111;font-weight:700;">
+                ${formatCurrency(product.discountPrice)}
+              </strong>
+            `;
         } else {
-            prices.innerHTML = `<strong>${formatCurrency(product.price)}</strong>`;
+            prices.innerHTML = `<strong class="price-new" style="font-size:1.03rem;color:#111;font-weight:700;">${formatCurrency(product.price)}</strong>`;
         }
     }
 
@@ -1100,11 +1240,28 @@ function attachGlobalEvents() {
     if (nameEl) { nameEl.addEventListener('input', () => { validateName(); validateFormAll(); }); nameEl.addEventListener('blur', validateName); }
     if (emailEl) { emailEl.addEventListener('input', () => { validateEmail(); validateFormAll(); }); emailEl.addEventListener('blur', validateEmail); }
     if (phoneEl) {
-        phoneEl.addEventListener('input', () => { validatePhone(); validateFormAll(); });
+        // sanitizar: solo dígitos en tiempo real
+        phoneEl.addEventListener('input', (e) => {
+            const v = e.currentTarget.value;
+            const cleaned = v.replace(/\D+/g, '');
+            if (cleaned !== v) e.currentTarget.value = cleaned;
+            validatePhone();
+            validateFormAll();
+        });
         phoneEl.addEventListener('blur', validatePhone);
     }
     if (addrEl) { addrEl.addEventListener('input', () => { validateAddress(); validateFormAll(); }); addrEl.addEventListener('blur', validateAddress); }
-    if (ageEl) { ageEl.addEventListener('input', () => { validateAge(); validateFormAll(); }); ageEl.addEventListener('blur', validateAge); }
+    if (ageEl) {
+        // sanitizar edad: solo dígitos y máximo 3 caracteres
+        ageEl.addEventListener('input', (e) => {
+            const v = e.currentTarget.value;
+            const cleaned = v.replace(/\D+/g, '').slice(0, 3);
+            if (cleaned !== v) e.currentTarget.value = cleaned;
+            validateAge();
+            validateFormAll();
+        });
+        ageEl.addEventListener('blur', validateAge);
+    }
 
     const checkoutForm = document.getElementById('checkoutForm');
     if (checkoutForm) {
@@ -1142,4 +1299,3 @@ async function boot() {
 window.addEventListener('load', boot);
 export { };
 // FIN
-
