@@ -88,7 +88,7 @@ img {
 .topbar {
   height: 64px;
   display: flex;
-  align-items: center;
+ align-items: center;
   gap: 16px;
   padding: 0 18px;
   background: var(--card-bg);
@@ -175,7 +175,9 @@ img {
 .presence-pill.offline .dot {
   background: #cbd5e1;
 }
-
+.top-search .presence-pill {
+  margin-left: auto;
+}
 /* hide the real checkbox for sidebar toggle */
 .nav-toggle {
   position: absolute;
