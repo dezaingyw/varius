@@ -11,122 +11,144 @@
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
 
+    <!-- Nuevo: estilos específicos y seguros para el modal de producto -->
+    <link rel="stylesheet" href="assets/css/product-modal.css">
+
     <style>
         /* Correcciones: tamaño fijo 56x56 para mini-thumbs y reglas de objeto para no deformar
-   Además: botones de mover (visibles sólo en touch) para reordenar en móvil */
-:root {
-  --border: #e6e8eb;
-}
+           Además: botones de mover (visibles sólo en touch) para reordenar en móvil */
+        :root {
+            --border: #e6e8eb;
+        }
 
-/* Mini thumbs en tabla y mini-slider */
-.mini-slide,
-.mini-slide img,
-.thumb,
-.mini-slider .mini-slide,
-.mini-slider .mini-slide img {
-  width: 56px !important;
-  height: 56px !important;
-  min-width: 56px !important;
-  min-height: 56px !important;
-  max-width: 56px !important;
-  max-height: 56px !important;
-  object-fit: cover !important;
-  display: inline-block;
-  border-radius: 6px;
-  overflow: hidden;
-}
+        /* Mini thumbs en tabla y mini-slider */
+        .mini-slide,
+        .mini-slide img,
+        .thumb,
+        .mini-slider .mini-slide,
+        .mini-slider .mini-slide img {
+            width: 56px !important;
+            height: 56px !important;
+            min-width: 56px !important;
+            min-height: 56px !important;
+            max-width: 56px !important;
+            max-height: 56px !important;
+            object-fit: cover !important;
+            display: inline-block;
+            border-radius: 6px;
+            overflow: hidden;
+        }
 
-/* Asegura que los items del slider modal mantienen proporción y no estiren la imagen */
-.slide-item {
-  min-width: 120px;
-  height: 80px;
-  border-radius: 8px;
-  overflow: hidden;
-  position: relative;
-  background: #fff;
-  border: 1px solid var(--border);
-  display: flex;
-  justify-content: center;
-}
+        /* Asegura que los items del slider modal mantienen proporción y no estiren la imagen */
+        .slide-item {
+            min-width: 120px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            background: #fff;
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: center;
+        }
 
-/* Imagenes dentro de slide-item siempre cover */
-.slide-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+        /* Imagenes dentro de slide-item siempre cover */
+        .slide-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
 
-/* Banner en tarjeta: mantener cover y no salirse */
-.card-banner {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  max-height: 260px; /* límite razonable */
-}
+        /* Banner en tarjeta: mantener cover y no salirse */
+        .card-banner {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            max-height: 260px;
+            /* límite razonable */
+        }
 
-/* Botones de mover sólo visibles en dispositivos táctiles */
-.img-move {
-  position: absolute;
-  bottom: 6px;
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-  border: none;
-  background: rgba(0,0,0,0.56);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  cursor: pointer;
-  z-index: 6;
-  opacity: 0.95;
-}
+        /* Botones de mover sólo visibles en dispositivos táctiles */
+        .img-move {
+            position: absolute;
+            bottom: 6px;
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            border: none;
+            background: rgba(0, 0, 0, 0.56);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 6;
+            opacity: 0.95;
+        }
 
-/* botón izquierda y derecha */
-.img-move-left { left: 6px; }
-.img-move-right { right: 6px; }
+        /* botón izquierda y derecha */
+        .img-move-left {
+            left: 6px;
+        }
 
-/* Ocultar botones por defecto (sólo se mostrarán en touch mediante la clase .touch-enabled) */
-.touch-enabled .slide-item .img-move { display: inline-flex; }
-.slide-item .img-move { display: none; }
+        .img-move-right {
+            right: 6px;
+        }
 
-/* Si deseas que el área de slide tenga espacio en móviles para los botones */
-@media (max-width: 700px) {
-  .slide-item { min-width: 110px; height: 76px; }
-  .mini-slide, .mini-slide img { width: 56px; height: 56px; }
-}
+        /* Ocultar botones por defecto (sólo se mostrarán en touch mediante la clase .touch-enabled) */
+        .touch-enabled .slide-item .img-move {
+            display: inline-flex;
+        }
 
-/* pequeño ajuste visual para el botón eliminar sobre imágenes */
-.img-remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0,0,0,0.55);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 7;
-}
+        .slide-item .img-move {
+            display: none;
+        }
 
-/* aseguramos que el thumb placeholder respete tamaño */
-.thumb {
-  width: 56px !important;
-  height: 56px !important;
-  min-width: 56px !important;
-  min-height: 56px !important;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
+        /* Si deseas que el área de slide tenga espacio en móviles para los botones */
+        @media (max-width: 700px) {
+            .slide-item {
+                min-width: 110px;
+                height: 76px;
+            }
+
+            .mini-slide,
+            .mini-slide img {
+                width: 56px;
+                height: 56px;
+            }
+        }
+
+        /* pequeño ajuste visual para el botón eliminar sobre imágenes */
+        .img-remove {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 7;
+        }
+
+        /* aseguramos que el thumb placeholder respete tamaño */
+        .thumb {
+            width: 56px !important;
+            height: 56px !important;
+            min-width: 56px !important;
+            min-height: 56px !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
     </style>
 </head>
 
@@ -240,24 +262,29 @@
                 <div class="modal-body">
                     <form id="productForm" class="modal-form" novalidate>
                         <input type="hidden" id="productId" />
-                        <div class="form-row">
-                            <label>Nombre <span class="required">*</span></label>
+
+                        <!-- Nombre (full width) -->
+                        <div class="form-row full-width">
+                            <label for="name">Nombre <span class="required">*</span></label>
                             <input id="name" type="text" required />
                         </div>
 
-                        <div class="form-row">
-                            <label>Descripción</label>
+                        <!-- Descripción (full width) -->
+                        <div class="form-row full-width">
+                            <label for="description">Descripción</label>
                             <textarea id="description" rows="3"></textarea>
                         </div>
 
-                        <div class="form-row">
-                            <label>Precio (USD) <span class="required">*</span></label>
+                        <!-- Precio (full width) -->
+                        <div class="form-row full-width">
+                            <label for="price">Precio (USD) <span class="required">*</span></label>
                             <input id="price" type="number" min="0" required />
                         </div>
 
-                        <div class="form-row inline">
+                        <!-- Categoria + Estado (two column row) -->
+                        <div class="form-row two-col">
                             <div>
-                                <label>Categoría <span class="required">*</span></label>
+                                <label for="category">Categoría <span class="required">*</span></label>
                                 <select id="category" required>
                                     <option value="">Seleccionar categoría</option>
                                     <option>Ropa</option>
@@ -268,7 +295,7 @@
                             </div>
 
                             <div>
-                                <label>Estado</label>
+                                <label for="status">Estado</label>
                                 <select id="status">
                                     <option>Activo</option>
                                     <option>Inactivo</option>
@@ -276,25 +303,30 @@
                             </div>
                         </div>
 
-                        <div class="form-row inline">
-                            <label class="checkbox-row">
-                                <input id="onOffer" type="checkbox" />
-                                <span>En oferta</span>
-                            </label>
-
-                            <div>
-                                <label>Descuento (%)</label>
-                                <input id="discount" type="number" min="0" max="100" value="0" />
+                        <!-- Oferta + descuento + stock (compact row) -->
+                        <div class="form-row two-col compact-row">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <label class="checkbox-row" style="margin:0">
+                                    <input id="onOffer" type="checkbox" />
+                                    <span>En oferta</span>
+                                </label>
                             </div>
 
-                            <div>
-                                <label>Stock</label>
-                                <input id="stock" type="number" min="0" value="0" />
+                            <div style="display:flex;gap:12px;">
+                                <div style="flex:1">
+                                    <label for="discount">Descuento (%)</label>
+                                    <input id="discount" type="number" min="0" max="100" value="0" />
+                                </div>
+
+                                <div style="width:120px">
+                                    <label for="stock">Stock</label>
+                                    <input id="stock" type="number" min="0" value="0" />
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Image upload / drag-drop: allow multiple (min 4 recommended) -->
-                        <div class="form-row">
+                        <!-- Imagenes (full width) -->
+                        <div class="form-row full-width">
                             <label>Imágenes (arrastra o selecciona hasta 8) <span class="muted"
                                     style="font-weight:400">mínimo 1, ideal 4</span></label>
 
@@ -313,8 +345,9 @@
                             </div>
                         </div>
 
-                        <div class="form-row">
-                            <label>SKU <small>(generado automáticamente según categoría)</small></label>
+                        <!-- SKU (full width) -->
+                        <div class="form-row full-width">
+                            <label for="sku">SKU <small>(generado automáticamente según categoría)</small></label>
                             <input id="sku" type="text" readonly placeholder="Se generará al seleccionar categoría" />
                         </div>
 
