@@ -252,6 +252,12 @@ function removeItem(productId) {
 }
 function clearCart() { CART = createEmptyCart(); persistCart(); showToast('Carrito vaciado'); }
 
+/* ---------------------- Helpers de cantidad modal/carrito ---------------------- */
+function getCartQuantity(productId) {
+    const it = CART.items.find(i => i.productId === productId);
+    return it ? it.quantity : 0;
+}
+
 /* ----------------------
    Confirm modal (mejor estilo) - retorna Promise<boolean>
    ---------------------- */
@@ -790,6 +796,8 @@ let _productModalCurrentIndex = 0;
 let _productModalImages = [];
 let _productModalCurrentProduct = null;
 
+// Reemplaza la función openProductModal en tu pedidos-data.js por esta versión corregida
+
 function openProductModal(product) {
     const modal = document.getElementById('productModal');
     if (!modal) return;
@@ -856,15 +864,149 @@ function openProductModal(product) {
         thumbs.appendChild(t);
     });
 
-    addBtn.onclick = () => {
-        const q = Math.max(1, Math.min(999, parseInt(qtyEl.value, 10) || 1));
-        const added = addToCart(product.id, q);
-        if (added) {
-            renderCartPanel();
-            showToast('Producto agregado');
-            closeProductModal();
+    // --- NUEVO: sincronizar control de cantidad del modal con el carrito y añadir botones +/- dinámicamente ---
+    try {
+        if (qtyEl) {
+            // Buscar wrapper existente (si el input ya fue envuelto previamente)
+            let wrapper = qtyEl.closest('.modal-qty-wrapper');
+            let minusBtn = null;
+            let plusBtn = null;
+
+            if (!wrapper) {
+                // crear wrapper y botones
+                wrapper = document.createElement('div');
+                wrapper.className = 'modal-qty-wrapper';
+                wrapper.style.display = 'inline-flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.gap = '8px';
+
+                minusBtn = document.createElement('button');
+                minusBtn.type = 'button';
+                minusBtn.className = 'modal-qty-decr';
+                minusBtn.setAttribute('aria-label', 'Disminuir cantidad');
+                minusBtn.textContent = '−';
+                minusBtn.style.padding = '8px 12px';
+                minusBtn.style.borderRadius = '10px';
+                minusBtn.style.background = '#cdb4ff';
+                minusBtn.style.border = 'none';
+                minusBtn.style.cursor = 'pointer';
+
+                plusBtn = document.createElement('button');
+                plusBtn.type = 'button';
+                plusBtn.className = 'modal-qty-incr';
+                plusBtn.setAttribute('aria-label', 'Aumentar cantidad');
+                plusBtn.textContent = '+';
+                plusBtn.style.padding = '8px 12px';
+                plusBtn.style.borderRadius = '10px';
+                plusBtn.style.background = '#cdb4ff';
+                plusBtn.style.border = 'none';
+                plusBtn.style.cursor = 'pointer';
+
+                // Insertar el wrapper en el DOM en la posición original del input
+                const parent = qtyEl.parentElement;
+                const next = qtyEl.nextSibling;
+                parent.insertBefore(wrapper, next);
+                wrapper.appendChild(minusBtn);
+                wrapper.appendChild(qtyEl);
+                wrapper.appendChild(plusBtn);
+            } else {
+                // ya existe el wrapper: recuperar botones si existen
+                minusBtn = wrapper.querySelector('.modal-qty-decr');
+                plusBtn = wrapper.querySelector('.modal-qty-incr');
+            }
+
+            // siempre actualizar el productId en dataset del wrapper para que los listeners genéricos sepan sobre qué producto actuar
+            wrapper.dataset.productId = product.id;
+
+            // configurar input
+            qtyEl.type = 'number';
+            qtyEl.min = '0';
+            qtyEl.max = '999';
+            qtyEl.style.width = '70px';
+            qtyEl.style.padding = '8px';
+            qtyEl.style.borderRadius = '8px';
+            qtyEl.style.textAlign = 'center';
+
+            // Inicializar con cantidad actual del carrito
+            qtyEl.value = String(getCartQuantity(product.id) || 0);
+
+            // Ocultar botón "Agregar" si ya tenemos control +/- (el usuario solicitó esto)
+            if (addBtn) addBtn.style.display = 'none';
+
+            // Añadir handlers "genéricos" que no capturan `product` en la clausura,
+            // en su lugar leen el productId desde el wrapper en tiempo de ejecución.
+            if (minusBtn && !minusBtn.dataset.listener) {
+                minusBtn.addEventListener('click', (ev) => {
+                    const w = ev.currentTarget.closest('.modal-qty-wrapper');
+                    const pid = w?.dataset?.productId || _productModalCurrentProduct?.id;
+                    if (!pid) return;
+                    const current = getCartQuantity(pid);
+                    if (!current || current <= 0) {
+                        showToast('No hay unidades en el carrito para este producto');
+                        qtyEl.value = '0';
+                        return;
+                    }
+                    updateQuantity(pid, Math.max(0, current - 1));
+                    renderCartPanel();
+                    // actualizar valor del input con la cantidad actual en carrito para ese pid
+                    qtyEl.value = String(getCartQuantity(pid));
+                });
+                minusBtn.dataset.listener = '1';
+            }
+
+            if (plusBtn && !plusBtn.dataset.listener) {
+                plusBtn.addEventListener('click', (ev) => {
+                    const w = ev.currentTarget.closest('.modal-qty-wrapper');
+                    const pid = w?.dataset?.productId || _productModalCurrentProduct?.id;
+                    if (!pid) return;
+                    addToCart(pid, 1);
+                    renderCartPanel();
+                    qtyEl.value = String(getCartQuantity(pid));
+                });
+                plusBtn.dataset.listener = '1';
+            }
+
+            if (!qtyEl.dataset.listener) {
+                qtyEl.addEventListener('change', (ev) => {
+                    const w = ev.currentTarget.closest('.modal-qty-wrapper');
+                    const pid = w?.dataset?.productId || _productModalCurrentProduct?.id;
+                    if (!pid) return;
+                    let q = parseInt(ev.currentTarget.value, 10);
+                    if (isNaN(q) || q < 0) q = 0;
+                    const existing = getCartQuantity(pid);
+                    if (q === 0) {
+                        removeItem(pid);
+                    } else {
+                        if (existing === 0) {
+                            // add exact amount (addToCart expects delta; to add exact, add q)
+                            addToCart(pid, q);
+                        } else {
+                            updateQuantity(pid, q);
+                        }
+                    }
+                    renderCartPanel();
+                    qtyEl.value = String(getCartQuantity(pid));
+                });
+                qtyEl.dataset.listener = '1';
+            }
         }
-    };
+    } catch (err) {
+        console.warn('Error al init controles de cantidad del modal', err);
+    }
+    // --- FIN NUEVO ---
+
+    // Mantener el botón "Agregar" funcional pero oculto por defecto (ya lo ocultamos arriba)
+    if (addBtn) {
+        addBtn.onclick = () => {
+            const q = Math.max(1, Math.min(999, parseInt(qtyEl.value, 10) || 1));
+            const added = addToCart(product.id, q);
+            if (added) {
+                renderCartPanel();
+                showToast('Producto agregado');
+                closeProductModal();
+            }
+        };
+    }
 
     viewFull.style.display = 'none';
     viewFull.onclick = () => { window.location.href = `product.html?product=${encodeURIComponent(product.id)}`; };
