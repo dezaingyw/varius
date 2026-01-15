@@ -1,0 +1,284 @@
+/* product-modal.css
+   Override / improvements scoped to #productModal to:
+   - present a clean two-column form on desktop
+   - keep all behavior responsive and accessible on mobile
+   - avoid touching global styles (specific selectors)
+*/
+
+/* Scope everything to the modal to avoid global side effects */
+#productModal .modal-content {
+  width: min(880px, 96%);
+  max-width: 96%;
+  border-radius: 10px;
+  padding: 12px 18px;
+  box-sizing: border-box;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+}
+
+/* Grid layout: main column + side column for compact fields */
+#productModal .modal-form {
+  display: grid;
+  grid-template-columns: 1fr 240px; /* main + side */
+  gap: 12px 16px;
+  align-items: start;
+  padding: 6px 0 10px 0;
+}
+
+/* Full width rows (span both columns) */
+#productModal .modal-form .full-width {
+  grid-column: 1 / -1;
+}
+
+/* Two-col rows that should keep their children as columns */
+#productModal .modal-form .two-col {
+  display: contents; /* keep grid children to occupy the defined columns */
+}
+/* Ensure its direct children occupy each column */
+#productModal .modal-form .two-col > div:first-child {
+  grid-column: 1 / 2;
+}
+#productModal .modal-form .two-col > div:last-child {
+  grid-column: 2 / 3;
+}
+
+/* When you need a compact internal layout, keep existing inline behaviors */
+#productModal .modal-form .compact-row {
+  align-items: center;
+}
+
+/* Labels and inputs consistent sizing */
+#productModal .modal-form label {
+  font-size: 13px;
+  color: #556070;
+  margin-bottom: 6px;
+  display: block;
+  font-weight: 600;
+}
+
+#productModal .modal-form input[type="text"],
+#productModal .modal-form input[type="number"],
+#productModal .modal-form select,
+#productModal .modal-form textarea {
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e6e8eb;
+  background: #fff;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* textarea larger but flexible */
+#productModal .modal-form textarea {
+  min-height: 120px;
+  height: auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  resize: vertical;
+}
+
+/* Checkbox alignment */
+#productModal .modal-form .checkbox-row {
+  gap: 8px;
+  align-items: center;
+  display: inline-flex;
+}
+
+/* Dropzone tweaks */
+#productModal .image-dropzone {
+  border-radius: 8px;
+  padding: 14px;
+  border: 2px dashed #e6e8eb;
+  background: linear-gradient(180deg, #fff, #fafafa);
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  margin-top: 6px;
+}
+#productModal .image-dropzone .dz-instructions {
+  color: #6b7280;
+  font-size: 14px;
+  text-align: center;
+  padding: 6px 10px;
+}
+
+/* Dragover visual */
+#productModal .image-dropzone.dragover {
+  border-color: #7c3aed;
+  box-shadow: 0 6px 20px rgba(124,58,237,0.08);
+}
+
+/* Slider preview */
+#productModal .image-slider {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#productModal .slide-track {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px;
+  flex: 1;
+  scroll-behavior: smooth;
+}
+#productModal .slide-item {
+  min-width: 92px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e6e8eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  position: relative;
+}
+#productModal .slide-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Remove / move buttons inside thumbnails */
+#productModal .img-remove {
+  background: rgba(0,0,0,0.48);
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border: 0;
+}
+
+/* SKU small note */
+#productModal #sku {
+  background: #fafafa;
+  color: #374151;
+}
+
+/* Modal header / footer visual polish */
+#productModal .modal-header {
+  padding: 8px 0;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 4;
+  border-bottom: 1px solid #eef1f4;
+}
+#productModal .modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), #fff);
+  padding: 10px 0;
+  border-top: 1px solid #eef1f4;
+  z-index: 4;
+}
+
+/* Form actions layout */
+#productModal .form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 6px;
+}
+
+/* Buttons consistent size */
+#productModal .btn-primary,
+#productModal .btn-secondary {
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+/* Make primary stand out but keep existing palette */
+#productModal .btn-primary {
+  background: linear-gradient(180deg,#7c3aed,#6d28d9);
+  color: #fff;
+  border: none;
+  box-shadow: 0 8px 20px rgba(124,58,237,0.08);
+}
+
+/* Small visual for cancel */
+#productModal .btn-secondary {
+  background: #fff;
+  border: 1px solid #e6e8eb;
+  color: #0f172a;
+}
+
+/* Accessibility: focus */
+#productModal .modal-form input:focus,
+#productModal .modal-form select:focus,
+#productModal .modal-form textarea:focus,
+#productModal .modal-content .btn-primary:focus,
+#productModal .modal-content .btn-secondary:focus {
+  outline: 3px solid rgba(124,58,237,0.12);
+  outline-offset: 2px;
+}
+
+/* Responsive: collapse to single column on small screens */
+@media (max-width: 700px) {
+  #productModal .modal-form {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding-bottom: 72px; /* espacio para footer sticky */
+  }
+
+  /* two-col children stack */
+  #productModal .modal-form .two-col > div:first-child,
+  #productModal .modal-form .two-col > div:last-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Actions full width vertical */
+  #productModal .form-actions {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0), #fff);
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  #productModal .form-actions .btn-primary {
+    width: 100%;
+  }
+  #productModal .form-actions .btn-secondary {
+    width: 100%;
+  }
+
+  /* Shrink thumbnails height a bit for narrow screens */
+  #productModal .slide-item {
+    min-width: 84px;
+    height: 60px;
+  }
+}
+
+/* Tiny polish: ensure compact numeric input look */
+#productModal .modal-form input[type="number"] {
+  -moz-appearance: textfield;
+}
+#productModal .modal-form input[type="number"]::-webkit-outer-spin-button,
+#productModal .modal-form input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Prevent overflowing long labels inside mobile stacked product card layout */
+#productModal .modal-form .form-row {
+  min-width: 0;
+}
