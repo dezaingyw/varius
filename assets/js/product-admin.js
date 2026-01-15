@@ -273,7 +273,7 @@ if (stockField) {
     stockField.addEventListener('paste', (e) => handlePasteSanitize(e, 'integer'));
     stockField.addEventListener('keydown', (e) => {
         // allow control/navigation keys and digits only
-        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End'];
+        const allowed = ['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab', 'Home', 'End'];
         if (allowed.includes(e.key)) return;
         if (/^\d$/.test(e.key)) return;
         e.preventDefault();
@@ -297,7 +297,7 @@ if (discountField) {
     });
     discountField.addEventListener('paste', (e) => handlePasteSanitize(e, 'integer'));
     discountField.addEventListener('keydown', (e) => {
-        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End'];
+        const allowed = ['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab', 'Home', 'End'];
         if (allowed.includes(e.key)) return;
         if (/^\d$/.test(e.key)) return;
         e.preventDefault();
@@ -330,7 +330,7 @@ function priceBuffersToDisplay() {
     if (priceDecimalMode) {
         return decDisplay === '' ? `${intFmt},` : `${intFmt},${decDisplay}`;
     } else {
-        return `${intFmt},${(decDisplay || '00').slice(0,2)}`;
+        return `${intFmt},${(decDisplay || '00').slice(0, 2)}`;
     }
 }
 
@@ -338,7 +338,7 @@ function updatePriceFieldFromBuffers() {
     if (!priceField) return;
     priceField.value = priceBuffersToDisplay();
     // attach data-cents for potential machine use
-    const cents = Number((priceIntegerBuffer || '0')) * 100 + Number((priceDecimalBuffer || '0').padEnd(2, '0').slice(0,2));
+    const cents = Number((priceIntegerBuffer || '0')) * 100 + Number((priceDecimalBuffer || '0').padEnd(2, '0').slice(0, 2));
     priceField.setAttribute('data-cents', String(cents));
     clearFieldError(priceField);
 }
@@ -440,13 +440,13 @@ if (priceField) {
         // Keep display up-to-date; caret placed at end
         updatePriceFieldFromBuffers();
         setTimeout(() => {
-            try { priceField.selectionStart = priceField.selectionEnd = priceField.value.length; } catch (e) {}
+            try { priceField.selectionStart = priceField.selectionEnd = priceField.value.length; } catch (e) { }
         }, 0);
     });
 
     priceField.addEventListener('keydown', (e) => {
         // allow navigation and editing handled below
-        const navAllowed = ['ArrowLeft','ArrowRight','Home','End','Tab'];
+        const navAllowed = ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'];
         if (navAllowed.includes(e.key)) return;
 
         if (e.key === 'Backspace') {
@@ -810,14 +810,53 @@ function clearModalPreviews() {
     clearAllFieldErrors(productForm);
 }
 
-// Abstracción para mostrar el slider dentro del modal usando los arrays actuales:
-// - currentSavedImageObjs (array de {url, path})
-// - currentPreviewUrls (array de object URLs para previews)
+/* ---------- Drag & Drop reordering helpers & style injection ---------- */
+// Inject minimal CSS for drag feedback (once)
+(function injectDragStyles() {
+    if (document.getElementById('product-admin-drag-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'product-admin-drag-styles';
+    style.textContent = `
+    #slideTrack .slide-item { cursor: grab; user-select: none; }
+    #slideTrack .slide-item.dragging { opacity: 0.45; }
+    #slideTrack .slide-item.drop-target { outline: 2px dashed rgba(79,70,229,0.9); outline-offset: -6px; }
+    #slideTrack .slide-item img { display:block; width:100%; height:auto; }
+    `;
+    document.head.appendChild(style);
+})();
+
+// Return combined list of items in the currently displayed order
+function getCombinedItems() {
+    const saved = Array.isArray(currentSavedImageObjs) ? currentSavedImageObjs.map((o, i) => ({ type: 'saved', url: o.url, path: o.path || '', savedIndex: i })) : [];
+    const previews = Array.isArray(currentPreviewUrls) ? currentPreviewUrls.map((u, i) => ({ type: 'preview', url: u, file: currentPreviewFiles[i], previewIndex: i })) : [];
+    return saved.concat(previews);
+}
+
+// Apply a combined-ordered list back into the separate arrays used elsewhere
+function applyCombinedItems(items) {
+    const newSaved = [];
+    const newPreviewUrls = [];
+    const newPreviewFiles = [];
+    for (const it of items) {
+        if (it.type === 'saved') {
+            newSaved.push({ url: it.url, path: it.path || '' });
+        } else if (it.type === 'preview') {
+            newPreviewUrls.push(it.url);
+            newPreviewFiles.push(it.file);
+        }
+    }
+    currentSavedImageObjs = newSaved;
+    // Revoke old preview objectURLs that were removed (already revoked in removePreviewImage but keep safe)
+    currentPreviewUrls.forEach(u => { try { if (!newPreviewUrls.includes(u)) URL.revokeObjectURL(u); } catch (e) { } });
+    currentPreviewUrls = newPreviewUrls;
+    currentPreviewFiles = newPreviewFiles;
+}
+
+/* ---------------- Show modal slider for files (with drag & drop reordering) ---------------- */
 function showModalSliderForFiles() {
     slideTrack.innerHTML = '';
-    const saved = Array.isArray(currentSavedImageObjs) ? currentSavedImageObjs : [];
-    const previews = Array.isArray(currentPreviewUrls) ? currentPreviewUrls : [];
-    const combinedLen = saved.length + previews.length;
+    const combined = getCombinedItems();
+    const combinedLen = combined.length;
 
     if (!combinedLen) {
         imagePreviewSlider.classList.add('hidden');
@@ -828,26 +867,37 @@ function showModalSliderForFiles() {
     imagePreviewSlider.classList.remove('hidden');
     imagePreviewSlider.setAttribute('aria-hidden', 'false');
 
-    // Render saved images first (they map to currentSavedImageObjs)
-    saved.forEach((obj, idx) => {
+    // Create slide items for each combined entry (saved first then previews per combined list)
+    combined.forEach((item, idx) => {
         const node = document.createElement('div');
         node.className = 'slide-item';
         node.style.position = 'relative';
+        node.setAttribute('draggable', 'true');
+        node.dataset.combinedIndex = String(idx);
+
         const img = document.createElement('img');
-        img.src = obj.url;
+        img.src = item.url;
         img.alt = 'preview';
         img.loading = 'lazy';
         img.style.display = 'block';
         img.style.maxWidth = '100%';
         node.appendChild(img);
 
-        // remove button for saved image
+        // Remove button
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'img-remove';
         btn.title = 'Eliminar imagen';
-        btn.dataset.type = 'saved';
-        btn.dataset.index = String(idx);
+        btn.dataset.type = item.type;
+        // For saved items compute the index in currentSavedImageObjs; for previews compute index in currentPreviewUrls
+        if (item.type === 'saved') {
+            // index within saved array after reordering
+            btn.dataset.index = String(currentSavedImageObjs.length ? currentSavedImageObjs.length + idx /* placeholder; not read */ : idx);
+            // We'll instead compute indexes when clicking by looking for dataset.combinedIndex on parent; keep type only for delegated handler
+            btn.dataset.index = '';
+        } else {
+            btn.dataset.index = '';
+        }
         // basic inline styles so funciona sin CSS adicional
         btn.style.position = 'absolute';
         btn.style.top = '6px';
@@ -866,45 +916,46 @@ function showModalSliderForFiles() {
         btn.textContent = '×';
         node.appendChild(btn);
 
-        slideTrack.appendChild(node);
-    });
+        // Drag handlers
+        node.addEventListener('dragstart', (e) => {
+            node.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            // store source index
+            e.dataTransfer.setData('text/plain', String(idx));
+            try { if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(node, 20, 20); } catch (er) { }
+        });
+        node.addEventListener('dragend', () => {
+            node.classList.remove('dragging');
+            // cleanup any drop-target classes
+            slideTrack.querySelectorAll('.slide-item.drop-target').forEach(n => n.classList.remove('drop-target'));
+        });
 
-    // Render preview images (files selected but not yet uploaded)
-    previews.forEach((url, idx) => {
-        const node = document.createElement('div');
-        node.className = 'slide-item';
-        node.style.position = 'relative';
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = 'preview';
-        img.loading = 'lazy';
-        img.style.display = 'block';
-        img.style.maxWidth = '100%';
-        node.appendChild(img);
-
-        // remove button for preview
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'img-remove';
-        btn.title = 'Eliminar imagen';
-        btn.dataset.type = 'preview';
-        btn.dataset.index = String(idx);
-        btn.style.position = 'absolute';
-        btn.style.top = '6px';
-        btn.style.right = '6px';
-        btn.style.width = '28px';
-        btn.style.height = '28px';
-        btn.style.borderRadius = '50%';
-        btn.style.border = 'none';
-        btn.style.background = 'rgba(0,0,0,0.55)';
-        btn.style.color = '#fff';
-        btn.style.cursor = 'pointer';
-        btn.style.display = 'flex';
-        btn.style.alignItems = 'center';
-        btn.style.justifyContent = 'center';
-        btn.style.fontSize = '16px';
-        btn.textContent = '×';
-        node.appendChild(btn);
+        node.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            node.classList.add('drop-target');
+            e.dataTransfer.dropEffect = 'move';
+        });
+        node.addEventListener('dragleave', () => {
+            node.classList.remove('drop-target');
+        });
+        node.addEventListener('drop', (e) => {
+            e.preventDefault();
+            node.classList.remove('drop-target');
+            const srcIdxStr = e.dataTransfer.getData('text/plain');
+            const srcIdx = Number.isFinite(Number(srcIdxStr)) ? Number(srcIdxStr) : null;
+            const tgtIdx = Number(node.dataset.combinedIndex);
+            if (srcIdx === null || Number.isNaN(tgtIdx)) return;
+            if (srcIdx === tgtIdx) return;
+            // Reorder combined array
+            const copy = combined.slice();
+            const [moved] = copy.splice(srcIdx, 1);
+            // If dropping after an element and source < target, adjust insertion index
+            copy.splice(tgtIdx, 0, moved);
+            // Apply reordering back to arrays
+            applyCombinedItems(copy);
+            // Re-render slider with new order
+            showModalSliderForFiles();
+        });
 
         slideTrack.appendChild(node);
     });
@@ -912,6 +963,7 @@ function showModalSliderForFiles() {
     slideTrack.scrollLeft = 0;
 }
 
+/* ---------------- Remove helpers (updated to calculate index from combined list) ---------------- */
 // Remove selected preview image (before upload)
 function removePreviewImage(idx) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= currentPreviewUrls.length) return;
@@ -940,14 +992,24 @@ function removeSavedImage(idx) {
 slideTrack.addEventListener('click', (e) => {
     const btn = e.target.closest && e.target.closest('.img-remove');
     if (!btn) return;
-    const type = btn.dataset.type;
-    const idx = Number(btn.dataset.index);
-    if (type === 'preview') {
-        removePreviewImage(idx);
-    } else if (type === 'saved') {
-        // confirm deletion of saved image from product (mark for deletion)
-        const c = confirm('Eliminar esta imagen del producto? Se quitará al guardar los cambios.');
-        if (c) removeSavedImage(idx);
+    // identify which slide-item contains this button
+    const itemNode = btn.closest('.slide-item');
+    if (!itemNode) return;
+    const combinedIndex = Number(itemNode.dataset.combinedIndex);
+    const combined = getCombinedItems();
+    const clicked = combined[combinedIndex];
+    if (!clicked) return;
+    if (clicked.type === 'preview') {
+        // find preview index in currentPreviewUrls
+        const pIdx = currentPreviewUrls.indexOf(clicked.url);
+        if (pIdx !== -1) removePreviewImage(pIdx);
+    } else if (clicked.type === 'saved') {
+        // find saved index in currentSavedImageObjs by matching url and path
+        const sIdx = currentSavedImageObjs.findIndex(s => s.url === clicked.url && (s.path || '') === (clicked.path || ''));
+        if (sIdx !== -1) {
+            const c = confirm('Eliminar esta imagen del producto? Se quitará al guardar los cambios.');
+            if (c) removeSavedImage(sIdx);
+        }
     }
 });
 
@@ -1123,20 +1185,13 @@ async function updateProduct(id, data, newFiles = []) {
         const snap = await getDoc(prodRef);
         if (!snap.exists()) { showToast('Producto no encontrado'); return; }
         const docData = snap.data();
-        let imageUrls = Array.isArray(docData.imageUrls) ? docData.imageUrls.slice() : [];
-        let imagePaths = Array.isArray(docData.imagePaths) ? docData.imagePaths.slice() : [];
 
-        if (newFiles && newFiles.length) {
-            createModalProgressUI();
-            const uploaded = await uploadImagesToProductFolder(id, newFiles, data.name, 8, (pct) => updateModalProgress(pct));
-            removeModalProgressUI();
-            imageUrls = imageUrls.concat(uploaded.map(x => x.url));
-            imagePaths = imagePaths.concat(uploaded.map(x => x.path));
-        }
+        // Start from arrays present in DB but filtered by pending deletions later.
+        let imageUrlsFromDb = Array.isArray(docData.imageUrls) ? docData.imageUrls.slice() : [];
+        let imagePathsFromDb = Array.isArray(docData.imagePaths) ? docData.imagePaths.slice() : [];
 
-        // If there are pendingDeletePaths (images the user removed in the modal), attempt to delete them from storage
+        // If there are pendingDeletePaths (images the user removed in the modal), attempt to delete them from storage (best-effort)
         if (pendingDeletePaths.length) {
-            // Try to delete storage objects (best-effort)
             for (const p of pendingDeletePaths) {
                 try {
                     const ref = storageRef(storage, p);
@@ -1145,22 +1200,72 @@ async function updateProduct(id, data, newFiles = []) {
                     console.warn('Error deleting storage path', p, err);
                 }
             }
-            // Now remove paths and corresponding urls from arrays
-            imagePaths = imagePaths.filter(p => !pendingDeletePaths.includes(p));
+            // remove from db arrays
+            imagePathsFromDb = imagePathsFromDb.filter(p => !pendingDeletePaths.includes(p));
+            // rebuild urls from imagePathsFromDb using original mapping from docData
             const pathToUrl = {};
             if (Array.isArray(docData.imagePaths)) {
                 docData.imagePaths.forEach((p, idx) => { if (docData.imageUrls && docData.imageUrls[idx]) pathToUrl[p] = docData.imageUrls[idx]; });
             }
             if (Object.keys(pathToUrl).length) {
-                imageUrls = imagePaths.map(p => pathToUrl[p]).filter(Boolean);
+                imageUrlsFromDb = imagePathsFromDb.map(p => pathToUrl[p]).filter(Boolean);
             } else {
-                imageUrls = imageUrls.slice(0, imagePaths.length);
+                imageUrlsFromDb = imageUrlsFromDb.slice(0, imagePathsFromDb.length);
             }
             // clear pending deletes after processing
             pendingDeletePaths = [];
         }
 
-        if ((!imageUrls || !imageUrls.length)) {
+        // We'll produce the final ordered arrays based on the current combined order in the modal.
+        const combinedItems = getCombinedItems();
+
+        // Upload new files if any. IMPORTANT: we need uploaded results in the same order as currentPreviewFiles (which should match ordering in combinedItems where type==='preview').
+        let uploadedResults = [];
+        if (newFiles && newFiles.length) {
+            createModalProgressUI();
+            uploadedResults = await uploadImagesToProductFolder(id, newFiles, data.name, 8, (pct) => updateModalProgress(pct));
+            removeModalProgressUI();
+        }
+
+        // Build maps to find original saved urls/paths by url or path:
+        // For saved images currently shown in modal we have currentSavedImageObjs which were built from prod data on openEdit.
+        // We'll iterate through combinedItems and for each:
+        // - if saved: push its url/path (from currentSavedImageObjs)
+        // - if preview: push next uploaded result
+        const finalUrls = [];
+        const finalPaths = [];
+        let uploadPointer = 0;
+        for (const it of combinedItems) {
+            if (it.type === 'saved') {
+                // find saved item in the originally loaded saved objects (currentSavedImageObjs should already reflect the up-to-date saved list and order)
+                const found = currentSavedImageObjs.find(s => s.url === it.url && (s.path || '') === (it.path || ''));
+                if (found) {
+                    finalUrls.push(found.url);
+                    finalPaths.push(found.path || '');
+                } else {
+                    // If not found in currentSavedImageObjs (maybe was originally from DB but lacks path), try to match by url on db arrays
+                    // fallback: try finding in imageUrlsFromDb
+                    const idx = imageUrlsFromDb.indexOf(it.url);
+                    if (idx !== -1) {
+                        finalUrls.push(imageUrlsFromDb[idx]);
+                        finalPaths.push(imagePathsFromDb[idx] || '');
+                    } else {
+                        // nothing: skip
+                    }
+                }
+            } else if (it.type === 'preview') {
+                // take next uploaded result (if any)
+                if (uploadPointer < uploadedResults.length) {
+                    finalUrls.push(uploadedResults[uploadPointer].url);
+                    finalPaths.push(uploadedResults[uploadPointer].path);
+                    uploadPointer++;
+                } else {
+                    // No uploaded result (shouldn't happen) — ignore
+                }
+            }
+        }
+
+        if ((!finalUrls || !finalUrls.length)) {
             setFieldError(imageFileField, 'Debe tener al menos una imagen asociada al producto');
             return;
         }
@@ -1177,8 +1282,8 @@ async function updateProduct(id, data, newFiles = []) {
             onOffer: !!data.onOffer,
             discount: Number(data.discount) || 0,
             stock: Number(data.stock) || 0,
-            imageUrls,
-            imagePaths,
+            imageUrls: finalUrls,
+            imagePaths: finalPaths,
             sku: data.sku || '',
             updatedAt: serverTimestamp()
         });
@@ -1318,7 +1423,12 @@ productForm.addEventListener('submit', async (e) => {
         sku: skuField.value || ''
     };
 
-    const filesToUpload = currentPreviewFiles.slice();
+    // Use the combined order when preparing filesToUpload and saved image arrays.
+    const combined = getCombinedItems();
+    // For add: all items will be previews (since no saved). For edit: combined may interleave saved + preview.
+    // Build filesToUpload in the order they appear in combined (only preview items).
+    const filesToUpload = [];
+    combined.forEach(it => { if (it.type === 'preview' && it.file) filesToUpload.push(it.file); });
 
     if (isEditing && editingId) {
         const hasSaved = currentSavedImageObjs && currentSavedImageObjs.length;
