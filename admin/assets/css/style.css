@@ -516,8 +516,6 @@ nav .nav-list {
 
 /* Botón aplicar filtros */
 .btn-apply {
-  background: var(--btn-bg);
-  color: #ffffff;
   padding: 10px 16px;
   border-radius: 8px;
   border: none;
