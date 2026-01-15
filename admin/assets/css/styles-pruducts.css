@@ -16,20 +16,6 @@
     --badge-bg: #f3f4f6;
 }
 
-/* Reset */
-* {
-    box-sizing: border-box
-}
-
-body {
-    margin: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--bg);
-    color: #111827;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
 /* Header */
 .page-header {
     display: flex;
