@@ -168,7 +168,6 @@ tbody td {
 
 /* Nombre y descripcion */
 .product-name {
-    display: flex;
     flex-direction: column;
     gap: 6px;
 }
