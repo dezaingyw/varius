@@ -1,9 +1,7 @@
 // assets/js/product-admin.js
-// (Este archivo es la versión completa con las mejoras previas y las nuevas necesarias
-//  para el manejo de filtros en responsive y la muestra de precios cuando hay oferta.)
-// IMPORTANTE: Aquí incluyo el archivo completo reusando la base anterior y aplicando
-// las modificaciones solicitadas: renderProductsAsCards ahora muestra precio original (tachado),
-// precio en oferta y porcentaje; además se agregan listeners para los botones de filtros.
+// (Versión modificada: incluye soporte táctil para reordenar imágenes en modal
+//  y asegura que no se usa drag&drop nativo en dispositivos touch.)
+// IMPORTANTE: Mantén este archivo en la misma ruta y reemplaza el anterior.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -1025,11 +1023,43 @@ function applyCombinedItems(items) {
     currentPreviewFiles = newPreviewFiles;
 }
 
-/* ---------------- Show modal slider for files ---------------- */
+/* ---------------- Show modal slider for files (REEMPLAZADA con soporte touch) ---------------- */
+
+/* --- Helpers touch + mover --- */
+function isTouchDevice() {
+    return (('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0);
+}
+
+/* Mueve un elemento combinado (getCombinedItems) desde fromIndex por dir (-1 izquierda, +1 derecha) */
+function moveCombinedItem(fromIndex, dir) {
+    const items = getCombinedItems();
+    if (!Array.isArray(items) || items.length <= 1) return;
+    const idx = Number(fromIndex);
+    if (!Number.isInteger(idx)) return;
+    const tgt = idx + dir;
+    if (tgt < 0 || tgt >= items.length) return;
+    const copy = items.slice();
+    const [moved] = copy.splice(idx, 1);
+    copy.splice(tgt, 0, moved);
+    applyCombinedItems(copy);
+    // volver a renderizar
+    showModalSliderForFiles();
+}
+
+/* ---------- Reemplazo de showModalSliderForFiles con soporte touch reorder ---------- */
 function showModalSliderForFiles() {
     slideTrack.innerHTML = '';
     const combined = getCombinedItems();
     const combinedLen = combined.length;
+
+    const touch = isTouchDevice();
+
+    // toggle clase en slideTrack padre para mostrar botones touch via CSS
+    if (touch) {
+        slideTrack.closest('.image-slider')?.classList.add('touch-enabled');
+    } else {
+        slideTrack.closest('.image-slider')?.classList.remove('touch-enabled');
+    }
 
     if (!combinedLen) {
         imagePreviewSlider.classList.add('hidden');
@@ -1044,7 +1074,8 @@ function showModalSliderForFiles() {
         const node = document.createElement('div');
         node.className = 'slide-item';
         node.style.position = 'relative';
-        node.setAttribute('draggable', 'true');
+        // Solo usar draggable en no-touch (es más confiable en desktop)
+        if (!touch) node.setAttribute('draggable', 'true');
         node.dataset.combinedIndex = String(idx);
 
         const img = document.createElement('img');
@@ -1055,65 +1086,79 @@ function showModalSliderForFiles() {
         img.style.maxWidth = '100%';
         node.appendChild(img);
 
+        // Remove button (existe en tu código)
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'img-remove';
         btn.title = 'Eliminar imagen';
         btn.dataset.type = item.type;
-        btn.style.position = 'absolute';
-        btn.style.top = '6px';
-        btn.style.right = '6px';
-        btn.style.width = '28px';
-        btn.style.height = '28px';
-        btn.style.borderRadius = '50%';
-        btn.style.border = 'none';
-        btn.style.background = 'rgba(0,0,0,0.55)';
-        btn.style.color = '#fff';
-        btn.style.cursor = 'pointer';
-        btn.style.display = 'flex';
-        btn.style.alignItems = 'center';
-        btn.style.justifyContent = 'center';
-        btn.style.fontSize = '16px';
         btn.textContent = '×';
         node.appendChild(btn);
 
-        node.addEventListener('dragstart', (e) => {
-            node.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', String(idx));
-            try { if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(node, 20, 20); } catch (er) { }
-        });
-        node.addEventListener('dragend', () => {
-            node.classList.remove('dragging');
-            slideTrack.querySelectorAll('.slide-item.drop-target').forEach(n => n.classList.remove('drop-target'));
-        });
+        // If touch device -> add left/right move buttons
+        if (touch) {
+            const btnLeft = document.createElement('button');
+            btnLeft.type = 'button';
+            btnLeft.className = 'img-move img-move-left';
+            btnLeft.title = 'Mover a la izquierda';
+            btnLeft.textContent = '◀';
+            btnLeft.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                moveCombinedItem(idx, -1);
+            });
+            node.appendChild(btnLeft);
 
-        node.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            node.classList.add('drop-target');
-            e.dataTransfer.dropEffect = 'move';
-        });
-        node.addEventListener('dragleave', () => {
-            node.classList.remove('drop-target');
-        });
-        node.addEventListener('drop', (e) => {
-            e.preventDefault();
-            node.classList.remove('drop-target');
-            const srcIdxStr = e.dataTransfer.getData('text/plain');
-            const srcIdx = Number.isFinite(Number(srcIdxStr)) ? Number(srcIdxStr) : null;
-            const tgtIdx = Number(node.dataset.combinedIndex);
-            if (srcIdx === null || Number.isNaN(tgtIdx)) return;
-            if (srcIdx === tgtIdx) return;
-            const copy = combined.slice();
-            const [moved] = copy.splice(srcIdx, 1);
-            copy.splice(tgtIdx, 0, moved);
-            applyCombinedItems(copy);
-            showModalSliderForFiles();
-        });
+            const btnRight = document.createElement('button');
+            btnRight.type = 'button';
+            btnRight.className = 'img-move img-move-right';
+            btnRight.title = 'Mover a la derecha';
+            btnRight.textContent = '▶';
+            btnRight.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                moveCombinedItem(idx, 1);
+            });
+            node.appendChild(btnRight);
+        } else {
+            // Drag handlers for desktop (tu implementación original adaptada)
+            node.addEventListener('dragstart', (e) => {
+                node.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(idx));
+                try { if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(node, 20, 20); } catch (er) { }
+            });
+            node.addEventListener('dragend', () => {
+                node.classList.remove('dragging');
+                slideTrack.querySelectorAll('.slide-item.drop-target').forEach(n => n.classList.remove('drop-target'));
+            });
+
+            node.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                node.classList.add('drop-target');
+                e.dataTransfer.dropEffect = 'move';
+            });
+            node.addEventListener('dragleave', () => {
+                node.classList.remove('drop-target');
+            });
+            node.addEventListener('drop', (e) => {
+                e.preventDefault();
+                node.classList.remove('drop-target');
+                const srcIdxStr = e.dataTransfer.getData('text/plain');
+                const srcIdx = Number.isFinite(Number(srcIdxStr)) ? Number(srcIdxStr) : null;
+                const tgtIdx = Number(node.dataset.combinedIndex);
+                if (srcIdx === null || Number.isNaN(tgtIdx)) return;
+                if (srcIdx === tgtIdx) return;
+                const copy = combined.slice();
+                const [moved] = copy.splice(srcIdx, 1);
+                copy.splice(tgtIdx, 0, moved);
+                applyCombinedItems(copy);
+                showModalSliderForFiles();
+            });
+        }
 
         slideTrack.appendChild(node);
     });
 
+    // scroll to start for good UX
     slideTrack.scrollLeft = 0;
 }
 
