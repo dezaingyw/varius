@@ -94,16 +94,6 @@ body {
     align-items: center;
 }
 
-.search {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 1px solid var(--border);
-    padding: 10px;
-    border-radius: 8px;
-    background: #fbfbfb;
-}
 
 .search input {
     border: 0;
