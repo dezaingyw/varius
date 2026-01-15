@@ -8,6 +8,8 @@
   --btn-bg: #111827;
   --badge-bg: #f3f4f6;
 }
+
+/* State badges */
 .state-badge {
   padding: 6px 10px;
   border-radius: 12px;
@@ -48,7 +50,7 @@
   border: 1px solid #fecaca;
 } /* red */
 
-/* ... (existing rules from your file) ... */
+/* General layout and header */
 .page-header {
   display: flex;
   align-items: center;
@@ -114,6 +116,8 @@
   border: 1px solid var(--border);
   background: white;
 }
+
+/* Table card and table */
 .table-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -141,6 +145,8 @@ tbody td {
   color: #111827;
   font-size: 14px;
 }
+
+/* Thumbs */
 .thumb {
   width: 44px;
   height: 44px;
@@ -157,6 +163,7 @@ tbody td {
   gap: 6px;
 }
 
+/* Actions and buttons */
 .actions {
   gap: 10px;
   align-items: center;
@@ -171,6 +178,8 @@ tbody td {
   justify-content: center;
   cursor: pointer;
 }
+
+/* Modal base */
 .modal {
   position: fixed;
   inset: 0;
@@ -267,6 +276,8 @@ tbody td {
   border-radius: 8px;
   cursor: pointer;
 }
+
+/* Toast */
 .toast {
   position: fixed;
   right: 20px;
@@ -279,10 +290,10 @@ tbody td {
   box-shadow: 0 6px 20px rgba(12, 15, 20, 0.15);
 }
 
-/* --- Slider styles adapted to your look --- */
+/* --- Slider styles --- */
 .mini-slider-cell {
   width: 92px;
-} /* narrow column */
+}
 .mini-slider {
   display: flex;
   align-items: center;
@@ -379,30 +390,6 @@ tbody td {
   object-fit: cover;
 }
 
-/* Adiciones para eliminador individual y barra progreso modal */
-
-/* slide delete button (overlay) */
-.slide-item {
-  position: relative;
-}
-.slide-item .slide-delete {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  border: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-}
-
 /* modal progress */
 .modal-progress {
   margin: 12px 0 0 0;
@@ -428,43 +415,363 @@ tbody td {
   }
 }
 
-/* Responsive */
-@media (max-width: 900px) {
-  .search-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  thead th:nth-child(3),
-  tbody td:nth-child(3),
-  thead th:nth-child(4),
-  tbody td:nth-child(4),
-  thead th:nth-child(5),
-  tbody td:nth-child(5),
-  thead th:nth-child(6),
-  tbody td:nth-child(6) {
-    display: none;
-  }
-  table {
-    min-width: 0;
-  }
+/* Responsive: CARD view styles (used in mobile) */
+/* ========================================================
+   New card-based product view - image banner top + title,
+   price & meta below, buttons inline (horizontal).
+   Palette kept consistent with existing variables.
+   ======================================================== */
+.products-cards {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  padding: 8px 0;
 }
-.mini-display {
-  width: 56px;
-  height: 40px;
-  border-radius: 6px;
-  overflow: hidden;
+
+/* Tarjeta general: imagen arriba */
+.product-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--border);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+  overflow: hidden;
+}
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
+}
+
+/* MEDIA / BANNER */
+.card-media {
+  position: relative;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fbfdff, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  min-height: 160px; /* more breathing room for banner */
 }
-
-.mini-display img.mini-current {
+.card-banner {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: opacity 220ms ease;
-  opacity: 1;
+  aspect-ratio: 16/10;
+}
+
+/* Oferta corner badge */
+.card-offer-flag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #fff1f2;
+  color: #dc2626;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.06);
+}
+
+/* BODY */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+/* TITLE */
+.card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+}
+.card-cat {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
+  max-height: 3.2em;
+  overflow: hidden;
+}
+
+/* INFO ROW: price & stock/state */
+.card-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.card-price-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.card-price-offer-row {
+  font-size: 14px;
+  color: #064e3b;
+  font-weight: 700;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.card-price-original {
+  color: #6b7280;
+  font-size: 13px;
+  text-decoration: line-through;
+}
+
+/* RIGHT block small info */
+.card-right-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  min-width: 110px;
+}
+.card-stock {
+  font-size: 13px;
+  color: var(--muted);
+}
+.card-state-badge {
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+/* BUTTONS: inline and visible */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* Button styles consistent with palette */
+.btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 0;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  min-height: 40px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+/* Variants */
+.btn-copy {
+  background: linear-gradient(180deg, #e9f9f3, #dff3ea);
+  color: #045a3e;
+}
+.btn-edit {
+  background: linear-gradient(180deg, #eaf6ff, #e0f1ff);
+  color: #075985;
+}
+.btn-suspend {
+  background: linear-gradient(180deg, #fff2f2, #fff0f0);
+  color: #7a2b2b;
+}
+
+/* Alineado boton pequeño icono */
+.btn-label {
+  pointer-events: none;
+}
+
+/* Low-stock highlight */
+.product-card[data-low-stock="true"] {
+  border-left: 6px solid #ef4444;
+  background: linear-gradient(180deg, #fff6f6, #fff);
+}
+
+/* Keep table visible on desktop (cards hidden by default) */
+@media (min-width: 701px) {
+  .products-cards {
+    display: none;
+  }
+}
+
+/* Show cards and hide table on smaller screens */
+@media (max-width: 700px) {
+  table.products-table {
+    display: none;
+  }
+  .products-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .card-media {
+    min-height: 180px;
+  }
+}
+
+/* Modal sticky header/footer tweaks */
+.modal-header {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 2;
+  padding: 12px 0;
+}
+.modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), #fff);
+  padding: 12px 0 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* small tidy */
+.field-error {
+  margin-left: 2px;
+}
+
+/* Accessibility focus */
+.product-card:focus-within,
+.product-card:focus {
+  outline: 3px solid rgba(43, 110, 246, 0.08);
+  outline-offset: 2px;
+}
+
+/* End of file */
+@media (max-width: 900px) {
+  .filters-card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .filters-card .search-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .filters-card .search {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  .filters-card .filter-select {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  /* Actions row (Buscar / Limpiar) */
+  .filters-card .filters-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-start;
+    margin-top: 4px;
+  }
+
+  /* Make sure buttons occupy reasonable width but remain inline */
+  .filters-card .btn-apply {
+    background: linear-gradient(180deg, #8b5cf6, #7c3aed);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 9px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(124, 58, 237, 0.08);
+  }
+
+  .filters-card .btn-secondary {
+    background: #fff;
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 9px;
+    cursor: pointer;
+    color: #111827;
+    font-weight: 700;
+  }
+}
+
+/* On desktop: keep them inline and not compressed */
+@media (min-width: 901px) {
+  .filters-card .search-row {
+    align-items: center;
+    gap: 12px;
+  }
+
+  .filters-card .filters-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .filters-card .btn-apply {
+    background: linear-gradient(180deg, #8b5cf6, #7c3aed);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 9px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
+
+/* Prevent filters from being compressed inside container: allow them to grow */
+.filters-card .search,
+.filters-card .filter-select,
+.filters-card .filters-actions {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Small visual tweak: add spacing below filters when cards are visible to avoid cramped look */
+@media (max-width: 700px) {
+  .filters-card {
+    margin-bottom: 14px;
+  }
+
+  .products-cards { padding-top: 6px; }
+}
+
+/* Ensure empty space under filters when the table is hidden (cards mode) */
+@media (max-width: 700px) {
+  .table-card { display: none; }
+  .tarjeta-card { display: block; padding: 0 12px 18px 12px; }
+}
+
+/* Small helper to ensure search input inside filters has consistent height */
+.filters-card input[type="text"],
+.filters-card input[type="search"] {
+  height: 44px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
 }
