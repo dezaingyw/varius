@@ -56,7 +56,7 @@
                 <main class="container">
                     <section class="filters-card">
                         <div class="search-row">
-                            <div class="search">
+                            <div class="search" style="width:100%">
                                 <svg class="icon" viewBox="0 0 24 24" width="18" height="18">
                                     <path fill="currentColor"
                                         d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16a6.471 6.471 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM10 15a5 5 0 110-10 5 5 0 010 10z">
@@ -76,11 +76,17 @@
                                 <option value="en_oferta">En oferta</option>
                                 <option value="no_oferta">No</option>
                             </select>
+
+                            <!-- Apply / Clear buttons for filters -->
+                            <div class="filters-actions" style="display:flex;gap:8px;align-items:center;">
+                                <button id="applyFiltersBtn" class="btn-apply" type="button">Buscar</button>
+                                <button id="clearFiltersBtn" class="btn-secondary" type="button">Limpiar</button>
+                            </div>
                         </div>
                     </section>
 
                     <section class="table-card">
-                        <table id="productsTable" aria-live="polite" role="table">
+                        <table id="productsTable" aria-live="polite" role="table" class="products-table">
                             <thead>
                                 <tr>
                                     <th>Imagen</th>
@@ -98,104 +104,117 @@
                                 <!-- Filas renderizadas por JS -->
                             </tbody>
                         </table>
+
                     </section>
                 </main>
+                <section class="tarjeta-card">
+                    <!-- Cards view (hidden by default) -->
+                    <div id="productsCards" class="products-cards hidden" aria-live="polite" role="list">
+                        <!-- Tarjetas renderizadas por JS en modo responsive -->
+                    </div>
+                </section>
             </div>
         </section>
 
         <!-- Modal -->
         <div id="productModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
-            <div class="modal-content modal-lg">
+            <div class="modal-content modal-lg" role="document">
                 <header class="modal-header">
                     <h2 id="modalTitle">Agregar Producto</h2>
                     <button id="closeModal" class="close-btn" aria-label="Cerrar">&times;</button>
                 </header>
 
-                <form id="productForm" class="modal-form" novalidate>
-                    <input type="hidden" id="productId" />
-                    <div class="form-row">
-                        <label>Nombre <span class="required">*</span></label>
-                        <input id="name" type="text" required />
-                    </div>
-
-                    <div class="form-row">
-                        <label>Descripción</label>
-                        <textarea id="description" rows="3"></textarea>
-                    </div>
-
-                    <div class="form-row">
-                        <label>Precio (USD) <span class="required">*</span></label>
-                        <input id="price" type="number" min="0" required />
-                    </div>
-
-                    <div class="form-row inline">
-                        <div>
-                            <label>Categoría <span class="required">*</span></label>
-                            <select id="category" required>
-                                <option value="">Seleccionar categoría</option>
-                                <option>Ropa</option>
-                                <option>Electrónica</option>
-                                <option>Hogar</option>
-                                <option>Accesorios</option>
-                            </select>
+                <div class="modal-body">
+                    <form id="productForm" class="modal-form" novalidate>
+                        <input type="hidden" id="productId" />
+                        <div class="form-row">
+                            <label>Nombre <span class="required">*</span></label>
+                            <input id="name" type="text" required />
                         </div>
 
-                        <div>
-                            <label>Estado</label>
-                            <select id="status">
-                                <option>Activo</option>
-                                <option>Inactivo</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row inline">
-                        <label class="checkbox-row">
-                            <input id="onOffer" type="checkbox" />
-                            <span>En oferta</span>
-                        </label>
-
-                        <div>
-                            <label>Descuento (%)</label>
-                            <input id="discount" type="number" min="0" max="100" value="0" />
+                        <div class="form-row">
+                            <label>Descripción</label>
+                            <textarea id="description" rows="3"></textarea>
                         </div>
 
-                        <div>
-                            <label>Stock</label>
-                            <input id="stock" type="number" min="0" value="0" />
+                        <div class="form-row">
+                            <label>Precio (USD) <span class="required">*</span></label>
+                            <input id="price" type="number" min="0" required />
                         </div>
-                    </div>
 
-                    <!-- Image upload / drag-drop: allow multiple (min 4 recommended) -->
-                    <div class="form-row">
-                        <label>Imágenes (arrastra o selecciona hasta 8) <span class="muted"
-                                style="font-weight:400">mínimo 1, ideal 4</span></label>
+                        <div class="form-row inline">
+                            <div>
+                                <label>Categoría <span class="required">*</span></label>
+                                <select id="category" required>
+                                    <option value="">Seleccionar categoría</option>
+                                    <option>Ropa</option>
+                                    <option>Electrónica</option>
+                                    <option>Hogar</option>
+                                    <option>Accesorios</option>
+                                </select>
+                            </div>
 
-                        <div id="imageDropZone" class="image-dropzone" aria-label="Arrastra imágenes aquí">
-                            <input id="imageFile" type="file" accept="image/*" multiple />
-                            <div class="dz-instructions">
-                                Arrastra imágenes o haz click para seleccionar (máx. 8)
+                            <div>
+                                <label>Estado</label>
+                                <select id="status">
+                                    <option>Activo</option>
+                                    <option>Inactivo</option>
+                                </select>
                             </div>
                         </div>
 
-                        <!-- Slider thumbnails preview -->
-                        <div id="imagePreviewSlider" class="image-slider hidden" aria-hidden="true">
-                            <button type="button" id="prevSlide" class="slide-btn">‹</button>
-                            <div class="slide-track" id="slideTrack"></div>
-                            <button type="button" id="nextSlide" class="slide-btn">›</button>
+                        <div class="form-row inline">
+                            <label class="checkbox-row">
+                                <input id="onOffer" type="checkbox" />
+                                <span>En oferta</span>
+                            </label>
+
+                            <div>
+                                <label>Descuento (%)</label>
+                                <input id="discount" type="number" min="0" max="100" value="0" />
+                            </div>
+
+                            <div>
+                                <label>Stock</label>
+                                <input id="stock" type="number" min="0" value="0" />
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="form-row">
-                        <label>SKU <small>(generado automáticamente según categoría)</small></label>
-                        <input id="sku" type="text" readonly placeholder="Se generará al seleccionar categoría" />
-                    </div>
+                        <!-- Image upload / drag-drop: allow multiple (min 4 recommended) -->
+                        <div class="form-row">
+                            <label>Imágenes (arrastra o selecciona hasta 8) <span class="muted"
+                                    style="font-weight:400">mínimo 1, ideal 4</span></label>
 
+                            <div id="imageDropZone" class="image-dropzone" aria-label="Arrastra imágenes aquí">
+                                <input id="imageFile" type="file" accept="image/*" multiple />
+                                <div class="dz-instructions">
+                                    Arrastra imágenes o haz click para seleccionar (máx. 8)
+                                </div>
+                            </div>
+
+                            <!-- Slider thumbnails preview -->
+                            <div id="imagePreviewSlider" class="image-slider hidden" aria-hidden="true">
+                                <button type="button" id="prevSlide" class="slide-btn">‹</button>
+                                <div class="slide-track" id="slideTrack"></div>
+                                <button type="button" id="nextSlide" class="slide-btn">›</button>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label>SKU <small>(generado automáticamente según categoría)</small></label>
+                            <input id="sku" type="text" readonly placeholder="Se generará al seleccionar categoría" />
+                        </div>
+
+                        <!-- keep form-actions out of body (moved to footer) -->
+                    </form>
+                </div>
+
+                <footer class="modal-footer">
                     <div class="form-actions">
-                        <button type="submit" class="btn-primary admin-only">Guardar</button>
+                        <button type="submit" form="productForm" class="btn-primary admin-only">Guardar</button>
                         <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
                     </div>
-                </form>
+                </footer>
             </div>
         </div>
     </main>
