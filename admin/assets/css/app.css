@@ -591,8 +591,6 @@ nav .nav-list {
 
 /* Legacy compatibility: .btn-apply override consistent */
 .btn-apply {
-  background: var(--btn-bg);
-  color: #ffffff;
   padding: 10px 16px;
   border-radius: 8px;
   border: none;
@@ -648,6 +646,7 @@ body.is-admin .admin-only {
 /* =========================
    5. FORMS, FILTERS & SELECTS
    ========================= */
+   
 .filters-card {
   padding: 18px;
   border-radius: 10px;
