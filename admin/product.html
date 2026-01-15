@@ -10,6 +10,124 @@
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
+
+    <style>
+        /* Correcciones: tamaño fijo 56x56 para mini-thumbs y reglas de objeto para no deformar
+   Además: botones de mover (visibles sólo en touch) para reordenar en móvil */
+:root {
+  --border: #e6e8eb;
+}
+
+/* Mini thumbs en tabla y mini-slider */
+.mini-slide,
+.mini-slide img,
+.thumb,
+.mini-slider .mini-slide,
+.mini-slider .mini-slide img {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  min-height: 56px !important;
+  max-width: 56px !important;
+  max-height: 56px !important;
+  object-fit: cover !important;
+  display: inline-block;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Asegura que los items del slider modal mantienen proporción y no estiren la imagen */
+.slide-item {
+  min-width: 120px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+}
+
+/* Imagenes dentro de slide-item siempre cover */
+.slide-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Banner en tarjeta: mantener cover y no salirse */
+.card-banner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  max-height: 260px; /* límite razonable */
+}
+
+/* Botones de mover sólo visibles en dispositivos táctiles */
+.img-move {
+  position: absolute;
+  bottom: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0,0,0,0.56);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 6;
+  opacity: 0.95;
+}
+
+/* botón izquierda y derecha */
+.img-move-left { left: 6px; }
+.img-move-right { right: 6px; }
+
+/* Ocultar botones por defecto (sólo se mostrarán en touch mediante la clase .touch-enabled) */
+.touch-enabled .slide-item .img-move { display: inline-flex; }
+.slide-item .img-move { display: none; }
+
+/* Si deseas que el área de slide tenga espacio en móviles para los botones */
+@media (max-width: 700px) {
+  .slide-item { min-width: 110px; height: 76px; }
+  .mini-slide, .mini-slide img { width: 56px; height: 56px; }
+}
+
+/* pequeño ajuste visual para el botón eliminar sobre imágenes */
+.img-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 7;
+}
+
+/* aseguramos que el thumb placeholder respete tamaño */
+.thumb {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  min-height: 56px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+    </style>
 </head>
 
 <body>
