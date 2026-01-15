@@ -1,14 +1,9 @@
 // assets/js/product-admin.js
-// Versión completa revisada con paginación cliente y data-labels para vista responsive (tarjetas)
-// Actualizaciones principales:
-// - Precio: entrada tipo "enteros primero, decimales solo si se presiona ','".
-//   - Campo inicia en "0,00".
-//   - Al escribir dígitos se construye la parte entera (izquierda de la coma) y se mantiene ",00" hasta que el usuario presione ','.
-//   - Si el usuario presiona ',' entra en modo decimal y los dígitos siguientes rellenan la fracción (se permiten varios decimales).
-//   - Backspace elimina en decimal si hay decimales, si no hay decimales elimina la parte entera.
-//   - Pegado intenta parsear un número (acepta formatos con '.' y ','), y establece buffers apropiados.
-// - `stock` y `discount` siguen sanitizados como enteros; `discount` permanece deshabilitado hasta activar `onOffer`.
-// - Formateo mostrado usa miles con '.' y decimales con ',' (locale es-ES).
+// (Este archivo es la versión completa con las mejoras previas y las nuevas necesarias
+//  para el manejo de filtros en responsive y la muestra de precios cuando hay oferta.)
+// IMPORTANTE: Aquí incluyo el archivo completo reusando la base anterior y aplicando
+// las modificaciones solicitadas: renderProductsAsCards ahora muestra precio original (tachado),
+// precio en oferta y porcentaje; además se agregan listeners para los botones de filtros.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -32,9 +27,13 @@ const storage = getStorage(app);
 
 // UI elements
 const productsBody = document.getElementById('productsBody');
+const productsCardsContainer = document.getElementById('productsCards');
 const searchInput = document.getElementById('searchInput');
 const stateFilter = document.getElementById('stateFilter');
 const offerFilter = document.getElementById('offerFilter');
+
+const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+const clearFiltersBtn = document.getElementById('clearFiltersBtn');
 
 const productModal = document.getElementById('productModal');
 const openAddBtn = document.getElementById('openAddBtn');
@@ -196,7 +195,12 @@ function formatIntegerWithThousands(intStr) {
 function calculateOfferPrice(price, discount) {
     if (price === undefined || price === null) return null;
     if (discount === undefined || discount === null) return null;
-    return Math.round(Number(price) * (1 - Number(discount) / 100));
+    return Math.round(Number(price) * (1 - Number(discount) / 100) * 100) / 100;
+}
+function calculateDiscountPercentage(original, offered) {
+    if (!Number.isFinite(Number(original)) || !Number.isFinite(Number(offered))) return null;
+    const perc = (1 - (Number(offered) / Number(original))) * 100;
+    return Math.round(perc);
 }
 function generateSKUForCategory(category) {
     const prefix = CATEGORY_PREFIX[category] || (category ? category.slice(0, 3).toUpperCase() : 'PRD');
@@ -205,7 +209,7 @@ function generateSKUForCategory(category) {
     return `${prefix}-${timePortion}${rnd}`;
 }
 
-/* ---------------- Inline field error helpers ---------------- */
+/* ---------------- INLINE ERRORS ---------------- */
 function setFieldError(fieldOrId, message) {
     const el = typeof fieldOrId === 'string' ? document.getElementById(fieldOrId) : fieldOrId;
     if (!el) return;
@@ -305,28 +309,17 @@ if (discountField) {
 }
 
 /* ---------------- Price field: integer-first with explicit decimal mode ---------------- */
-/*
- Behavior:
- - Field shows formatted price with thousands (.) and decimals (,).
- - Default mode: integerMode. Digits typed go to integer part (left of comma). ",00" shown but decimals are zero until user enters decimal mode.
- - If user presses ',' or '.' key, switch to decimalMode and subsequent digits go to decimal part.
- - Backspace removes last decimal digit if in decimalMode and decimal part non-empty; if decimal empty, exit decimalMode; otherwise delete last integer digit.
- - Paste will parse numeric strings and set both buffers.
- - On openEditModal the buffers are loaded from the product value.
-*/
-
-let priceIntegerBuffer = ''; // digits for integer part, without thousand separators
-let priceDecimalBuffer = ''; // digits for decimal fractional part (can be 0..n)
+/* (NO cambios funcionales en este bloque respecto a tu versión anterior) */
+let priceIntegerBuffer = '';
+let priceDecimalBuffer = '';
 let priceDecimalMode = false;
-const PRICE_DECIMAL_MAX = 6; // max decimals allowed for entry (configurable)
+const PRICE_DECIMAL_MAX = 6;
 
 function priceBuffersToDisplay() {
     const intPart = priceIntegerBuffer ? Number(priceIntegerBuffer) : 0;
     const intFmt = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(intPart);
     const dec = priceDecimalBuffer || '00';
-    // ensure at least two decimals displayed for consistency
     const decDisplay = priceDecimalMode ? (priceDecimalBuffer === '' ? '' : priceDecimalBuffer) : (dec.length ? dec.padStart(2, '0').slice(0, 2) : '00');
-    // when in decimalMode and decimal buffer empty show trailing comma to indicate mode
     if (priceDecimalMode) {
         return decDisplay === '' ? `${intFmt},` : `${intFmt},${decDisplay}`;
     } else {
@@ -337,7 +330,6 @@ function priceBuffersToDisplay() {
 function updatePriceFieldFromBuffers() {
     if (!priceField) return;
     priceField.value = priceBuffersToDisplay();
-    // attach data-cents for potential machine use
     const cents = Number((priceIntegerBuffer || '0')) * 100 + Number((priceDecimalBuffer || '0').padEnd(2, '0').slice(0, 2));
     priceField.setAttribute('data-cents', String(cents));
     clearFieldError(priceField);
@@ -367,7 +359,6 @@ function setPriceBuffersFromFormattedString(s) {
         setPriceBuffersFromNumber(parsed);
         return;
     }
-    // fallback: extract digits around comma
     const parts = String(s || '').trim().split(/[,\.]/);
     if (parts.length === 0) { resetPriceBuffersToZero(); return; }
     priceIntegerBuffer = (parts[0] || '').replace(/\D+/g, '') || '0';
@@ -376,43 +367,32 @@ function setPriceBuffersFromFormattedString(s) {
     updatePriceFieldFromBuffers();
 }
 
-// Append integer digit
 function priceAddIntegerDigit(d) {
     if (!/^\d$/.test(String(d))) return;
-    // prevent leading zeros unless user wants them
     if (priceIntegerBuffer === '0') priceIntegerBuffer = d;
     else priceIntegerBuffer = (priceIntegerBuffer || '') + d;
     updatePriceFieldFromBuffers();
 }
-
-// Remove last integer digit
 function priceRemoveIntegerDigit() {
     if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; updatePriceFieldFromBuffers(); return; }
     priceIntegerBuffer = priceIntegerBuffer.slice(0, -1);
     if (priceIntegerBuffer === '') priceIntegerBuffer = '0';
     updatePriceFieldFromBuffers();
 }
-
-// Append decimal digit (only in decimalMode)
 function priceAddDecimalDigit(d) {
     if (!/^\d$/.test(String(d))) return;
     if (priceDecimalBuffer.length >= PRICE_DECIMAL_MAX) return;
     priceDecimalBuffer = priceDecimalBuffer + d;
     updatePriceFieldFromBuffers();
 }
-
-// Remove last decimal digit
 function priceRemoveDecimalDigit() {
     if (!priceDecimalBuffer) {
-        // if nothing in decimal buffer, exit decimal mode
         priceDecimalMode = false;
     } else {
         priceDecimalBuffer = priceDecimalBuffer.slice(0, -1);
     }
     updatePriceFieldFromBuffers();
 }
-
-// Handle paste into price
 function priceHandlePaste(text) {
     if (!text) return;
     const parsed = parseFormattedPrice(text);
@@ -420,7 +400,6 @@ function priceHandlePaste(text) {
         setPriceBuffersFromNumber(parsed);
         return;
     }
-    // fallback: try to pull digits left and right of comma if present
     const t = String(text || '').trim();
     const match = t.match(/^([\d\.\s]+)[,\.]?(\d*)$/);
     if (match) {
@@ -431,13 +410,10 @@ function priceHandlePaste(text) {
     }
 }
 
-// Price field keyboard handling
 if (priceField) {
-    // Ensure buffers exist
     if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; }
 
     priceField.addEventListener('focus', () => {
-        // Keep display up-to-date; caret placed at end
         updatePriceFieldFromBuffers();
         setTimeout(() => {
             try { priceField.selectionStart = priceField.selectionEnd = priceField.value.length; } catch (e) { }
@@ -445,7 +421,6 @@ if (priceField) {
     });
 
     priceField.addEventListener('keydown', (e) => {
-        // allow navigation and editing handled below
         const navAllowed = ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'];
         if (navAllowed.includes(e.key)) return;
 
@@ -453,24 +428,20 @@ if (priceField) {
             e.preventDefault();
             if (priceDecimalMode) {
                 if (priceDecimalBuffer.length > 0) priceRemoveDecimalDigit();
-                else priceDecimalMode = false; // exit decimal mode if buffer empty
+                else priceDecimalMode = false;
             } else {
-                // remove integer digit
                 priceRemoveIntegerDigit();
             }
             return;
         }
 
-        // Enter decimal mode on comma or dot
         if (e.key === ',' || e.key === '.') {
             e.preventDefault();
             priceDecimalMode = true;
-            // keep current decimalBuffer unchanged
             updatePriceFieldFromBuffers();
             return;
         }
 
-        // Digits
         if (/^[0-9]$/.test(e.key)) {
             e.preventDefault();
             if (priceDecimalMode) {
@@ -481,7 +452,6 @@ if (priceField) {
             return;
         }
 
-        // prevent everything else (letters, symbols)
         e.preventDefault();
     });
 
@@ -491,14 +461,9 @@ if (priceField) {
         priceHandlePaste(txt);
     });
 
-    // blur: ensure consistent formatting (two decimals shown)
     priceField.addEventListener('blur', () => {
-        // If decimalMode and decimalBuffer empty, show trailing comma is removed and ",00" displayed
         priceDecimalMode = false;
-        // Normalize decimalBuffer to two digits for display (but keep full decimal buffer internally)
         if (!priceDecimalBuffer) priceDecimalBuffer = '00';
-        // Update display
-        // Compose number from buffers to get consistent rounding when necessary
         const intVal = Number(priceIntegerBuffer || '0');
         const decVal = Number((priceDecimalBuffer || '00').slice(0, 2).padEnd(2, '0'));
         const finalNumber = intVal + decVal / 100;
@@ -516,24 +481,18 @@ function setDiscountEnabled(enabled) {
         discountField.value = '0';
         clearFieldError(discountField);
     } else {
-        // focus for quick entry
         discountField.focus();
-        // ensure value is a number string
         if (!discountField.value) discountField.value = '0';
     }
 }
 if (onOfferField) {
-    // initialize discount state on load
     setDiscountEnabled(!!onOfferField.checked);
     onOfferField.addEventListener('change', () => {
         setDiscountEnabled(!!onOfferField.checked);
     });
 }
 
-/* ---------------- Render products ----------------
-   Usa data-label en cada td para permitir la vista responsive tipo tarjetas.
-   La fila se marca visualmente cuando el stock es menor a 5.
-*/
+/* ---------------- Render products (tabla) ---------------- */
 function renderProducts(list) {
     productsBody.innerHTML = '';
     if (!list.length) {
@@ -559,10 +518,9 @@ function renderProducts(list) {
         const stockNum = Number(prod.stock ?? 0);
         const isLowStock = Number.isFinite(stockNum) && stockNum < 5;
 
-        // If low stock, visually highlight the whole row (red tint + left red border)
         if (isLowStock) {
-            tr.style.backgroundColor = '#fff5f5'; // very light red/pink
-            tr.style.borderLeft = '4px solid #ef4444'; // red left accent
+            tr.style.backgroundColor = '#fff5f5';
+            tr.style.borderLeft = '4px solid #ef4444';
             tr.setAttribute('data-low-stock', 'true');
             tr.setAttribute('aria-label', `Stock bajo: ${stockNum}`);
         }
@@ -630,9 +588,8 @@ function renderProducts(list) {
         // Stock
         const tdStock = document.createElement('td'); tdStock.setAttribute('data-label', 'Stock');
         tdStock.textContent = prod.stock ?? 0;
-        // If low stock, set clearer color on the stock cell
         if (isLowStock) {
-            tdStock.style.color = '#991b1b'; // dark red text
+            tdStock.style.color = '#991b1b';
             tdStock.style.fontWeight = '700';
         }
         tr.appendChild(tdStock);
@@ -640,7 +597,7 @@ function renderProducts(list) {
         // State badge
         const tdState = document.createElement('td'); tdState.setAttribute('data-label', 'Estado');
         const stateBadge = document.createElement('span');
-        stateBadge.className = 'badge-state state-badge';
+        stateBadge.className = 'badge-state';
         const st = (prod.status || 'Activo').toLowerCase();
         if (st === 'activo' || st === 'active') { stateBadge.classList.add('state-active'); stateBadge.textContent = 'Activo'; }
         else if (st === 'inactivo' || st === 'inactive') { stateBadge.classList.add('state-inactive'); stateBadge.textContent = 'Inactivo'; }
@@ -694,6 +651,192 @@ function renderProducts(list) {
     });
 
     // notify for mini-rotator
+    document.dispatchEvent(new CustomEvent('products:rendered'));
+}
+
+/* ---------------- Render products AS CARDS (mobile responsive view)
+   Nuevo: muestra precio original tachado y precio en oferta con porcentaje cuando aplica.
+*/
+function renderProductsAsCards(list) {
+    if (!productsCardsContainer) return;
+    productsCardsContainer.innerHTML = '';
+    if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'cards-empty';
+        empty.textContent = 'No hay productos';
+        productsCardsContainer.appendChild(empty);
+        document.dispatchEvent(new CustomEvent('products:rendered'));
+        return;
+    }
+
+    list.forEach(prod => {
+        if ((prod.status || '').toLowerCase() === 'suspendido' && currentUserRole !== 'administrador') return;
+
+        const card = document.createElement('article');
+        card.className = 'product-card';
+        card.setAttribute('role', 'listitem');
+        card.dataset.id = prod.id || '';
+        if (Number(prod.stock ?? 0) < 5) card.dataset.lowStock = 'true';
+
+        // MEDIA: banner image (use first image if available)
+        const media = document.createElement('div');
+        media.className = 'card-media';
+        const images = Array.isArray(prod.imageUrls) && prod.imageUrls.length ? prod.imageUrls : (prod.imageUrl ? [prod.imageUrl] : []);
+        const mainImg = document.createElement('img');
+        mainImg.className = 'card-banner';
+        mainImg.alt = prod.name || 'Producto';
+        mainImg.loading = 'lazy';
+        mainImg.src = images[0] || 'assets/img/placeholder.png';
+        media.appendChild(mainImg);
+
+        // Offer badge (corner)
+        if (prod.onOffer) {
+            const badgeOffer = document.createElement('span');
+            badgeOffer.className = 'card-offer-flag';
+            badgeOffer.textContent = 'Oferta';
+            media.appendChild(badgeOffer);
+        }
+
+        // BODY
+        const body = document.createElement('div');
+        body.className = 'card-body';
+
+        // Title (below image)
+        const title = document.createElement('h3');
+        title.className = 'card-title';
+        title.textContent = prod.name || '';
+        title.title = prod.name || '';
+        body.appendChild(title);
+
+        // Category & short description
+        if (prod.category || prod.description) {
+            const meta = document.createElement('div');
+            meta.className = 'card-meta';
+            if (prod.category) {
+                const cat = document.createElement('div');
+                cat.className = 'card-cat';
+                cat.textContent = prod.category;
+                meta.appendChild(cat);
+            }
+            body.appendChild(meta);
+        }
+
+        // Price / Offer / Stock / State row
+        const infoRow = document.createElement('div');
+        infoRow.className = 'card-info-row';
+
+        // Left: price block (if onOffer show original struck + offer price + percentage)
+        const priceBlock = document.createElement('div');
+        priceBlock.className = 'card-price-block';
+
+        if (prod.onOffer) {
+            // show original (struck), offer price, and percent
+            const original = document.createElement('div');
+            original.className = 'card-price-original';
+            original.textContent = formatPriceDisplay(prod.price);
+            original.style.textDecoration = 'line-through';
+            original.style.opacity = '0.7';
+
+            const offeredValue = calculateOfferPrice(prod.price, prod.discount);
+            const offered = document.createElement('div');
+            offered.className = 'card-price';
+            offered.textContent = formatPriceDisplay(offeredValue);
+
+            const pct = document.createElement('div');
+            pct.className = 'card-offer-percent';
+            const percNum = Number(prod.discount || 0);
+            pct.textContent = percNum ? `-${percNum}%` : (calculateDiscountPercentage(prod.price, offeredValue) ? `-${calculateDiscountPercentage(prod.price, offeredValue)}%` : '');
+            pct.style.fontSize = '13px';
+            pct.style.color = '#10b981';
+            pct.style.fontWeight = '700';
+
+            priceBlock.appendChild(original);
+            const arrowRow = document.createElement('div');
+            arrowRow.style.display = 'flex';
+            arrowRow.style.alignItems = 'center';
+            arrowRow.style.gap = '8px';
+            arrowRow.appendChild(offered);
+            arrowRow.appendChild(pct);
+            priceBlock.appendChild(arrowRow);
+        } else {
+            const priceEl = document.createElement('div');
+            priceEl.className = 'card-price';
+            priceEl.textContent = formatPriceDisplay(prod.price);
+            priceBlock.appendChild(priceEl);
+        }
+
+        infoRow.appendChild(priceBlock);
+
+        // Right: stock + state small badges
+        const rightBlock = document.createElement('div');
+        rightBlock.className = 'card-right-block';
+        const stock = document.createElement('div');
+        stock.className = 'card-stock';
+        stock.textContent = `Stock: ${prod.stock ?? 0}`;
+        rightBlock.appendChild(stock);
+
+        const stateBadge = document.createElement('span');
+        stateBadge.className = 'badge-state card-state-badge';
+        const st = (prod.status || 'Activo').toLowerCase();
+        if (st === 'activo' || st === 'active') { stateBadge.classList.add('state-active'); stateBadge.textContent = 'Activo'; }
+        else if (st === 'inactivo' || st === 'inactive') { stateBadge.classList.add('state-inactive'); stateBadge.textContent = 'Inactivo'; }
+        else if (st === 'suspendido' || st === 'suspended') { stateBadge.classList.add('state-suspended'); stateBadge.textContent = 'Suspendido'; }
+        else { stateBadge.textContent = prod.status || '—'; }
+        rightBlock.appendChild(stateBadge);
+
+        infoRow.appendChild(rightBlock);
+
+        body.appendChild(infoRow);
+
+        // Actions row: buttons inline (horizontales)
+        const actionsRow = document.createElement('div');
+        actionsRow.className = 'card-actions';
+
+        // Copy button
+        const btnCopy = document.createElement('button');
+        btnCopy.className = 'btn-small btn-copy';
+        btnCopy.type = 'button';
+        btnCopy.title = 'Copiar enlace';
+        btnCopy.innerHTML = `<span class="btn-label"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg" viewBox="0 0 16 16">
+                                <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
+                                <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/>
+                            </svg></span>`;
+        btnCopy.addEventListener('click', () => copyProductLink(prod.id));
+        actionsRow.appendChild(btnCopy);
+
+        if (currentUserRole === 'administrador') {
+            const btnEdit = document.createElement('button');
+            btnEdit.className = 'btn-small btn-edit';
+            btnEdit.type = 'button';
+            btnEdit.title = 'Editar';
+            btnEdit.innerHTML = `<span class="btn-label"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+                                    <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                                    <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+                                </svg></span>`;
+            btnEdit.addEventListener('click', () => openEditProduct(prod.id));
+            actionsRow.appendChild(btnEdit);
+
+            const btnDelete = document.createElement('button');
+            btnDelete.className = 'btn-small btn-suspend';
+            btnDelete.type = 'button';
+            btnDelete.title = 'Suspender';
+            btnDelete.innerHTML = `<span class="btn-label"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                                    </svg></span>`;
+            btnDelete.addEventListener('click', () => softDeleteProduct(prod.id));
+            actionsRow.appendChild(btnDelete);
+        }
+
+        body.appendChild(actionsRow);
+
+        card.appendChild(media);
+        card.appendChild(body);
+
+        productsCardsContainer.appendChild(card);
+    });
+
+    // Ensure rotator initialization
     document.dispatchEvent(new CustomEvent('products:rendered'));
 }
 
@@ -761,6 +904,14 @@ function applyFilters() {
     paginateAndRender(filteredProducts);
 }
 
+function clearFilters() {
+    if (searchInput) searchInput.value = '';
+    if (stateFilter) stateFilter.value = '';
+    if (offerFilter) offerFilter.value = '';
+    // Re-apply (will set to full list)
+    applyFilters();
+}
+
 function paginateAndRender(list) {
     ensurePaginationUi();
     const total = list.length || 0;
@@ -769,7 +920,18 @@ function paginateAndRender(list) {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     const slice = list.slice(start, end);
-    renderProducts(slice);
+
+    if (isCardMode()) {
+        // show cards
+        if (productsCardsContainer) productsCardsContainer.classList.remove('hidden');
+        if (document.getElementById('productsTable')) document.getElementById('productsTable').classList.add('hidden');
+        renderProductsAsCards(slice);
+    } else {
+        // show table
+        if (productsCardsContainer) productsCardsContainer.classList.add('hidden');
+        if (document.getElementById('productsTable')) document.getElementById('productsTable').classList.remove('hidden');
+        renderProducts(slice);
+    }
 
     // update pagination UI
     if (paginationContainer) {
@@ -777,7 +939,6 @@ function paginateAndRender(list) {
         totalCountEl.textContent = `Total: ${total}`;
         prevPageBtn.disabled = currentPage <= 1;
         nextPageBtn.disabled = currentPage >= totalPages;
-        // hide paginador si no hay paginación necesaria
         if (total <= pageSize) {
             paginationContainer.style.display = 'none';
         } else {
@@ -786,6 +947,22 @@ function paginateAndRender(list) {
     }
 }
 
+/* ---------------- Responsive detection for card mode ---------------- */
+function isCardMode() {
+    // threshold adjustable
+    return window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
+}
+let resizeTimer = null;
+function onResizeCheckMode() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        // re-render current filteredProducts to update view
+        paginateAndRender(filteredProducts);
+    }, 140);
+}
+window.addEventListener('resize', onResizeCheckMode);
+
+/* ---------------- Realtime listener ---------------- */
 function startRealtimeListener() {
     const q = query(productsCol, orderBy('name_lower', 'asc'));
     onSnapshot(q, snapshot => {
@@ -797,7 +974,7 @@ function startRealtimeListener() {
     });
 }
 
-/* ---------------- Modal open/edit/submit (simplified) ---------------- */
+/* ---------------- Modal open/edit/submit ---------------- */
 function clearModalPreviews() {
     currentPreviewFiles = [];
     currentPreviewUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { } });
@@ -810,8 +987,7 @@ function clearModalPreviews() {
     clearAllFieldErrors(productForm);
 }
 
-/* ---------- Drag & Drop reordering helpers & style injection ---------- */
-// Inject minimal CSS for drag feedback (once)
+/* ---------- Drag & Drop helpers & style injection (no functional changes) ---------- */
 (function injectDragStyles() {
     if (document.getElementById('product-admin-drag-styles')) return;
     const style = document.createElement('style');
@@ -825,14 +1001,12 @@ function clearModalPreviews() {
     document.head.appendChild(style);
 })();
 
-// Return combined list of items in the currently displayed order
 function getCombinedItems() {
     const saved = Array.isArray(currentSavedImageObjs) ? currentSavedImageObjs.map((o, i) => ({ type: 'saved', url: o.url, path: o.path || '', savedIndex: i })) : [];
     const previews = Array.isArray(currentPreviewUrls) ? currentPreviewUrls.map((u, i) => ({ type: 'preview', url: u, file: currentPreviewFiles[i], previewIndex: i })) : [];
     return saved.concat(previews);
 }
 
-// Apply a combined-ordered list back into the separate arrays used elsewhere
 function applyCombinedItems(items) {
     const newSaved = [];
     const newPreviewUrls = [];
@@ -846,13 +1020,12 @@ function applyCombinedItems(items) {
         }
     }
     currentSavedImageObjs = newSaved;
-    // Revoke old preview objectURLs that were removed (already revoked in removePreviewImage but keep safe)
     currentPreviewUrls.forEach(u => { try { if (!newPreviewUrls.includes(u)) URL.revokeObjectURL(u); } catch (e) { } });
     currentPreviewUrls = newPreviewUrls;
     currentPreviewFiles = newPreviewFiles;
 }
 
-/* ---------------- Show modal slider for files (with drag & drop reordering) ---------------- */
+/* ---------------- Show modal slider for files ---------------- */
 function showModalSliderForFiles() {
     slideTrack.innerHTML = '';
     const combined = getCombinedItems();
@@ -867,7 +1040,6 @@ function showModalSliderForFiles() {
     imagePreviewSlider.classList.remove('hidden');
     imagePreviewSlider.setAttribute('aria-hidden', 'false');
 
-    // Create slide items for each combined entry (saved first then previews per combined list)
     combined.forEach((item, idx) => {
         const node = document.createElement('div');
         node.className = 'slide-item';
@@ -883,22 +1055,11 @@ function showModalSliderForFiles() {
         img.style.maxWidth = '100%';
         node.appendChild(img);
 
-        // Remove button
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'img-remove';
         btn.title = 'Eliminar imagen';
         btn.dataset.type = item.type;
-        // For saved items compute the index in currentSavedImageObjs; for previews compute index in currentPreviewUrls
-        if (item.type === 'saved') {
-            // index within saved array after reordering
-            btn.dataset.index = String(currentSavedImageObjs.length ? currentSavedImageObjs.length + idx /* placeholder; not read */ : idx);
-            // We'll instead compute indexes when clicking by looking for dataset.combinedIndex on parent; keep type only for delegated handler
-            btn.dataset.index = '';
-        } else {
-            btn.dataset.index = '';
-        }
-        // basic inline styles so funciona sin CSS adicional
         btn.style.position = 'absolute';
         btn.style.top = '6px';
         btn.style.right = '6px';
@@ -916,17 +1077,14 @@ function showModalSliderForFiles() {
         btn.textContent = '×';
         node.appendChild(btn);
 
-        // Drag handlers
         node.addEventListener('dragstart', (e) => {
             node.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
-            // store source index
             e.dataTransfer.setData('text/plain', String(idx));
             try { if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(node, 20, 20); } catch (er) { }
         });
         node.addEventListener('dragend', () => {
             node.classList.remove('dragging');
-            // cleanup any drop-target classes
             slideTrack.querySelectorAll('.slide-item.drop-target').forEach(n => n.classList.remove('drop-target'));
         });
 
@@ -946,14 +1104,10 @@ function showModalSliderForFiles() {
             const tgtIdx = Number(node.dataset.combinedIndex);
             if (srcIdx === null || Number.isNaN(tgtIdx)) return;
             if (srcIdx === tgtIdx) return;
-            // Reorder combined array
             const copy = combined.slice();
             const [moved] = copy.splice(srcIdx, 1);
-            // If dropping after an element and source < target, adjust insertion index
             copy.splice(tgtIdx, 0, moved);
-            // Apply reordering back to arrays
             applyCombinedItems(copy);
-            // Re-render slider with new order
             showModalSliderForFiles();
         });
 
@@ -963,27 +1117,21 @@ function showModalSliderForFiles() {
     slideTrack.scrollLeft = 0;
 }
 
-/* ---------------- Remove helpers (updated to calculate index from combined list) ---------------- */
-// Remove selected preview image (before upload)
+/* ---------------- Remove helpers ---------------- */
 function removePreviewImage(idx) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= currentPreviewUrls.length) return;
-    // Revoke object URL
     try { URL.revokeObjectURL(currentPreviewUrls[idx]); } catch (e) { }
-    // Remove file and url in same index
     currentPreviewFiles.splice(idx, 1);
     currentPreviewUrls.splice(idx, 1);
     showModalSliderForFiles();
 }
 
-// Mark saved image for deletion (during edit). It will be removed from UI and path added to pendingDeletePaths.
-// Actual deletion from storage/doc happens when the product is updated (updateProduct).
 function removeSavedImage(idx) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= currentSavedImageObjs.length) return;
     const imgObj = currentSavedImageObjs[idx];
     if (imgObj && imgObj.path) {
         pendingDeletePaths.push(imgObj.path);
     }
-    // remove image from saved array
     currentSavedImageObjs.splice(idx, 1);
     showModalSliderForFiles();
 }
@@ -992,7 +1140,6 @@ function removeSavedImage(idx) {
 slideTrack.addEventListener('click', (e) => {
     const btn = e.target.closest && e.target.closest('.img-remove');
     if (!btn) return;
-    // identify which slide-item contains this button
     const itemNode = btn.closest('.slide-item');
     if (!itemNode) return;
     const combinedIndex = Number(itemNode.dataset.combinedIndex);
@@ -1000,11 +1147,9 @@ slideTrack.addEventListener('click', (e) => {
     const clicked = combined[combinedIndex];
     if (!clicked) return;
     if (clicked.type === 'preview') {
-        // find preview index in currentPreviewUrls
         const pIdx = currentPreviewUrls.indexOf(clicked.url);
         if (pIdx !== -1) removePreviewImage(pIdx);
     } else if (clicked.type === 'saved') {
-        // find saved index in currentSavedImageObjs by matching url and path
         const sIdx = currentSavedImageObjs.findIndex(s => s.url === clicked.url && (s.path || '') === (clicked.path || ''));
         if (sIdx !== -1) {
             const c = confirm('Eliminar esta imagen del producto? Se quitará al guardar los cambios.');
@@ -1013,8 +1158,7 @@ slideTrack.addEventListener('click', (e) => {
     }
 });
 
-/* ---------------- Image upload / drag-drop: allow multiple (min 4 recommended) ---------------- */
-// ... (rest unchanged)
+/* ---------------- Image upload / drag-drop ---------------- */
 imageFileField.addEventListener('change', (e) => {
     const files = Array.from(e.target.files || []).slice(0, 8);
     currentPreviewFiles = currentPreviewFiles.concat(files);
@@ -1036,7 +1180,7 @@ imageDropZone.addEventListener('drop', (e) => {
     showModalSliderForFiles();
 });
 
-/* ---------- Upload images helper with optimization & resumable progress ---------- */
+/* ---------- Upload images helper ---------- */
 async function uploadImagesToProductFolder(productId, files = [], baseName = 'product', maxFiles = 8, onProgress = null) {
     if (!files || !files.length) return [];
     const arr = Array.from(files).slice(0, maxFiles);
@@ -1100,7 +1244,6 @@ async function addProduct(data, files) {
     if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
     if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
 
-    // discount validation when onOffer
     if (data.onOffer) {
         const d = Number(data.discount || 0);
         if (Number.isNaN(d) || d < 0 || d > 100) { setFieldError(discountField, 'Descuento inválido (0-100)'); discountField.focus(); return; }
@@ -1172,7 +1315,6 @@ async function updateProduct(id, data, newFiles = []) {
     if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
     if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
 
-    // discount validation when onOffer
     if (data.onOffer) {
         const d = Number(data.discount || 0);
         if (Number.isNaN(d) || d < 0 || d > 100) { setFieldError(discountField, 'Descuento inválido (0-100)'); discountField.focus(); return; }
@@ -1186,11 +1328,9 @@ async function updateProduct(id, data, newFiles = []) {
         if (!snap.exists()) { showToast('Producto no encontrado'); return; }
         const docData = snap.data();
 
-        // Start from arrays present in DB but filtered by pending deletions later.
         let imageUrlsFromDb = Array.isArray(docData.imageUrls) ? docData.imageUrls.slice() : [];
         let imagePathsFromDb = Array.isArray(docData.imagePaths) ? docData.imagePaths.slice() : [];
 
-        // If there are pendingDeletePaths (images the user removed in the modal), attempt to delete them from storage (best-effort)
         if (pendingDeletePaths.length) {
             for (const p of pendingDeletePaths) {
                 try {
@@ -1200,9 +1340,7 @@ async function updateProduct(id, data, newFiles = []) {
                     console.warn('Error deleting storage path', p, err);
                 }
             }
-            // remove from db arrays
             imagePathsFromDb = imagePathsFromDb.filter(p => !pendingDeletePaths.includes(p));
-            // rebuild urls from imagePathsFromDb using original mapping from docData
             const pathToUrl = {};
             if (Array.isArray(docData.imagePaths)) {
                 docData.imagePaths.forEach((p, idx) => { if (docData.imageUrls && docData.imageUrls[idx]) pathToUrl[p] = docData.imageUrls[idx]; });
@@ -1212,14 +1350,11 @@ async function updateProduct(id, data, newFiles = []) {
             } else {
                 imageUrlsFromDb = imageUrlsFromDb.slice(0, imagePathsFromDb.length);
             }
-            // clear pending deletes after processing
             pendingDeletePaths = [];
         }
 
-        // We'll produce the final ordered arrays based on the current combined order in the modal.
         const combinedItems = getCombinedItems();
 
-        // Upload new files if any. IMPORTANT: we need uploaded results in the same order as currentPreviewFiles (which should match ordering in combinedItems where type==='preview').
         let uploadedResults = [];
         if (newFiles && newFiles.length) {
             createModalProgressUI();
@@ -1227,40 +1362,31 @@ async function updateProduct(id, data, newFiles = []) {
             removeModalProgressUI();
         }
 
-        // Build maps to find original saved urls/paths by url or path:
-        // For saved images currently shown in modal we have currentSavedImageObjs which were built from prod data on openEdit.
-        // We'll iterate through combinedItems and for each:
-        // - if saved: push its url/path (from currentSavedImageObjs)
-        // - if preview: push next uploaded result
         const finalUrls = [];
         const finalPaths = [];
         let uploadPointer = 0;
         for (const it of combinedItems) {
             if (it.type === 'saved') {
-                // find saved item in the originally loaded saved objects (currentSavedImageObjs should already reflect the up-to-date saved list and order)
                 const found = currentSavedImageObjs.find(s => s.url === it.url && (s.path || '') === (it.path || ''));
                 if (found) {
                     finalUrls.push(found.url);
                     finalPaths.push(found.path || '');
                 } else {
-                    // If not found in currentSavedImageObjs (maybe was originally from DB but lacks path), try to match by url on db arrays
-                    // fallback: try finding in imageUrlsFromDb
                     const idx = imageUrlsFromDb.indexOf(it.url);
                     if (idx !== -1) {
                         finalUrls.push(imageUrlsFromDb[idx]);
                         finalPaths.push(imagePathsFromDb[idx] || '');
                     } else {
-                        // nothing: skip
+                        // skip
                     }
                 }
             } else if (it.type === 'preview') {
-                // take next uploaded result (if any)
                 if (uploadPointer < uploadedResults.length) {
                     finalUrls.push(uploadedResults[uploadPointer].url);
                     finalPaths.push(uploadedResults[uploadPointer].path);
                     uploadPointer++;
                 } else {
-                    // No uploaded result (shouldn't happen) — ignore
+                    // ignore
                 }
             }
         }
@@ -1379,9 +1505,22 @@ openAddBtn?.addEventListener('click', openAddModal);
 closeModalBtn?.addEventListener('click', () => { productModal.classList.add('hidden'); productModal.setAttribute('aria-hidden', 'true'); clearModalPreviews(); });
 cancelBtn?.addEventListener('click', () => { productModal.classList.add('hidden'); productModal.setAttribute('aria-hidden', 'true'); clearModalPreviews(); });
 
-searchInput.addEventListener('input', applyFilters);
-stateFilter.addEventListener('change', applyFilters);
-offerFilter.addEventListener('change', applyFilters);
+searchInput.addEventListener('input', () => {
+    // do not auto-apply on mobile typing to avoid re-rendering while typing;
+    // keep local update and let user press Buscar
+    // But on desktop we still do live filtering for convenience
+    if (!isCardMode()) applyFilters();
+});
+stateFilter.addEventListener('change', () => {
+    if (!isCardMode()) applyFilters();
+});
+offerFilter.addEventListener('change', () => {
+    if (!isCardMode()) applyFilters();
+});
+
+// Apply / Clear buttons always available: apply triggers applyFilters; clear resets
+applyFiltersBtn?.addEventListener('click', () => applyFilters());
+clearFiltersBtn?.addEventListener('click', () => clearFilters());
 
 // Clear field errors on input
 [nameField, descriptionField, priceField, categoryField, statusField, discountField, stockField, imageFileField].forEach(el => {
@@ -1423,10 +1562,7 @@ productForm.addEventListener('submit', async (e) => {
         sku: skuField.value || ''
     };
 
-    // Use the combined order when preparing filesToUpload and saved image arrays.
     const combined = getCombinedItems();
-    // For add: all items will be previews (since no saved). For edit: combined may interleave saved + preview.
-    // Build filesToUpload in the order they appear in combined (only preview items).
     const filesToUpload = [];
     combined.forEach(it => { if (it.type === 'preview' && it.file) filesToUpload.push(it.file); });
 
@@ -1461,9 +1597,7 @@ onAuthStateChanged(auth, async (user) => {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         currentUserRole = userDoc.exists() ? (userDoc.data().role || 'vendedor') : 'vendedor';
         applyUiRestrictions(currentUserRole);
-        // ensure discount state reflects onOffer checkbox on start
         setDiscountEnabled(!!onOfferField?.checked);
-        // initialize price buffers to zero if empty
         if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; updatePriceFieldFromBuffers(); }
         startRealtimeListener();
     } catch (err) {
@@ -1472,7 +1606,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// Modal open/edit functions (moved further down to keep flow consistent)
+/* ---------- Modal open/edit functions ---------- */
 function openAddModal() {
     if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
     isEditing = false;
@@ -1484,7 +1618,6 @@ function openAddModal() {
     productIdField.value = '';
     skuField.value = '';
     skuField.placeholder = 'Se generará al seleccionar categoría';
-    // initialize price buffers to zero
     priceIntegerBuffer = '0';
     priceDecimalBuffer = '';
     priceDecimalMode = false;
@@ -1507,7 +1640,6 @@ async function openEditProduct(id) {
         productIdField.value = id;
         nameField.value = prod.name || '';
         descriptionField.value = prod.description || '';
-        // set price buffers from stored number
         setPriceBuffersFromNumber(Number(prod.price || 0));
         categoryField.value = prod.category || '';
         statusField.value = prod.status || 'Activo';
@@ -1530,7 +1662,6 @@ async function openEditProduct(id) {
         currentPreviewFiles = [];
         currentPreviewUrls = [];
         pendingDeletePaths = [];
-        // render combined slider using internal arrays
         showModalSliderForFiles();
         if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
         productModal.classList.remove('hidden');
