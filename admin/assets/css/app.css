@@ -431,10 +431,14 @@ nav .nav-list {
 }
 
 .action-primary {
-  background: var(--btn-bg);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  background: linear-gradient(
+    180deg,
+    var(--btn-primary),
+    color-mix(in srgb, var(--btn-primary) 86%, black 4%)
+  );
+  color: var(--btn-primary-contrast);
+  border: none;
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.08);
 }
 
 .action-icon {
@@ -847,6 +851,7 @@ table#ordersTable tbody td {
   font-size: 14px;
 }
 
+/* Modal base */
 .modal {
   position: fixed;
   inset: 0;
@@ -1125,7 +1130,6 @@ table#ordersTable tbody td {
 :focus-visible {
   outline: 3px solid rgba(43, 110, 246, 0.12);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 
 /* =========================
@@ -1805,4 +1809,385 @@ table#ordersTable tbody td {
   gap: 8px; /* Espacio entre botones */
 }
 
+/* ===========================================================
+   FORMS & MODAL-FORM IMPROVEMENTS (Overrides para mejor layout
+   y comportamiento responsive de los formularios en los modales)
+   Este bloque está añadido para mejorar la distribución de los
+   inputs y reducir espacios excesivos. Está al final para que
+   tenga prioridad sobre reglas anteriores.
+   =========================================================== */
 
+/* Layout principal del modal: menos padding, mejor max-width y scroll coherente */
+.modal .modal-content {
+  padding: 12px 18px;
+  max-width: 760px;
+  width: min(760px, calc(100vw - 48px));
+  box-sizing: border-box;
+  border-radius: 10px;
+  max-height: calc(100vh - 110px);
+  overflow: auto;
+}
+
+/* Form grid: usar grid con gaps consistentes en lugar de márgenes dispersos */
+.modal-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 6px 0 8px 0;
+}
+
+/* Filas de formulario: uniformidad y eliminar márgenes mayores en HTML */
+.modal-form .form-row {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Etiquetas: tamaño consistente y menos "salto" visual */
+.modal-form .form-row label {
+  font-size: 13px;
+  color: var(--muted, #6b7280);
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Inputs/selects: altura, padding y bordes coherentes */
+.modal-form input[type="text"],
+.modal-form input[type="email"],
+.modal-form input[type="tel"],
+.modal-form input[type="password"],
+.modal-form textarea,
+.modal-form select {
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e6e8eb);
+  background: #fff;
+  font-size: 14px;
+  color: var(--text, #0f172a);
+  transition: box-shadow 140ms ease, border-color 140ms ease, transform 120ms ease;
+  box-sizing: border-box;
+}
+
+/* Textareas no forzar altura fija */
+.modal-form textarea { height: auto; min-height: 80px; padding-top:10px; padding-bottom:10px; }
+
+/* Focus: destacar inputs para accesibilidad */
+.modal-form input:focus,
+.modal-form select:focus,
+.modal-form textarea:focus {
+  outline: none;
+  border-color: rgba(43, 110, 246, 0.4);
+  box-shadow: 0 6px 18px rgba(43, 110, 246, 0.06);
+}
+
+/* Dos columnas controladas por grid: usa minmax para mejor comportamiento responsive */
+.two-col,
+.row-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+/* Si existen form-rows dentro de grid, quitar su margin-bottom por defecto */
+.two-col .form-row,
+.row-2 .form-row {
+  margin-bottom: 0;
+}
+
+/* Anchos fijos respetados pero adaptables: mantener helpers w-160/w-120 */
+.w-160 { width: 160px; flex: 0 0 160px; max-width: 160px; }
+.w-120 { width: 120px; flex: 0 0 120px; max-width: 120px; }
+
+/* Para entradas acompañadas (input-with-toggle) ajustar posicionamiento del botón */
+.input-with-toggle {
+  position: relative;
+}
+.input-with-toggle input {
+  padding-right: 44px; /* espacio para el toggle */
+}
+
+/* Botón toggle de contraseña (más pequeño, alineado dentro del input) */
+.pwd-toggle,
+.icon-btn.small.pwd-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: rgba(0,0,0,0.04);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted, #374151);
+  border-radius: 6px;
+  height: 32px;
+  min-width: 32px;
+}
+
+/* Alertas de input: tamaño y espacio reservado para evitar "brinco" de layout */
+.input-alert {
+  color: #b71c1c;
+  font-size: 12px;
+  min-height: 18px;
+  margin-top: 2px;
+}
+
+/* Actions: botón guardar/cancelar alineados y compactos */
+.form-actions,
+.modal .form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 6px;
+}
+
+/* Botones: hacerlos consistentes en altura dentro del modal */
+.modal .btn-add,
+.modal .btn-secondary,
+.modal .btn-apply {
+  height: 40px;
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+/* Resultado de fecha / small meta en filas (por ejemplo FC/FS) */
+.date-cell { font-size: 13px; color: var(--muted, #6b7280); line-height: 1.25; }
+.date-cell strong { font-weight: 700; margin-right: 6px; }
+
+/* Reducir el espacio encima del header dentro del modal */
+.modal-header { padding: 8px 0; gap: 8px; }
+
+/* Toast: mostrar/ocultar transición más suave */
+.toast { transition: opacity 200ms ease, transform 200ms ease; }
+.toast.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+
+/* Truncado y wrap: evitar overflow en nombres largos */
+.user-name, .user-email { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 36ch; }
+
+/* Hacer que las filas suspendidas mantengan su padding y no empujen contenido */
+tr.row-suspendido td:first-child { padding-left: 14px; }
+
+/* Fixes para inputs inline (select + custom ext) */
+#u_email_ext_custom { width: 100%; padding: 10px 12px; height: 44px; box-sizing: border-box; }
+
+/* Manejo responsive */
+/* En pantallas pequeñas: apilar columnas, inputs ocupan 100% y etiquetas quedan encima */
+@media (max-width: 700px) {
+  /* por defecto apilar two-col (contraseñas etc.) */
+  .two-col {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  /*
+    Mantener side-by-side para los "pares compactos" que usamos en la plantilla:
+    - email local + extensión (estructura: .row-2 > .form-row (flex:1) + .form-row.w-160)
+    - operadora + numero (estructura: .row-2 > .form-row.w-120 + .form-row (flex:1))
+    En vez de cambiar HTML, transformamos .row-2 a flex en móvil para que respete
+    los anchos fijos (.w-160 / .w-120) y el resto ocupe el espacio restante.
+  */
+  .row-2 {
+    display: flex !important;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  /* contenedores dentro de row-2: email/número toma el espacio restante */
+  .row-2 > .form-row {
+    flex: 1 1 0%;
+    min-width: 0;
+  }
+
+  /* reducir ligeramente los selects fijos para que no se vean demasiado grandes en móvil */
+  .row-2 > .w-160 {
+    flex: 0 0 140px;
+    max-width: 140px;
+  }
+
+  .row-2 > .w-120 {
+    flex: 0 0 110px;
+    max-width: 110px;
+  }
+
+  /* asegurar inputs y selects de esos contenedores ocupen el 100% */
+  .row-2 input,
+  .row-2 select {
+    width: 80%;
+    box-sizing: border-box;
+    height: 42px;
+  }
+
+  /* si no hay suficiente ancho, permitir que se reduzcan de forma elegante */
+  .row-2 > .w-160,
+  .row-2 > .w-120 {
+    min-width: 0;
+  }
+
+  /* si la pantalla es muy angosta, permitir wrap y usar porcentajes para evitar cramping */
+  @media (max-width: 360px) {
+    .row-2 { flex-wrap: wrap; }
+    .row-2 > .w-160 { flex: 0 0 44%; max-width: 44%; }
+    .row-2 > .w-120 { flex: 0 0 30%; max-width: 30%; }
+    .row-2 > .form-row { flex: 1 1 56%; min-width: 30%; }
+  }
+
+  .w-160, .w-120 {
+    width: auto !important;
+  }
+
+  .modal .modal-content {
+    padding: 10px 12px;
+    max-width: 98%;
+    border-radius: 8px;
+    max-height: calc(100vh - 80px);
+    width: calc(100vw - 24px);
+  }
+
+  /* Reducir alturas en móviles para evitar scroll excesivo */
+  .modal-form input[type="text"],
+  .modal-form input[type="email"],
+  .modal-form select,
+  .modal-form input[type="password"] {
+    height: 42px;
+    font-size: 13px;
+  }
+
+  .modal .btn-add,
+  .modal .btn-secondary {
+    height: 40px;
+    padding: 9px 12px;
+    font-size: 13px;
+    width: auto;
+  }
+
+  /* Más espacio para el contenido del modal en móvil */
+  .modal-form { gap: 10px; }
+}
+
+/* Mobile very small: compactar aún más */
+@media (max-width: 420px) {
+  .modal .modal-content { padding: 10px; }
+  .modal-form .form-row label { font-size: 12px; }
+  .input-alert { font-size: 12px; }
+}
+
+/* Visual polish: focus visible para botones y inputs */
+.modal .btn-add:focus,
+.modal .btn-secondary:focus,
+.modal-form input:focus,
+.modal-form select:focus {
+  outline: 3px solid rgba(43, 110, 246, 0.12);
+  outline-offset: 2px;
+}
+
+/* Small utility to avoid tall gaps introduced inline */
+.modal-form [style*="margin-bottom"] {
+  margin-bottom: 0 !important;
+}
+
+/* ===========================================================
+   MOBILE MODAL SPECIFIC IMPROVEMENTS (NEW)
+   - Mejora la experiencia en pantallas pequeñas según capturas.
+   =========================================================== */
+
+@media (max-width: 700px) {
+  /* Ensamblar modal al top, dejar que el contenido sea scrollable internamente */
+  .modal {
+    align-items: flex-start;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .modal .modal-content {
+    /* ocupar casi todo el ancho y altura disponible */
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    margin: 12px auto;
+    border-radius: 10px;
+    max-height: calc(100vh - 24px);
+    box-shadow: 0 6px 20px rgba(11,15,34,0.08);
+  }
+
+  /* Cabecera sticky: siempre visible al hacer scroll */
+  .modal-header {
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 10;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Hacer que el formulario sea más compacto */
+  .modal-form {
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+
+  /* Acciones fijadas al fondo del modal: mejor accesibilidad en móvil */
+  .form-actions {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,1));
+    padding-top: 10px;
+    padding-bottom: 12px;
+    gap: 8px;
+    display: flex;
+    flex-direction: column-reverse; /* guardar botón principal abajo, cancelar arriba */
+    align-items: stretch;
+  }
+
+  .form-actions .btn-add,
+  .form-actions .btn-apply {
+    width: 100%;
+    border-radius: 8px;
+  }
+
+  .form-actions .btn-secondary {
+    width: 100%;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  /* Inputs, selects y custom ext ocupen todo el ancho */
+  #u_email_ext, #u_email_ext_custom, #u_operator, #u_role, #u_status {
+    box-sizing: border-box;
+  }
+
+  /* Reduce top/bottom spacing en labels/inputs */
+  .form-row label { margin-bottom: 6px; }
+  .modal-form input, .modal-form select { height: 42px; }
+
+  /* Evita que el toggle sobresalga */
+  .pwd-toggle { right: 10px; }
+
+  /* Evita que el footer del modal tape el contenido principal: dar margen inferior extra */
+  .modal .modal-content > .modal-form { padding-bottom: 72px; /* suficiente espacio para actions sticky */ }
+}
+
+/* Ajustes extra para pantallas muy pequeñas (<=360px) */
+@media (max-width: 360px) {
+  .modal .modal-content {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    margin: 8px auto;
+    border-radius: 8px;
+  }
+  .modal-header h2 { font-size: 15px; }
+  .modal-form input, .modal-form select { height: 40px; font-size: 13px; }
+  .modal-form { gap: 8px; }
+  .form-actions { padding-bottom: 10px; }
+}
+
+/* End of file */

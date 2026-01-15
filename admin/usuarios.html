@@ -5,8 +5,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Usuarios — Varius</title>
-
-    <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
     <style>
@@ -243,31 +241,6 @@
             margin-bottom: 0;
         }
 
-        .input-with-toggle {
-            position: relative;
-        }
-
-        .input-with-toggle input {
-            padding-right: 44px;
-        }
-
-        .input-with-toggle .pwd-toggle {
-            position: absolute;
-            right: 70px;
-            top: 50%;
-            transform: translateY(-50%);
-            border: 0;
-            background: #ddcbfb;
-            cursor: pointer;
-            font-size: 16px;
-            padding: 6px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            color: #374151;
-            border-radius: 6px;
-        }
-
         /* small helper to align two inputs on same row */
         .row-2 {
             display: flex;
@@ -314,11 +287,7 @@
 
         /* target very small screens including < 380px */
         @media (max-width: 380px) {
-            .modal .modal-content {
-                padding: 12px;
-                border-radius: 8px;
-                width: 98%;
-            }
+           
 
             .modal-form input[type="text"],
             .modal-form input[type="tel"],
@@ -337,26 +306,24 @@
                 padding: 8px 10px;
             }
 
-            .w-160,
-            .w-120 {
-                width: 100%;
-                flex-basis: 100%;
-                flex: 1 1 auto;
-            }
         }
 
         /* estilo fila suspendida: fondo rosado y barra izquierda roja (como en tu ejemplo) */
         tr.row-suspendido {
-            background: #fff1f2; /* rosa suave */
+            background: #fff1f2;
+            /* rosa suave */
         }
+
         tr.row-suspendido td {
             /* texto por defecto se mantiene; puedes ajustar color si quieres más contraste */
         }
+
         /* barra roja a la izquierda */
         tr.row-suspendido td:first-child {
             position: relative;
             padding-left: 12px;
         }
+
         tr.row-suspendido td:first-child::before {
             content: '';
             position: absolute;
@@ -364,7 +331,8 @@
             top: 10px;
             bottom: 10px;
             width: 4px;
-            background: #ef4444; /* rojo */
+            background: #ef4444;
+            /* rojo */
             border-radius: 2px;
         }
     </style>
@@ -414,7 +382,8 @@
                                 d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16a6.471 6.471 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM10 15a5 5 0 110-10 5 5 0 010 10z">
                             </path>
                         </svg>
-                        <input id="searchInput" type="text" placeholder="Buscar por nombre o correo..." aria-label="Buscar usuarios" />
+                        <input id="searchInput" type="text" placeholder="Buscar por nombre o correo..."
+                            aria-label="Buscar usuarios" />
                     </div>
 
                     <select id="roleFilter" class="filter-select">
@@ -507,7 +476,7 @@
                                 <option value="hotmail.com">Hotmail.com</option>
                                 <option value="outlook.com">Outlook.com</option>
                                 <option value="yahoo.com">Yahoo.com</option>
-                                <option value="otro">Otro...</option>
+                                
                             </select>
                             <input id="u_email_ext_custom" type="text" placeholder="dominio.com"
                                 style="display:none;margin-top:6px;" />
@@ -529,7 +498,6 @@
 
                         <div class="form-row" style="flex:1;">
                             <label for="u_phone_local">Numero de Telefono</label>
-                            <!-- local: EXACTAMENTE 7 dígitos -->
                             <input id="u_phone_local" type="tel" inputmode="numeric" maxlength="7"
                                 placeholder="4723636" />
                             <div id="u_phone_alert" class="input-alert"></div>

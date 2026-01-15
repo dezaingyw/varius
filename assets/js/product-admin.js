@@ -1,12 +1,14 @@
 // assets/js/product-admin.js
-// Versión completa revisada:
-// - Render con badges de estado y oferta (colores).
-// - Columna Imagen muestra mini-slider (rotador separado).
-// - "Eliminar" marca status = 'suspendido' (soft-delete) y sólo admin ve suspendidos.
-// - CRUD y subida de imágenes (usa optimizarImagen, sube a products/{productId}/...).
-// - Validaciones de rol (applyUiRestrictions debe ocultar .admin-only).
-// - Incluye funciones necesarias: renderProducts, add/update (with image upload), openEdit, soft delete.
-// Requiere: image-utils.js, rbac.js y storage.rules apropiadas.
+// Versión completa revisada con paginación cliente y data-labels para vista responsive (tarjetas)
+// Actualizaciones principales:
+// - Precio: entrada tipo "enteros primero, decimales solo si se presiona ','".
+//   - Campo inicia en "0,00".
+//   - Al escribir dígitos se construye la parte entera (izquierda de la coma) y se mantiene ",00" hasta que el usuario presione ','.
+//   - Si el usuario presiona ',' entra en modo decimal y los dígitos siguientes rellenan la fracción (se permiten varios decimales).
+//   - Backspace elimina en decimal si hay decimales, si no hay decimales elimina la parte entera.
+//   - Pegado intenta parsear un número (acepta formatos con '.' y ','), y establece buffers apropiados.
+// - `stock` y `discount` siguen sanitizados como enteros; `discount` permanece deshabilitado hasta activar `onOffer`.
+// - Formateo mostrado usa miles con '.' y decimales con ',' (locale es-ES).
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -62,13 +64,14 @@ const prevSlideBtn = document.getElementById('prevSlide');
 const nextSlideBtn = document.getElementById('nextSlide');
 
 let productsLocal = [];
+let filteredProducts = [];
 let currentUser = null;
 let currentUserRole = null;
 let isEditing = false;
 let editingId = null;
 let currentPreviewFiles = [];
 let currentPreviewUrls = [];
-let currentSavedImageObjs = [];
+let currentSavedImageObjs = []; // [{url, path}]
 let pendingDeletePaths = [];
 
 const productsCol = collection(db, 'product');
@@ -79,6 +82,74 @@ const CATEGORY_PREFIX = {
     "Hogar": "HOG",
     "Accesorios": "ACC"
 };
+
+/* ---------------- PAGINACIÓN ---------------- */
+let pageSize = 10;
+let currentPage = 1;
+const PAGE_SIZES = [10, 50, 100, 500];
+
+let paginationContainer = null;
+let pageSizeSelect = null;
+let prevPageBtn = null;
+let nextPageBtn = null;
+let pageInfoEl = null;
+let totalCountEl = null;
+
+function ensurePaginationUi() {
+    if (paginationContainer) return;
+    const tableCard = document.querySelector('.table-card');
+    if (!tableCard) return;
+
+    paginationContainer = document.createElement('div');
+    paginationContainer.className = 'pagination-controls';
+
+    // page size
+    const sizeWrap = document.createElement('div');
+    sizeWrap.className = 'page-size';
+    sizeWrap.innerHTML = `<label for="pageSizeSelect">Mostrar</label>`;
+    pageSizeSelect = document.createElement('select');
+    pageSizeSelect.id = 'pageSizeSelect';
+    PAGE_SIZES.forEach(s => {
+        const o = document.createElement('option'); o.value = String(s); o.textContent = String(s);
+        if (s === pageSize) o.selected = true;
+        pageSizeSelect.appendChild(o);
+    });
+    sizeWrap.appendChild(pageSizeSelect);
+    paginationContainer.appendChild(sizeWrap);
+
+    // pager controls
+    const pager = document.createElement('div');
+    pager.className = 'pager';
+    prevPageBtn = document.createElement('button'); prevPageBtn.type = 'button'; prevPageBtn.className = 'pager-btn prev'; prevPageBtn.textContent = '«';
+    nextPageBtn = document.createElement('button'); nextPageBtn.type = 'button'; nextPageBtn.className = 'pager-btn next'; nextPageBtn.textContent = '»';
+    pageInfoEl = document.createElement('span'); pageInfoEl.className = 'page-info';
+    totalCountEl = document.createElement('span'); totalCountEl.className = 'total-info';
+    pager.appendChild(prevPageBtn);
+    pager.appendChild(pageInfoEl);
+    pager.appendChild(nextPageBtn);
+    paginationContainer.appendChild(pager);
+
+    // total
+    const totalWrap = document.createElement('div');
+    totalWrap.className = 'page-total';
+    totalWrap.appendChild(totalCountEl);
+    paginationContainer.appendChild(totalWrap);
+
+    // append after table-card
+    tableCard.parentNode.insertBefore(paginationContainer, tableCard.nextSibling);
+
+    // events
+    pageSizeSelect.addEventListener('change', () => {
+        pageSize = Number(pageSizeSelect.value) || 10;
+        currentPage = 1;
+        paginateAndRender(filteredProducts);
+    });
+    prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; paginateAndRender(filteredProducts); } });
+    nextPageBtn.addEventListener('click', () => {
+        const totalPages = Math.max(1, Math.ceil((filteredProducts?.length || 0) / pageSize));
+        if (currentPage < totalPages) { currentPage += 1; paginateAndRender(filteredProducts); }
+    });
+}
 
 /* ---------------- Helpers ---------------- */
 function showToast(msg, ms = 3000) {
@@ -98,12 +169,33 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '=': '&#x3D;', '`': '&#x60;' }[c]));
 }
 
-function formatPrice(num) {
-    if (num === undefined || num === null || num === '') return '-';
-    return Number(num).toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+/* Price formatting/parsing using locale that uses '.' thousands and ',' decimals (es-ES) */
+function formatPriceDisplay(num) {
+    if (num === undefined || num === null || num === '') return '';
+    const n = Number(num);
+    if (Number.isNaN(n)) return '';
+    // use 2 decimal places, thousands '.' and decimal ','
+    return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+function parseFormattedPrice(str) {
+    if (str === undefined || str === null) return NaN;
+    const s = String(str).trim();
+    if (!s) return NaN;
+    // Remove thousand separators '.' and replace decimal ',' with '.'
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.').replace(/\s+/g, '');
+    const v = parseFloat(cleaned);
+    return Number.isNaN(v) ? NaN : v;
+}
+function formatIntegerWithThousands(intStr) {
+    // intStr: digits only string
+    if (!intStr) return '0';
+    const n = Number(intStr);
+    if (Number.isNaN(n)) return intStr;
+    return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(n);
 }
 function calculateOfferPrice(price, discount) {
-    if (!price || !discount) return null;
+    if (price === undefined || price === null) return null;
+    if (discount === undefined || discount === null) return null;
     return Math.round(Number(price) * (1 - Number(discount) / 100));
 }
 function generateSKUForCategory(category) {
@@ -113,9 +205,334 @@ function generateSKUForCategory(category) {
     return `${prefix}-${timePortion}${rnd}`;
 }
 
+/* ---------------- Inline field error helpers ---------------- */
+function setFieldError(fieldOrId, message) {
+    const el = typeof fieldOrId === 'string' ? document.getElementById(fieldOrId) : fieldOrId;
+    if (!el) return;
+    clearFieldError(el);
+    el.classList.add('input-error');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field-error';
+    wrapper.style.color = '#dc2626';
+    wrapper.style.fontSize = '13px';
+    wrapper.style.marginTop = '6px';
+    wrapper.textContent = message;
+    const parentRow = el.closest('.form-row') || el.parentNode;
+    parentRow.appendChild(wrapper);
+}
+
+function clearFieldError(fieldOrId) {
+    const el = typeof fieldOrId === 'string' ? document.getElementById(fieldOrId) : fieldOrId;
+    if (!el) return;
+    el.classList.remove('input-error');
+    const parentRow = el.closest('.form-row') || el.parentNode;
+    const prev = parentRow.querySelector('.field-error');
+    if (prev) parentRow.removeChild(prev);
+}
+
+function clearAllFieldErrors(formEl) {
+    const els = (formEl || document).querySelectorAll('.field-error');
+    els.forEach(e => e.remove());
+    (formEl || document).querySelectorAll('.input-error').forEach(i => i.classList.remove('input-error'));
+}
+
+/* ---------------- Input sanitizers and handlers ---------------- */
+function sanitizeIntegerInputValue(v) {
+    // remove everything except digits
+    return (String(v || '')).replace(/\D+/g, '');
+}
+function sanitizeNumericFieldValue(v) {
+    // allow digits, dots and commas; remove letters and other chars
+    return (String(v || '')).replace(/[^0-9\.,]+/g, '');
+}
+
+// prevent paste of invalid characters
+function handlePasteSanitize(e, type = 'numeric') {
+    const paste = (e.clipboardData || window.clipboardData).getData('text') || '';
+    if (!paste) return;
+    let cleaned = paste;
+    if (type === 'integer') cleaned = sanitizeIntegerInputValue(cleaned);
+    else cleaned = sanitizeNumericFieldValue(cleaned);
+    // replace selection with cleaned text
+    e.preventDefault();
+    const el = e.target;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const newVal = el.value.slice(0, start) + cleaned + el.value.slice(end);
+    el.value = newVal;
+    el.dispatchEvent(new Event('input'));
+}
+
+// Setup handlers for stock and discount (integers)
+if (stockField) {
+    stockField.addEventListener('input', () => {
+        const v = sanitizeIntegerInputValue(stockField.value);
+        stockField.value = v;
+        clearFieldError(stockField);
+    });
+    stockField.addEventListener('paste', (e) => handlePasteSanitize(e, 'integer'));
+    stockField.addEventListener('keydown', (e) => {
+        // allow control/navigation keys and digits only
+        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End'];
+        if (allowed.includes(e.key)) return;
+        if (/^\d$/.test(e.key)) return;
+        e.preventDefault();
+    });
+}
+
+if (discountField) {
+    // initially disabled; will be toggled by onOffer
+    discountField.addEventListener('input', () => {
+        const v = sanitizeIntegerInputValue(discountField.value);
+        let n = v === '' ? '' : String(Number(v));
+        // clamp 0-100
+        if (n !== '') {
+            let ni = Number(n);
+            if (ni > 100) ni = 100;
+            if (ni < 0) ni = 0;
+            n = String(ni);
+        }
+        discountField.value = n;
+        clearFieldError(discountField);
+    });
+    discountField.addEventListener('paste', (e) => handlePasteSanitize(e, 'integer'));
+    discountField.addEventListener('keydown', (e) => {
+        const allowed = ['Backspace','ArrowLeft','ArrowRight','Delete','Tab','Home','End'];
+        if (allowed.includes(e.key)) return;
+        if (/^\d$/.test(e.key)) return;
+        e.preventDefault();
+    });
+}
+
+/* ---------------- Price field: integer-first with explicit decimal mode ---------------- */
+/*
+ Behavior:
+ - Field shows formatted price with thousands (.) and decimals (,).
+ - Default mode: integerMode. Digits typed go to integer part (left of comma). ",00" shown but decimals are zero until user enters decimal mode.
+ - If user presses ',' or '.' key, switch to decimalMode and subsequent digits go to decimal part.
+ - Backspace removes last decimal digit if in decimalMode and decimal part non-empty; if decimal empty, exit decimalMode; otherwise delete last integer digit.
+ - Paste will parse numeric strings and set both buffers.
+ - On openEditModal the buffers are loaded from the product value.
+*/
+
+let priceIntegerBuffer = ''; // digits for integer part, without thousand separators
+let priceDecimalBuffer = ''; // digits for decimal fractional part (can be 0..n)
+let priceDecimalMode = false;
+const PRICE_DECIMAL_MAX = 6; // max decimals allowed for entry (configurable)
+
+function priceBuffersToDisplay() {
+    const intPart = priceIntegerBuffer ? Number(priceIntegerBuffer) : 0;
+    const intFmt = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(intPart);
+    const dec = priceDecimalBuffer || '00';
+    // ensure at least two decimals displayed for consistency
+    const decDisplay = priceDecimalMode ? (priceDecimalBuffer === '' ? '' : priceDecimalBuffer) : (dec.length ? dec.padStart(2, '0').slice(0, 2) : '00');
+    // when in decimalMode and decimal buffer empty show trailing comma to indicate mode
+    if (priceDecimalMode) {
+        return decDisplay === '' ? `${intFmt},` : `${intFmt},${decDisplay}`;
+    } else {
+        return `${intFmt},${(decDisplay || '00').slice(0,2)}`;
+    }
+}
+
+function updatePriceFieldFromBuffers() {
+    if (!priceField) return;
+    priceField.value = priceBuffersToDisplay();
+    // attach data-cents for potential machine use
+    const cents = Number((priceIntegerBuffer || '0')) * 100 + Number((priceDecimalBuffer || '0').padEnd(2, '0').slice(0,2));
+    priceField.setAttribute('data-cents', String(cents));
+    clearFieldError(priceField);
+}
+
+function resetPriceBuffersToZero() {
+    priceIntegerBuffer = '0';
+    priceDecimalBuffer = '';
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+}
+
+function setPriceBuffersFromNumber(n) {
+    if (!Number.isFinite(n)) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; updatePriceFieldFromBuffers(); return; }
+    const cents = Math.round(Number(n) * 100);
+    const intPart = Math.floor(cents / 100);
+    const decPart = String(cents % 100).padStart(2, '0');
+    priceIntegerBuffer = String(intPart);
+    priceDecimalBuffer = decPart;
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+}
+
+function setPriceBuffersFromFormattedString(s) {
+    const parsed = parseFormattedPrice(s);
+    if (!Number.isNaN(parsed)) {
+        setPriceBuffersFromNumber(parsed);
+        return;
+    }
+    // fallback: extract digits around comma
+    const parts = String(s || '').trim().split(/[,\.]/);
+    if (parts.length === 0) { resetPriceBuffersToZero(); return; }
+    priceIntegerBuffer = (parts[0] || '').replace(/\D+/g, '') || '0';
+    priceDecimalBuffer = (parts[1] || '').replace(/\D+/g, '');
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+}
+
+// Append integer digit
+function priceAddIntegerDigit(d) {
+    if (!/^\d$/.test(String(d))) return;
+    // prevent leading zeros unless user wants them
+    if (priceIntegerBuffer === '0') priceIntegerBuffer = d;
+    else priceIntegerBuffer = (priceIntegerBuffer || '') + d;
+    updatePriceFieldFromBuffers();
+}
+
+// Remove last integer digit
+function priceRemoveIntegerDigit() {
+    if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; updatePriceFieldFromBuffers(); return; }
+    priceIntegerBuffer = priceIntegerBuffer.slice(0, -1);
+    if (priceIntegerBuffer === '') priceIntegerBuffer = '0';
+    updatePriceFieldFromBuffers();
+}
+
+// Append decimal digit (only in decimalMode)
+function priceAddDecimalDigit(d) {
+    if (!/^\d$/.test(String(d))) return;
+    if (priceDecimalBuffer.length >= PRICE_DECIMAL_MAX) return;
+    priceDecimalBuffer = priceDecimalBuffer + d;
+    updatePriceFieldFromBuffers();
+}
+
+// Remove last decimal digit
+function priceRemoveDecimalDigit() {
+    if (!priceDecimalBuffer) {
+        // if nothing in decimal buffer, exit decimal mode
+        priceDecimalMode = false;
+    } else {
+        priceDecimalBuffer = priceDecimalBuffer.slice(0, -1);
+    }
+    updatePriceFieldFromBuffers();
+}
+
+// Handle paste into price
+function priceHandlePaste(text) {
+    if (!text) return;
+    const parsed = parseFormattedPrice(text);
+    if (!Number.isNaN(parsed)) {
+        setPriceBuffersFromNumber(parsed);
+        return;
+    }
+    // fallback: try to pull digits left and right of comma if present
+    const t = String(text || '').trim();
+    const match = t.match(/^([\d\.\s]+)[,\.]?(\d*)$/);
+    if (match) {
+        priceIntegerBuffer = (match[1] || '').replace(/\D+/g, '') || '0';
+        priceDecimalBuffer = (match[2] || '').replace(/\D+/g, '');
+        priceDecimalMode = !!(match[2] && match[2].length > 0);
+        updatePriceFieldFromBuffers();
+    }
+}
+
+// Price field keyboard handling
+if (priceField) {
+    // Ensure buffers exist
+    if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; }
+
+    priceField.addEventListener('focus', () => {
+        // Keep display up-to-date; caret placed at end
+        updatePriceFieldFromBuffers();
+        setTimeout(() => {
+            try { priceField.selectionStart = priceField.selectionEnd = priceField.value.length; } catch (e) {}
+        }, 0);
+    });
+
+    priceField.addEventListener('keydown', (e) => {
+        // allow navigation and editing handled below
+        const navAllowed = ['ArrowLeft','ArrowRight','Home','End','Tab'];
+        if (navAllowed.includes(e.key)) return;
+
+        if (e.key === 'Backspace') {
+            e.preventDefault();
+            if (priceDecimalMode) {
+                if (priceDecimalBuffer.length > 0) priceRemoveDecimalDigit();
+                else priceDecimalMode = false; // exit decimal mode if buffer empty
+            } else {
+                // remove integer digit
+                priceRemoveIntegerDigit();
+            }
+            return;
+        }
+
+        // Enter decimal mode on comma or dot
+        if (e.key === ',' || e.key === '.') {
+            e.preventDefault();
+            priceDecimalMode = true;
+            // keep current decimalBuffer unchanged
+            updatePriceFieldFromBuffers();
+            return;
+        }
+
+        // Digits
+        if (/^[0-9]$/.test(e.key)) {
+            e.preventDefault();
+            if (priceDecimalMode) {
+                priceAddDecimalDigit(e.key);
+            } else {
+                priceAddIntegerDigit(e.key);
+            }
+            return;
+        }
+
+        // prevent everything else (letters, symbols)
+        e.preventDefault();
+    });
+
+    priceField.addEventListener('paste', (e) => {
+        const txt = (e.clipboardData || window.clipboardData).getData('text') || '';
+        e.preventDefault();
+        priceHandlePaste(txt);
+    });
+
+    // blur: ensure consistent formatting (two decimals shown)
+    priceField.addEventListener('blur', () => {
+        // If decimalMode and decimalBuffer empty, show trailing comma is removed and ",00" displayed
+        priceDecimalMode = false;
+        // Normalize decimalBuffer to two digits for display (but keep full decimal buffer internally)
+        if (!priceDecimalBuffer) priceDecimalBuffer = '00';
+        // Update display
+        // Compose number from buffers to get consistent rounding when necessary
+        const intVal = Number(priceIntegerBuffer || '0');
+        const decVal = Number((priceDecimalBuffer || '00').slice(0, 2).padEnd(2, '0'));
+        const finalNumber = intVal + decVal / 100;
+        setPriceBuffersFromNumber(finalNumber);
+        updatePriceFieldFromBuffers();
+    });
+}
+
+/* Offer toggle: enable/disable discount input */
+function setDiscountEnabled(enabled) {
+    if (!discountField) return;
+    discountField.disabled = !enabled;
+    discountField.setAttribute('aria-disabled', String(!enabled));
+    if (!enabled) {
+        discountField.value = '0';
+        clearFieldError(discountField);
+    } else {
+        // focus for quick entry
+        discountField.focus();
+        // ensure value is a number string
+        if (!discountField.value) discountField.value = '0';
+    }
+}
+if (onOfferField) {
+    // initialize discount state on load
+    setDiscountEnabled(!!onOfferField.checked);
+    onOfferField.addEventListener('change', () => {
+        setDiscountEnabled(!!onOfferField.checked);
+    });
+}
+
 /* ---------------- Render products ----------------
-   uses badges: state-active, state-inactive, state-suspended
-   offer badges: offer-yes, offer-no
+   Usa data-label en cada td para permitir la vista responsive tipo tarjetas.
+   La fila se marca visualmente cuando el stock es menor a 5.
 */
 function renderProducts(list) {
     productsBody.innerHTML = '';
@@ -134,14 +551,26 @@ function renderProducts(list) {
     }
 
     list.forEach(prod => {
-        // If suspended and not admin, skip
         if ((prod.status || '').toLowerCase() === 'suspendido' && currentUserRole !== 'administrador') return;
 
         const tr = document.createElement('tr');
 
+        // Determine stock and low-stock state
+        const stockNum = Number(prod.stock ?? 0);
+        const isLowStock = Number.isFinite(stockNum) && stockNum < 5;
+
+        // If low stock, visually highlight the whole row (red tint + left red border)
+        if (isLowStock) {
+            tr.style.backgroundColor = '#fff5f5'; // very light red/pink
+            tr.style.borderLeft = '4px solid #ef4444'; // red left accent
+            tr.setAttribute('data-low-stock', 'true');
+            tr.setAttribute('aria-label', `Stock bajo: ${stockNum}`);
+        }
+
         // Images mini-slider cell
         const tdImg = document.createElement('td');
         tdImg.className = 'mini-slider-cell';
+        tdImg.setAttribute('data-label', 'Imagen');
         const sliderWrap = document.createElement('div');
         sliderWrap.className = 'mini-slider';
         const track = document.createElement('div');
@@ -171,14 +600,15 @@ function renderProducts(list) {
 
         // Name & category
         const tdName = document.createElement('td'); tdName.className = 'product-name';
+        tdName.setAttribute('data-label', 'Nombre');
         tdName.innerHTML = `<div>${escapeHtml(prod.name)}</div><div style="font-size:12px;color:#6b7280">${escapeHtml(prod.category || '')}</div>`;
         tr.appendChild(tdName);
 
         // Price
-        const tdPrice = document.createElement('td'); tdPrice.textContent = formatPrice(prod.price); tr.appendChild(tdPrice);
+        const tdPrice = document.createElement('td'); tdPrice.textContent = formatPriceDisplay(prod.price); tdPrice.setAttribute('data-label', 'Precio'); tr.appendChild(tdPrice);
 
         // Offer badge
-        const tdOffer = document.createElement('td');
+        const tdOffer = document.createElement('td'); tdOffer.setAttribute('data-label', 'Oferta');
         const offerBadge = document.createElement('span');
         offerBadge.className = 'badge offer-badge';
         if (prod.onOffer) { offerBadge.classList.add('offer-yes'); offerBadge.textContent = 'En oferta'; }
@@ -187,21 +617,28 @@ function renderProducts(list) {
         tr.appendChild(tdOffer);
 
         // Discount
-        const tdDiscount = document.createElement('td');
+        const tdDiscount = document.createElement('td'); tdDiscount.setAttribute('data-label', 'Descuento');
         tdDiscount.textContent = prod.onOffer ? `-${(prod.discount || 0)}%` : '-';
         tr.appendChild(tdDiscount);
 
         // Offer price
-        const tdOfferPrice = document.createElement('td');
+        const tdOfferPrice = document.createElement('td'); tdOfferPrice.setAttribute('data-label', 'Precio Oferta');
         const op = prod.onOffer ? calculateOfferPrice(prod.price, prod.discount) : null;
-        tdOfferPrice.textContent = op ? formatPrice(op) : '-';
+        tdOfferPrice.textContent = op !== null ? formatPriceDisplay(op) : '-';
         tr.appendChild(tdOfferPrice);
 
         // Stock
-        const tdStock = document.createElement('td'); tdStock.textContent = prod.stock ?? 0; tr.appendChild(tdStock);
+        const tdStock = document.createElement('td'); tdStock.setAttribute('data-label', 'Stock');
+        tdStock.textContent = prod.stock ?? 0;
+        // If low stock, set clearer color on the stock cell
+        if (isLowStock) {
+            tdStock.style.color = '#991b1b'; // dark red text
+            tdStock.style.fontWeight = '700';
+        }
+        tr.appendChild(tdStock);
 
         // State badge
-        const tdState = document.createElement('td');
+        const tdState = document.createElement('td'); tdState.setAttribute('data-label', 'Estado');
         const stateBadge = document.createElement('span');
         stateBadge.className = 'badge-state state-badge';
         const st = (prod.status || 'Activo').toLowerCase();
@@ -213,12 +650,12 @@ function renderProducts(list) {
         tr.appendChild(tdState);
 
         // Actions
-        const tdActions = document.createElement('td'); tdActions.className = 'actions';
+        const tdActions = document.createElement('td'); tdActions.className = 'actions'; tdActions.setAttribute('data-label', 'Acciones');
         const actions = document.createElement('div'); actions.className = 'actions';
 
         // Copy link - always visible
         const btnCopy = document.createElement('button');
-        btnCopy.className = 'icon-btn btn-link';
+        btnCopy.className = 'btn-small btn-view';
         btnCopy.title = 'Copiar Enlace';
         btnCopy.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg" viewBox="0 0 16 16">
                                 <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
@@ -230,14 +667,17 @@ function renderProducts(list) {
         // Admin actions: edit and soft-delete
         if (currentUserRole === 'administrador') {
             const btnEdit = document.createElement('button');
-            btnEdit.className = 'icon-btn btn-edit';
+            btnEdit.className = 'btn-small btn-assign';
             btnEdit.title = 'Editar';
-            btnEdit.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"/><path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>`;
+            btnEdit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+                                    <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                                    <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+                                </svg>`;
             btnEdit.addEventListener('click', () => openEditProduct(prod.id));
             actions.appendChild(btnEdit);
 
             const btnDelete = document.createElement('button');
-            btnDelete.className = 'icon-btn btn-suspender';
+            btnDelete.className = 'btn-small btn-suspender';
             btnDelete.title = 'Suspender';
             btnDelete.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                                         <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
@@ -315,7 +755,35 @@ function applyFilters() {
         if (offerVal === 'en_oferta') filtered = filtered.filter(p => !!p.onOffer);
         if (offerVal === 'no_oferta') filtered = filtered.filter(p => !p.onOffer);
     }
-    renderProducts(filtered);
+    filteredProducts = filtered;
+    currentPage = 1;
+    ensurePaginationUi();
+    paginateAndRender(filteredProducts);
+}
+
+function paginateAndRender(list) {
+    ensurePaginationUi();
+    const total = list.length || 0;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const slice = list.slice(start, end);
+    renderProducts(slice);
+
+    // update pagination UI
+    if (paginationContainer) {
+        pageInfoEl.textContent = `Página ${currentPage} / ${totalPages}`;
+        totalCountEl.textContent = `Total: ${total}`;
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
+        // hide paginador si no hay paginación necesaria
+        if (total <= pageSize) {
+            paginationContainer.style.display = 'none';
+        } else {
+            paginationContainer.style.display = 'flex';
+        }
+    }
 }
 
 function startRealtimeListener() {
@@ -339,93 +807,158 @@ function clearModalPreviews() {
     slideTrack.innerHTML = '';
     imagePreviewSlider.classList.add('hidden');
     imagePreviewSlider.setAttribute('aria-hidden', 'true');
+    clearAllFieldErrors(productForm);
 }
 
-function openAddModal() {
-    if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
-    isEditing = false;
-    editingId = null;
-    currentSavedImageObjs = [];
-    clearModalPreviews();
-    modalTitle.textContent = 'Agregar Producto';
-    productForm.reset();
-    productIdField.value = '';
-    skuField.value = '';
-    skuField.placeholder = 'Se generará al seleccionar categoría';
-    productModal.classList.remove('hidden');
-    productModal.setAttribute('aria-hidden', 'false');
-}
-
-async function openEditProduct(id) {
-    try {
-        const snap = await getDoc(doc(db, 'product', id));
-        if (!snap.exists()) { showToast('Producto no encontrado'); return; }
-        const prod = { id: snap.id, ...snap.data() };
-        if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
-        isEditing = true;
-        editingId = id;
-        modalTitle.textContent = 'Editar Producto';
-        productIdField.value = id;
-        nameField.value = prod.name || '';
-        descriptionField.value = prod.description || '';
-        priceField.value = prod.price || 0;
-        categoryField.value = prod.category || '';
-        statusField.value = prod.status || 'Activo';
-        onOfferField.checked = !!prod.onOffer;
-        discountField.value = prod.discount || 0;
-        stockField.value = prod.stock || 0;
-        skuField.value = prod.sku || '';
-        imageFileField.value = '';
-
-        currentSavedImageObjs = [];
-        if (Array.isArray(prod.imageUrls) && prod.imageUrls.length) {
-            const urls = prod.imageUrls;
-            const paths = Array.isArray(prod.imagePaths) ? prod.imagePaths : [];
-            for (let i = 0; i < urls.length; i++) currentSavedImageObjs.push({ url: urls[i], path: paths[i] || '' });
-        } else if (prod.imageUrl) {
-            currentSavedImageObjs.push({ url: prod.imageUrl, path: '' });
-        }
-        currentPreviewFiles = [];
-        currentPreviewUrls = [];
-        showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
-        productModal.classList.remove('hidden');
-        productModal.setAttribute('aria-hidden', 'false');
-    } catch (err) {
-        console.error('openEdit error', err);
-        showToast('Error abriendo producto');
-    }
-}
-
-// small helper to show combined slider in modal (saved + preview)
-function showModalSliderForFiles(combined) {
+// Abstracción para mostrar el slider dentro del modal usando los arrays actuales:
+// - currentSavedImageObjs (array de {url, path})
+// - currentPreviewUrls (array de object URLs para previews)
+function showModalSliderForFiles() {
     slideTrack.innerHTML = '';
-    if (!combined || !combined.length) {
+    const saved = Array.isArray(currentSavedImageObjs) ? currentSavedImageObjs : [];
+    const previews = Array.isArray(currentPreviewUrls) ? currentPreviewUrls : [];
+    const combinedLen = saved.length + previews.length;
+
+    if (!combinedLen) {
         imagePreviewSlider.classList.add('hidden');
         imagePreviewSlider.setAttribute('aria-hidden', 'true');
         return;
     }
+
     imagePreviewSlider.classList.remove('hidden');
     imagePreviewSlider.setAttribute('aria-hidden', 'false');
-    combined.forEach(url => {
+
+    // Render saved images first (they map to currentSavedImageObjs)
+    saved.forEach((obj, idx) => {
         const node = document.createElement('div');
         node.className = 'slide-item';
+        node.style.position = 'relative';
+        const img = document.createElement('img');
+        img.src = obj.url;
+        img.alt = 'preview';
+        img.loading = 'lazy';
+        img.style.display = 'block';
+        img.style.maxWidth = '100%';
+        node.appendChild(img);
+
+        // remove button for saved image
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'img-remove';
+        btn.title = 'Eliminar imagen';
+        btn.dataset.type = 'saved';
+        btn.dataset.index = String(idx);
+        // basic inline styles so funciona sin CSS adicional
+        btn.style.position = 'absolute';
+        btn.style.top = '6px';
+        btn.style.right = '6px';
+        btn.style.width = '28px';
+        btn.style.height = '28px';
+        btn.style.borderRadius = '50%';
+        btn.style.border = 'none';
+        btn.style.background = 'rgba(0,0,0,0.55)';
+        btn.style.color = '#fff';
+        btn.style.cursor = 'pointer';
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.justifyContent = 'center';
+        btn.style.fontSize = '16px';
+        btn.textContent = '×';
+        node.appendChild(btn);
+
+        slideTrack.appendChild(node);
+    });
+
+    // Render preview images (files selected but not yet uploaded)
+    previews.forEach((url, idx) => {
+        const node = document.createElement('div');
+        node.className = 'slide-item';
+        node.style.position = 'relative';
         const img = document.createElement('img');
         img.src = url;
         img.alt = 'preview';
         img.loading = 'lazy';
+        img.style.display = 'block';
+        img.style.maxWidth = '100%';
         node.appendChild(img);
+
+        // remove button for preview
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'img-remove';
+        btn.title = 'Eliminar imagen';
+        btn.dataset.type = 'preview';
+        btn.dataset.index = String(idx);
+        btn.style.position = 'absolute';
+        btn.style.top = '6px';
+        btn.style.right = '6px';
+        btn.style.width = '28px';
+        btn.style.height = '28px';
+        btn.style.borderRadius = '50%';
+        btn.style.border = 'none';
+        btn.style.background = 'rgba(0,0,0,0.55)';
+        btn.style.color = '#fff';
+        btn.style.cursor = 'pointer';
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.justifyContent = 'center';
+        btn.style.fontSize = '16px';
+        btn.textContent = '×';
+        node.appendChild(btn);
+
         slideTrack.appendChild(node);
     });
+
     slideTrack.scrollLeft = 0;
 }
 
-// handle preview selection
+// Remove selected preview image (before upload)
+function removePreviewImage(idx) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= currentPreviewUrls.length) return;
+    // Revoke object URL
+    try { URL.revokeObjectURL(currentPreviewUrls[idx]); } catch (e) { }
+    // Remove file and url in same index
+    currentPreviewFiles.splice(idx, 1);
+    currentPreviewUrls.splice(idx, 1);
+    showModalSliderForFiles();
+}
+
+// Mark saved image for deletion (during edit). It will be removed from UI and path added to pendingDeletePaths.
+// Actual deletion from storage/doc happens when the product is updated (updateProduct).
+function removeSavedImage(idx) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= currentSavedImageObjs.length) return;
+    const imgObj = currentSavedImageObjs[idx];
+    if (imgObj && imgObj.path) {
+        pendingDeletePaths.push(imgObj.path);
+    }
+    // remove image from saved array
+    currentSavedImageObjs.splice(idx, 1);
+    showModalSliderForFiles();
+}
+
+// delegated click handler for remove buttons inside slideTrack
+slideTrack.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('.img-remove');
+    if (!btn) return;
+    const type = btn.dataset.type;
+    const idx = Number(btn.dataset.index);
+    if (type === 'preview') {
+        removePreviewImage(idx);
+    } else if (type === 'saved') {
+        // confirm deletion of saved image from product (mark for deletion)
+        const c = confirm('Eliminar esta imagen del producto? Se quitará al guardar los cambios.');
+        if (c) removeSavedImage(idx);
+    }
+});
+
+/* ---------------- Image upload / drag-drop: allow multiple (min 4 recommended) ---------------- */
+// ... (rest unchanged)
 imageFileField.addEventListener('change', (e) => {
     const files = Array.from(e.target.files || []).slice(0, 8);
     currentPreviewFiles = currentPreviewFiles.concat(files);
     const urls = files.map(f => URL.createObjectURL(f));
     currentPreviewUrls = currentPreviewUrls.concat(urls);
-    showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
+    showModalSliderForFiles();
 });
 
 imageDropZone.addEventListener('click', () => imageFileField.click());
@@ -438,7 +971,7 @@ imageDropZone.addEventListener('drop', (e) => {
     currentPreviewFiles = currentPreviewFiles.concat(dtFiles);
     const urls = dtFiles.map(f => URL.createObjectURL(f));
     currentPreviewUrls = currentPreviewUrls.concat(urls);
-    showModalSliderForFiles(currentSavedImageObjs.map(o => o.url).concat(currentPreviewUrls));
+    showModalSliderForFiles();
 });
 
 /* ---------- Upload images helper with optimization & resumable progress ---------- */
@@ -494,12 +1027,32 @@ async function uploadImagesToProductFolder(productId, files = [], baseName = 'pr
 async function addProduct(data, files) {
     if (!currentUser) { showToast('No autenticado'); return; }
     if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
-    const minImages = 4;
+
+    clearAllFieldErrors(productForm);
+
+    if (!data.name || !data.name.trim()) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
+    if (!data.description || !data.description.trim()) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
+    const priceParsed = parseFormattedPrice(String(data.price));
+    if (Number.isNaN(priceParsed) || priceParsed <= 0) { setFieldError(priceField, 'Precio inválido (debe ser mayor que 0)'); priceField.focus(); return; }
+    if (!data.category) { setFieldError(categoryField, 'La categoría es requerida'); categoryField.focus(); return; }
+    if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
+    if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
+
+    // discount validation when onOffer
+    if (data.onOffer) {
+        const d = Number(data.discount || 0);
+        if (Number.isNaN(d) || d < 0 || d > 100) { setFieldError(discountField, 'Descuento inválido (0-100)'); discountField.focus(); return; }
+    } else {
+        data.discount = 0;
+    }
+
+    const minImages = 1;
     const filesCount = (files && files.length) ? files.length : 0;
     if (filesCount < minImages) {
-        showToast(`Se requieren al menos ${minImages} imágenes (seleccionadas: ${filesCount})`, 5000);
+        setFieldError(imageFileField, `Se requiere al menos ${minImages} imagen(es) (seleccionadas: ${filesCount})`);
         return;
     }
+
     try {
         const slug = (data.name || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         const newDoc = {
@@ -507,7 +1060,7 @@ async function addProduct(data, files) {
             name_lower: data.name.toLowerCase(),
             slug,
             description: data.description || '',
-            price: Number(data.price) || 0,
+            price: priceParsed,
             currency: 'CLP',
             category: data.category || '',
             status: data.status || 'Activo',
@@ -525,7 +1078,6 @@ async function addProduct(data, files) {
         const docRef = await addDoc(productsCol, newDoc);
         const productId = docRef.id;
 
-        // show modal progress
         createModalProgressUI();
         const uploaded = await uploadImagesToProductFolder(productId, files, data.name, 8, (pct) => updateModalProgress(pct));
         removeModalProgressUI();
@@ -534,6 +1086,8 @@ async function addProduct(data, files) {
         const paths = uploaded.map(x => x.path);
 
         await updateDoc(doc(db, 'product', productId), { imageUrls: urls, imagePaths: paths, updatedAt: serverTimestamp() });
+
+        clearAllFieldErrors(productForm);
         showToast('Producto agregado con éxito');
     } catch (err) {
         removeModalProgressUI();
@@ -545,6 +1099,25 @@ async function addProduct(data, files) {
 async function updateProduct(id, data, newFiles = []) {
     if (!currentUser) { showToast('No autenticado'); return; }
     if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
+
+    clearAllFieldErrors(productForm);
+
+    if (!data.name || !data.name.trim()) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
+    if (!data.description || !data.description.trim()) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
+    const priceParsed = parseFormattedPrice(String(data.price));
+    if (Number.isNaN(priceParsed) || priceParsed <= 0) { setFieldError(priceField, 'Precio inválido (debe ser mayor que 0)'); priceField.focus(); return; }
+    if (!data.category) { setFieldError(categoryField, 'La categoría es requerida'); categoryField.focus(); return; }
+    if (!data.status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
+    if (data.stock === '' || data.stock === null || Number.isNaN(Number(data.stock)) || Number(data.stock) < 0 || !Number.isInteger(Number(data.stock))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
+
+    // discount validation when onOffer
+    if (data.onOffer) {
+        const d = Number(data.discount || 0);
+        if (Number.isNaN(d) || d < 0 || d > 100) { setFieldError(discountField, 'Descuento inválido (0-100)'); discountField.focus(); return; }
+    } else {
+        data.discount = 0;
+    }
+
     try {
         const prodRef = doc(db, 'product', id);
         const snap = await getDoc(prodRef);
@@ -553,7 +1126,6 @@ async function updateProduct(id, data, newFiles = []) {
         let imageUrls = Array.isArray(docData.imageUrls) ? docData.imageUrls.slice() : [];
         let imagePaths = Array.isArray(docData.imagePaths) ? docData.imagePaths.slice() : [];
 
-        // If new files, upload and append
         if (newFiles && newFiles.length) {
             createModalProgressUI();
             const uploaded = await uploadImagesToProductFolder(id, newFiles, data.name, 8, (pct) => updateModalProgress(pct));
@@ -562,10 +1134,19 @@ async function updateProduct(id, data, newFiles = []) {
             imagePaths = imagePaths.concat(uploaded.map(x => x.path));
         }
 
-        // If any pendingDeletePaths, remove them
+        // If there are pendingDeletePaths (images the user removed in the modal), attempt to delete them from storage
         if (pendingDeletePaths.length) {
+            // Try to delete storage objects (best-effort)
+            for (const p of pendingDeletePaths) {
+                try {
+                    const ref = storageRef(storage, p);
+                    await deleteObject(ref).catch(() => { /* ignore deletion errors */ });
+                } catch (err) {
+                    console.warn('Error deleting storage path', p, err);
+                }
+            }
+            // Now remove paths and corresponding urls from arrays
             imagePaths = imagePaths.filter(p => !pendingDeletePaths.includes(p));
-            // rebuild imageUrls to match remaining paths if mapping exists
             const pathToUrl = {};
             if (Array.isArray(docData.imagePaths)) {
                 docData.imagePaths.forEach((p, idx) => { if (docData.imageUrls && docData.imageUrls[idx]) pathToUrl[p] = docData.imageUrls[idx]; });
@@ -575,7 +1156,13 @@ async function updateProduct(id, data, newFiles = []) {
             } else {
                 imageUrls = imageUrls.slice(0, imagePaths.length);
             }
+            // clear pending deletes after processing
             pendingDeletePaths = [];
+        }
+
+        if ((!imageUrls || !imageUrls.length)) {
+            setFieldError(imageFileField, 'Debe tener al menos una imagen asociada al producto');
+            return;
         }
 
         const slug = (data.name || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
@@ -584,7 +1171,7 @@ async function updateProduct(id, data, newFiles = []) {
             name_lower: data.name.toLowerCase(),
             slug,
             description: data.description || '',
-            price: Number(data.price) || 0,
+            price: priceParsed,
             category: data.category || '',
             status: data.status || 'Activo',
             onOffer: !!data.onOffer,
@@ -595,6 +1182,8 @@ async function updateProduct(id, data, newFiles = []) {
             sku: data.sku || '',
             updatedAt: serverTimestamp()
         });
+
+        clearAllFieldErrors(productForm);
         showToast('Producto actualizado');
     } catch (err) {
         removeModalProgressUI();
@@ -613,7 +1202,6 @@ async function deleteSavedImageFromProduct(productId, imageObj) {
             const ref = storageRef(storage, path);
             await deleteObject(ref).catch(() => { /* ignore */ });
         }
-        // Update Firestore to remove this image
         const productRef = doc(db, 'product', productId);
         const snap = await getDoc(productRef);
         if (!snap.exists()) return true;
@@ -690,23 +1278,40 @@ searchInput.addEventListener('input', applyFilters);
 stateFilter.addEventListener('change', applyFilters);
 offerFilter.addEventListener('change', applyFilters);
 
+// Clear field errors on input
+[nameField, descriptionField, priceField, categoryField, statusField, discountField, stockField, imageFileField].forEach(el => {
+    if (!el) return;
+    el.addEventListener('input', () => clearFieldError(el));
+});
+
+/* ---------- Form submit ---------- */
 productForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = nameField.value.trim();
-    const price = priceField.value;
+    clearAllFieldErrors(productForm);
+
+    const name = (nameField.value || '').trim();
+    const priceRaw = priceField.value;
     const category = categoryField.value;
-    if (!name) { showToast('El nombre es requerido'); return; }
-    if (!category) { showToast('La categoría es requerida'); return; }
-    if (price === '' || Number(price) < 0) { showToast('Precio inválido'); return; }
+    const description = (descriptionField.value || '').trim();
+    const status = statusField.value;
+    const stockVal = stockField.value;
+
+    if (!name) { setFieldError(nameField, 'El nombre es requerido'); nameField.focus(); return; }
+    if (!description) { setFieldError(descriptionField, 'La descripción es requerida'); descriptionField.focus(); return; }
+    const priceParsed = parseFormattedPrice(String(priceRaw));
+    if (Number.isNaN(priceParsed) || priceParsed <= 0) { setFieldError(priceField, 'Precio inválido (debe ser mayor que 0)'); priceField.focus(); return; }
+    if (!category) { setFieldError(categoryField, 'La categoría es requerida'); categoryField.focus(); return; }
+    if (!status) { setFieldError(statusField, 'El estado es requerido'); statusField.focus(); return; }
+    if (stockVal === '' || Number.isNaN(Number(stockVal)) || Number(stockVal) < 0 || !Number.isInteger(Number(stockVal))) { setFieldError(stockField, 'Stock inválido (entero ≥ 0)'); stockField.focus(); return; }
 
     if (!isEditing && !skuField.value) skuField.value = generateSKUForCategory(category);
 
     const data = {
         name,
-        description: descriptionField.value.trim(),
-        price: Number(price),
+        description,
+        price: priceParsed,
         category,
-        status: statusField.value,
+        status,
         onOffer: onOfferField.checked,
         discount: Number(discountField.value) || 0,
         stock: Number(stockField.value) || 0,
@@ -715,8 +1320,20 @@ productForm.addEventListener('submit', async (e) => {
 
     const filesToUpload = currentPreviewFiles.slice();
 
-    if (isEditing && editingId) await updateProduct(editingId, data, filesToUpload);
-    else await addProduct(data, filesToUpload);
+    if (isEditing && editingId) {
+        const hasSaved = currentSavedImageObjs && currentSavedImageObjs.length;
+        if (!hasSaved && (!filesToUpload || !filesToUpload.length)) {
+            setFieldError(imageFileField, 'Debe agregar al menos una imagen');
+            return;
+        }
+        await updateProduct(editingId, data, filesToUpload);
+    } else {
+        if (!filesToUpload || !filesToUpload.length) {
+            setFieldError(imageFileField, 'Se requiere al menos 1 imagen');
+            return;
+        }
+        await addProduct(data, filesToUpload);
+    }
 
     productModal.classList.add('hidden');
     productModal.setAttribute('aria-hidden', 'true');
@@ -734,9 +1351,82 @@ onAuthStateChanged(auth, async (user) => {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         currentUserRole = userDoc.exists() ? (userDoc.data().role || 'vendedor') : 'vendedor';
         applyUiRestrictions(currentUserRole);
+        // ensure discount state reflects onOffer checkbox on start
+        setDiscountEnabled(!!onOfferField?.checked);
+        // initialize price buffers to zero if empty
+        if (!priceIntegerBuffer) { priceIntegerBuffer = '0'; priceDecimalBuffer = ''; priceDecimalMode = false; updatePriceFieldFromBuffers(); }
         startRealtimeListener();
     } catch (err) {
         console.error('Error checking role', err);
         window.location.href = new URL('../index.html', window.location.href).toString();
     }
 });
+
+// Modal open/edit functions (moved further down to keep flow consistent)
+function openAddModal() {
+    if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
+    isEditing = false;
+    editingId = null;
+    currentSavedImageObjs = [];
+    clearModalPreviews();
+    modalTitle.textContent = 'Agregar Producto';
+    productForm.reset();
+    productIdField.value = '';
+    skuField.value = '';
+    skuField.placeholder = 'Se generará al seleccionar categoría';
+    // initialize price buffers to zero
+    priceIntegerBuffer = '0';
+    priceDecimalBuffer = '';
+    priceDecimalMode = false;
+    updatePriceFieldFromBuffers();
+    if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
+    setDiscountEnabled(!!onOfferField?.checked);
+    productModal.classList.remove('hidden');
+    productModal.setAttribute('aria-hidden', 'false');
+}
+
+async function openEditProduct(id) {
+    try {
+        const snap = await getDoc(doc(db, 'product', id));
+        if (!snap.exists()) { showToast('Producto no encontrado'); return; }
+        const prod = { id: snap.id, ...snap.data() };
+        if (currentUserRole !== 'administrador') { setFieldError(openAddBtn, 'No autorizado'); return; }
+        isEditing = true;
+        editingId = id;
+        modalTitle.textContent = 'Editar Producto';
+        productIdField.value = id;
+        nameField.value = prod.name || '';
+        descriptionField.value = prod.description || '';
+        // set price buffers from stored number
+        setPriceBuffersFromNumber(Number(prod.price || 0));
+        categoryField.value = prod.category || '';
+        statusField.value = prod.status || 'Activo';
+        onOfferField.checked = !!prod.onOffer;
+        discountField.value = prod.discount || 0;
+        stockField.value = prod.stock || 0;
+        skuField.value = prod.sku || '';
+        imageFileField.value = '';
+
+        setDiscountEnabled(!!onOfferField?.checked);
+
+        currentSavedImageObjs = [];
+        if (Array.isArray(prod.imageUrls) && prod.imageUrls.length) {
+            const urls = prod.imageUrls;
+            const paths = Array.isArray(prod.imagePaths) ? prod.imagePaths : [];
+            for (let i = 0; i < urls.length; i++) currentSavedImageObjs.push({ url: urls[i], path: paths[i] || '' });
+        } else if (prod.imageUrl) {
+            currentSavedImageObjs.push({ url: prod.imageUrl, path: '' });
+        }
+        currentPreviewFiles = [];
+        currentPreviewUrls = [];
+        pendingDeletePaths = [];
+        // render combined slider using internal arrays
+        showModalSliderForFiles();
+        if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
+        productModal.classList.remove('hidden');
+        productModal.setAttribute('aria-hidden', 'false');
+    } catch (err) {
+        console.error('openEdit error', err);
+        showToast('Error abriendo producto');
+    }
+}

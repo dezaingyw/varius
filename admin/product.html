@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="assets/css/styles-pruducts.css">
     <link rel="stylesheet" href="assets/css/admin-products.css">
     <link rel="stylesheet" href="assets/css/style.css">
-
+    <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
 </head>
 
@@ -23,17 +23,20 @@
             </label>
             <a class="brand" href="./" aria-label="Dashboard">
                 <img src="assets/img/logo.png" alt="Varius" width="14%">
-
                 <span class="brand-text">VARIUS</span>
             </a>
         </div>
 
         <div class="top-search">
             <label for="q" class="sr-only">Buscar</label>
-            <input id="q" type="search" placeholder="Search..." aria-label="Buscar" />
+            <input id="q" type="search" placeholder="Buscar..." aria-label="Buscar" />
+
+            <!-- dentro de .topbar, a la derecha del contenido -->
+            <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
+                <span class="dot"></span>
+                <span class="label">Desconectado</span>
+            </div>
         </div>
-
-
     </header>
 
     <div id="app-sidebar"></div>
@@ -45,8 +48,8 @@
             <div class="table-header">
                 <h3>Gestión de Productos</h3>
                 <!-- Add button has admin-only class; JS will hide it for non-admin -->
-                <button id="openAddBtn" class="btn-add admin-only">
-                    <span class="plus">+</span> Añadir producto
+                <button id="openAddBtn" class="btn-add admin-only" title="Agregar nuevos Productos">
+                    <span class="plus">+</span> Añadir productos
                 </button>
             </div>
             <div class="table-scroll">
@@ -121,7 +124,7 @@
                     </div>
 
                     <div class="form-row">
-                        <label>Precio (CLP) <span class="required">*</span></label>
+                        <label>Precio (USD) <span class="required">*</span></label>
                         <input id="price" type="number" min="0" required />
                     </div>
 
@@ -202,5 +205,5 @@
     <script type="module" src="../assets/js/product-admin.js"></script>
     <script type="module" src="../assets/js/mini-rotator.js"></script>
 </body>
- 
+
 </html>
