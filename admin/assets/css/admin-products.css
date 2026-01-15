@@ -88,21 +88,8 @@
   border-radius: 8px;
   margin-bottom: 16px;
 }
-.search-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.search {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--border);
-  padding: 10px;
-  border-radius: 8px;
-  background: #fbfbfb;
-}
+
+
 .search input {
   border: 0;
   outline: none;
@@ -747,7 +734,7 @@ tbody td {
 .filters-card .search,
 .filters-card .filter-select,
 .filters-card .filters-actions {
-  min-width: 0;
+  min-width: auto;
   flex: 1 1 auto;
 }
 
