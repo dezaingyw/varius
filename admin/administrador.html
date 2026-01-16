@@ -5,9 +5,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Gestión de Pedidos — Varius</title>
-    <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
-
+    <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/payment-modal.css">
     <link rel="stylesheet" href="assets/css/orders.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
@@ -41,48 +40,87 @@
 
     <main class="main">
         <!-- KPI cards -->
+        <!-- Reemplaza la sección .kpis por este bloque -->
         <section class="kpis" aria-label="Indicadores rápidos">
-            <article id="kpi-lowstock" class="card kpi-card" role="button" tabindex="0" aria-pressed="false">
-                <div class="kpi-info">
-                    <div class="kpi-title">Stock bajo</div>
-                    <div class="kpi-value"><span id="kpi-lowstock-value">3</span></div>
-                    <div class="kpi-meta muted">Productos con bajo stock</div>
+            <article id="kpi-lowstock" class="card kpi-card kpi-modern kpi-variant-info" role="button" tabindex="0"
+                aria-pressed="false">
+                <div class="kpi-top">
+                    <div class="kpi-avatar" aria-hidden="true">⚠️</div>
+                    <div>
+                        <div class="kpi-title">Stock bajo</div>
+                        <div class="kpi-sub">Productos con bajo stock</div>
+                    </div>
                 </div>
-                <div class="kpi-icon" aria-hidden="true">
-                    <div class="icon-square">⚠️</div>
+                <div class="kpi-divider" role="separator"></div>
+
+                <div>
+                    <div class="kpi-amount"><span id="kpi-lowstock-value">3</span></div>
+                </div>
+
+                <div class="kpi-bottom">
+                    <div class="kpi-meta">Revisar inventario</div>
+                    <button class="kpi-action" aria-label="Ver stock">→</button>
                 </div>
             </article>
 
-            <!-- Updated Pedidos hoy KPI: keep id on value for JS, article is clickable and keyboard accessible -->
-            <article id="kpi-orders" class="card kpi-card" role="button" tabindex="0" aria-pressed="false">
-                <div class="kpi-info">
-                    <div class="kpi-title">Pedidos hoy</div>
-                    <div class="kpi-value" id="kpi-orders-today">—</div>
-                    <div class="kpi-meta muted">Comparado con la última fecha con pedidos</div>
+            <article id="kpi-orders" class="card kpi-card kpi-modern kpi-variant-info" role="button" tabindex="0"
+                aria-pressed="false">
+                <div class="kpi-top">
+                    <div class="kpi-avatar" aria-hidden="true">📦</div>
+                    <div>
+                        <div class="kpi-title">Pedidos hoy</div>
+                        <div class="kpi-sub">Comparado con la última fecha con pedidos</div>
+                    </div>
                 </div>
-                <div class="kpi-icon" aria-hidden="true">
-                    <div class="icon-square">📦</div>
+                <div class="kpi-divider"></div>
+
+                <div>
+                    <div class="kpi-amount" id="kpi-orders-today">—</div>
+                </div>
+
+                <div class="kpi-bottom">
+                    <div class="kpi-meta">Última actualización</div>
+                    <button class="kpi-action" aria-label="Abrir detalles">→</button>
                 </div>
             </article>
 
-            <article class="card kpi-card">
-                <div class="kpi-info">
-                    <div class="kpi-title">Ventas</div>
-                    <div class="kpi-value">$<span id="kpi-sales">—</span></div>
-                    <div class="kpi-meta muted">Total diario</div>
+            <article class="card kpi-card kpi-modern kpi-variant-info" aria-hidden="false">
+                <div class="kpi-top">
+                    <div class="kpi-avatar" aria-hidden="true">💲</div>
+                    <div>
+                        <div class="kpi-title">Ventas</div>
+                        <div class="kpi-sub">Total diario (solo pagadas)</div>
+                    </div>
                 </div>
-                <div class="kpi-icon" aria-hidden="true">
-                    <div class="icon-square">💲</div>
+                <div class="kpi-divider"></div>
+
+                <div>
+                    <div class="kpi-amount">$<span id="kpi-sales">—</span></div>
+                </div>
+
+                <div class="kpi-bottom">
+                    <div class="kpi-meta">Ingresos verificados</div>
+                    <button class="kpi-action" aria-label="Ver ventas">→</button>
                 </div>
             </article>
-            <article class="card kpi-card">
-                <div class="kpi-info">
-                    <div class="kpi-title">Caja</div>
-                    <div class="kpi-value">Abierta</div>
-                    <div class="kpi-meta muted">Estado actual</div>
+
+            <article class="card kpi-card kpi-modern kpi-variant-info" aria-hidden="false">
+                <div class="kpi-top">
+                    <div class="kpi-avatar" aria-hidden="true">🏧</div>
+                    <div>
+                        <div class="kpi-title">Caja</div>
+                        <div class="kpi-sub">Estado actual</div>
+                    </div>
                 </div>
-                <div class="kpi-icon" aria-hidden="true">
-                    <div class="icon-square">🏧</div>
+                <div class="kpi-divider"></div>
+
+                <div>
+                    <div class="kpi-amount">Abierta</div>
+                </div>
+
+                <div class="kpi-bottom">
+                    <div class="kpi-meta">Últ. cierre: —</div>
+                    <button class="kpi-action" aria-label="Acciones caja">→</button>
                 </div>
             </article>
         </section>

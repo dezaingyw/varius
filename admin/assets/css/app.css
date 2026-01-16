@@ -51,11 +51,13 @@ body {
 body {
   margin: 0;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(180deg, var(--bg), #ffffff);
+  background: linear-gradient(to bottom, #e2f7f4, #ffffff);
+  background-repeat: no-repeat;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.35;
+  min-height: 100vh;
 }
 
 a {
@@ -88,7 +90,7 @@ img {
 .topbar {
   height: 64px;
   display: flex;
- align-items: center;
+  align-items: center;
   gap: 16px;
   padding: 0 18px;
   background: var(--card-bg);
@@ -490,12 +492,8 @@ nav .nav-list {
 /* Primary / Apply */
 .btn-primary,
 .btn-apply {
-  background: linear-gradient(
-    180deg,
-    var(--btn-primary),
-    color-mix(in srgb, var(--btn-primary) 86%, black 4%)
-  );
-  color: var(--btn-primary-contrast);
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #f6fcfc;
   border: none;
   box-shadow: 0 8px 20px rgba(124, 58, 237, 0.08);
 }
@@ -585,8 +583,8 @@ nav .nav-list {
 .btn-add {
   padding: 10px 14px;
   border-radius: 10px;
-  background: linear-gradient(180deg, #7c3aed, #6d28d9);
-  color: #fff;
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #f6fcfc;
   border: none;
   box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08);
 }
@@ -648,7 +646,7 @@ body.is-admin .admin-only {
 /* =========================
    5. FORMS, FILTERS & SELECTS
    ========================= */
-   
+
 .filters-card {
   padding: 18px;
   border-radius: 10px;
@@ -1874,12 +1872,18 @@ table#ordersTable tbody td {
   background: #fff;
   font-size: 14px;
   color: var(--text, #0f172a);
-  transition: box-shadow 140ms ease, border-color 140ms ease, transform 120ms ease;
+  transition: box-shadow 140ms ease, border-color 140ms ease,
+    transform 120ms ease;
   box-sizing: border-box;
 }
 
 /* Textareas no forzar altura fija */
-.modal-form textarea { height: auto; min-height: 80px; padding-top:10px; padding-bottom:10px; }
+.modal-form textarea {
+  height: auto;
+  min-height: 80px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
 
 /* Focus: destacar inputs para accesibilidad */
 .modal-form input:focus,
@@ -1906,8 +1910,16 @@ table#ordersTable tbody td {
 }
 
 /* Anchos fijos respetados pero adaptables: mantener helpers w-160/w-120 */
-.w-160 { width: 160px; flex: 0 0 160px; max-width: 160px; }
-.w-120 { width: 120px; flex: 0 0 120px; max-width: 120px; }
+.w-160 {
+  width: 160px;
+  flex: 0 0 160px;
+  max-width: 160px;
+}
+.w-120 {
+  width: 120px;
+  flex: 0 0 120px;
+  max-width: 120px;
+}
 
 /* Para entradas acompañadas (input-with-toggle) ajustar posicionamiento del botón */
 .input-with-toggle {
@@ -1925,7 +1937,7 @@ table#ordersTable tbody td {
   top: 50%;
   transform: translateY(-50%);
   border: 0;
-  background: rgba(0,0,0,0.04);
+  background: rgba(0, 0, 0, 0.04);
   cursor: pointer;
   font-size: 14px;
   padding: 6px 8px;
@@ -1967,24 +1979,53 @@ table#ordersTable tbody td {
 }
 
 /* Resultado de fecha / small meta en filas (por ejemplo FC/FS) */
-.date-cell { font-size: 13px; color: var(--muted, #6b7280); line-height: 1.25; }
-.date-cell strong { font-weight: 700; margin-right: 6px; }
+.date-cell {
+  font-size: 13px;
+  color: var(--muted, #6b7280);
+  line-height: 1.25;
+}
+.date-cell strong {
+  font-weight: 700;
+  margin-right: 6px;
+}
 
 /* Reducir el espacio encima del header dentro del modal */
-.modal-header { padding: 8px 0; gap: 8px; }
+.modal-header {
+  padding: 8px 0;
+  gap: 8px;
+}
 
 /* Toast: mostrar/ocultar transición más suave */
-.toast { transition: opacity 200ms ease, transform 200ms ease; }
-.toast.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.toast {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.toast.hidden {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
 
 /* Truncado y wrap: evitar overflow en nombres largos */
-.user-name, .user-email { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 36ch; }
+.user-name,
+.user-email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 36ch;
+}
 
 /* Hacer que las filas suspendidas mantengan su padding y no empujen contenido */
-tr.row-suspendido td:first-child { padding-left: 14px; }
+tr.row-suspendido td:first-child {
+  padding-left: 14px;
+}
 
 /* Fixes para inputs inline (select + custom ext) */
-#u_email_ext_custom { width: 100%; padding: 10px 12px; height: 44px; box-sizing: border-box; }
+#u_email_ext_custom {
+  width: 100%;
+  padding: 10px 12px;
+  height: 44px;
+  box-sizing: border-box;
+}
 
 /* Manejo responsive */
 /* En pantallas pequeñas: apilar columnas, inputs ocupan 100% y etiquetas quedan encima */
@@ -2043,13 +2084,25 @@ tr.row-suspendido td:first-child { padding-left: 14px; }
 
   /* si la pantalla es muy angosta, permitir wrap y usar porcentajes para evitar cramping */
   @media (max-width: 360px) {
-    .row-2 { flex-wrap: wrap; }
-    .row-2 > .w-160 { flex: 0 0 44%; max-width: 44%; }
-    .row-2 > .w-120 { flex: 0 0 30%; max-width: 30%; }
-    .row-2 > .form-row { flex: 1 1 56%; min-width: 30%; }
+    .row-2 {
+      flex-wrap: wrap;
+    }
+    .row-2 > .w-160 {
+      flex: 0 0 44%;
+      max-width: 44%;
+    }
+    .row-2 > .w-120 {
+      flex: 0 0 30%;
+      max-width: 30%;
+    }
+    .row-2 > .form-row {
+      flex: 1 1 56%;
+      min-width: 30%;
+    }
   }
 
-  .w-160, .w-120 {
+  .w-160,
+  .w-120 {
     width: auto !important;
   }
 
@@ -2079,14 +2132,22 @@ tr.row-suspendido td:first-child { padding-left: 14px; }
   }
 
   /* Más espacio para el contenido del modal en móvil */
-  .modal-form { gap: 10px; }
+  .modal-form {
+    gap: 10px;
+  }
 }
 
 /* Mobile very small: compactar aún más */
 @media (max-width: 420px) {
-  .modal .modal-content { padding: 10px; }
-  .modal-form .form-row label { font-size: 12px; }
-  .input-alert { font-size: 12px; }
+  .modal .modal-content {
+    padding: 10px;
+  }
+  .modal-form .form-row label {
+    font-size: 12px;
+  }
+  .input-alert {
+    font-size: 12px;
+  }
 }
 
 /* Visual polish: focus visible para botones y inputs */
@@ -2123,7 +2184,7 @@ tr.row-suspendido td:first-child { padding-left: 14px; }
     margin: 12px auto;
     border-radius: 10px;
     max-height: calc(100vh - 24px);
-    box-shadow: 0 6px 20px rgba(11,15,34,0.08);
+    box-shadow: 0 6px 20px rgba(11, 15, 34, 0.08);
   }
 
   /* Cabecera sticky: siempre visible al hacer scroll */
@@ -2146,7 +2207,11 @@ tr.row-suspendido td:first-child { padding-left: 14px; }
   .form-actions {
     position: sticky;
     bottom: 0;
-    background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,1));
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 1)
+    );
     padding-top: 10px;
     padding-bottom: 12px;
     gap: 8px;
@@ -2168,19 +2233,32 @@ tr.row-suspendido td:first-child { padding-left: 14px; }
   }
 
   /* Inputs, selects y custom ext ocupen todo el ancho */
-  #u_email_ext, #u_email_ext_custom, #u_operator, #u_role, #u_status {
+  #u_email_ext,
+  #u_email_ext_custom,
+  #u_operator,
+  #u_role,
+  #u_status {
     box-sizing: border-box;
   }
 
   /* Reduce top/bottom spacing en labels/inputs */
-  .form-row label { margin-bottom: 6px; }
-  .modal-form input, .modal-form select { height: 42px; }
+  .form-row label {
+    margin-bottom: 6px;
+  }
+  .modal-form input,
+  .modal-form select {
+    height: 42px;
+  }
 
   /* Evita que el toggle sobresalga */
-  .pwd-toggle { right: 10px; }
+  .pwd-toggle {
+    right: 10px;
+  }
 
   /* Evita que el footer del modal tape el contenido principal: dar margen inferior extra */
-  .modal .modal-content > .modal-form { padding-bottom: 72px; /* suficiente espacio para actions sticky */ }
+  .modal .modal-content > .modal-form {
+    padding-bottom: 72px; /* suficiente espacio para actions sticky */
+  }
 }
 
 /* Ajustes extra para pantallas muy pequeñas (<=360px) */
@@ -2191,10 +2269,186 @@ tr.row-suspendido td:first-child { padding-left: 14px; }
     margin: 8px auto;
     border-radius: 8px;
   }
-  .modal-header h2 { font-size: 15px; }
-  .modal-form input, .modal-form select { height: 40px; font-size: 13px; }
-  .modal-form { gap: 8px; }
-  .form-actions { padding-bottom: 10px; }
+  .modal-header h2 {
+    font-size: 15px;
+  }
+  .modal-form input,
+  .modal-form select {
+    height: 40px;
+    font-size: 13px;
+  }
+  .modal-form {
+    gap: 8px;
+  }
+  .form-actions {
+    padding-bottom: 10px;
+  }
+}
+
+/* kpis-enhancements.css
+   Estilos específicos para mejorar visualmente las KPI cards
+   - Añadir después de app.css en administrador.html
+*/
+.kpi-modern {
+  padding: 18px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(250, 250, 252, 0.98)
+  );
+  box-shadow: 0 8px 20px rgba(11, 15, 34, 0.06);
+  border: 1px solid rgba(11, 15, 34, 0.04);
+  gap: 12px;
+}
+
+/* Header layout: icon left, title+subtitle right */
+.kpi-modern .kpi-top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* circular avatar with soft bg */
+.kpi-modern .kpi-avatar {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.09); /* default pale purple */
+  color: #3b82f6;
+  font-size: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* title and subtitle */
+.kpi-modern .kpi-top .kpi-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0b5be6; /* azul fuerte para el título */
+  line-height: 1.05;
+}
+.kpi-modern .kpi-top .kpi-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+/* divider line */
+.kpi-modern .kpi-divider {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(11, 15, 34, 0.03),
+    rgba(11, 15, 34, 0.015)
+  );
+  margin: 6px 0;
+  border-radius: 1px;
+}
+
+/* main value / amount */
+.kpi-modern .kpi-amount {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.5px;
+}
+
+/* bottom row: meta left, arrow right */
+.kpi-modern .kpi-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.kpi-modern .kpi-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* small arrow button */
+.kpi-modern .kpi-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #9cdcd5;
+  border: 1px solid rgba(11, 15, 34, 0.04);
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* Variantes de color (bordes y fondos sutiles) */
+.kpi-variant-processing {
+  border-color: #f59e0b33;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 244, 229, 0.75),
+    rgba(255, 250, 245, 0.85)
+  );
+}
+.kpi-variant-processing .kpi-avatar {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.kpi-variant-success {
+  border-color: #10b98133;
+  background: linear-gradient(
+    180deg,
+    rgb(225 255 241 / 84%),
+    rgb(186 213 199 / 85%)
+  );
+}
+.kpi-variant-success .kpi-avatar {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.kpi-variant-info {
+  border-color: #02070e29;
+  background: linear-gradient(
+    180deg,
+    rgb(240 247 255 / 86%),
+    rgb(255, 255, 255)
+  );
+}
+.kpi-variant-info .kpi-avatar {
+  background: rgba(59, 130, 246, 0.09);
+  color: #2563eb;
+}
+
+/* subtle shadow when has-low-stock or highlight */
+.kpi-modern.has-low-stock {
+  box-shadow: 0 10px 30px rgba(43, 110, 246, 0.06);
+}
+
+/* Responsiveness */
+@media (max-width: 900px) {
+  .kpi-modern {
+    min-height: 110px;
+    padding: 12px;
+    border-radius: 12px;
+  }
+  .kpi-modern .kpi-amount {
+    font-size: 20px;
+  }
+  .kpi-modern .kpi-avatar {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 /* End of file */

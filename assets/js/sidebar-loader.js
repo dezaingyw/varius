@@ -32,6 +32,42 @@ async function ensureNavToggleAndOverlay() {
     return { navToggle, overlay };
 }
 
+function injectSidebarCollapseStyles() {
+    // Inject CSS that allows collapsing the sidebar on desktop by toggling the class `sidebar-collapsed`
+    // We inject rules so you don't have to edit app.css directly.
+    if (document.getElementById('sidebar-collapse-styles')) return;
+    const css = `
+/* Desktop collapse: when html.sidebar-collapsed is present hide sidebar and expand main */
+html.sidebar-collapsed .sidebar {
+  transform: translateX(-108%);
+  box-shadow: none;
+  /* keep same transition defined in app.css */
+}
+
+/* Move main content to full width */
+html.sidebar-collapsed .main {
+  margin-left: 0 !important;
+}
+
+/* If there's an explicit overlay element, keep it hidden on desktop collapse */
+html.sidebar-collapsed .overlay {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Keep mobile behaviour intact (mobile uses .nav-toggle:checked ~ .sidebar / overlay).
+   On small screens the overlay logic from the loader remains in effect. */
+@media (max-width: 900px) {
+  /* don't override mobile rules here */
+}
+`;
+    const s = document.createElement('style');
+    s.id = 'sidebar-collapse-styles';
+    s.textContent = css;
+    document.head.appendChild(s);
+}
+
 async function loadSidebar() {
     const placeholder = document.getElementById(SIDEBAR_CONTAINER_ID);
     const { navToggle, overlay } = await ensureNavToggleAndOverlay();
@@ -53,7 +89,6 @@ async function loadSidebar() {
             }
         }
 
-        // Ensure overlay stays as a sibling and is available for CSS and JS
         // Slight delay to allow DOM to settle, then import module that depends on elements
         await import(SIDEBAR_MODULE);
 
@@ -74,9 +109,47 @@ async function loadSidebar() {
         }
         // Initialize
         syncOverlay();
-        navToggle.addEventListener('change', syncOverlay);
+
+        // Inject collapse styles (so desktop toggle works without changing app.css)
+        injectSidebarCollapseStyles();
+
+        // Helper to sync a class on the root element so we can control layout on desktop
+        function syncBodyCollapsed() {
+            // If checked -> collapse; if not checked -> show
+            const root = document.documentElement;
+            if (navToggle.checked) root.classList.add('sidebar-collapsed');
+            else root.classList.remove('sidebar-collapsed');
+        }
+        // initialize collapsed state
+        syncBodyCollapsed();
+
+        // Ensure overlay and body-class are kept in sync when the checkbox changes.
+        navToggle.addEventListener('change', () => {
+            syncOverlay();
+            syncBodyCollapsed();
+        });
+
         // Close sidebar when clicking overlay (works with nav-toggle checkbox)
         overlay.addEventListener('click', () => { navToggle.checked = false; navToggle.dispatchEvent(new Event('change')); });
+
+        // Keep behaviour consistent on resize: if the viewport becomes small, remove the html.sidebar-collapsed
+        // so mobile rules take over. If it becomes large, keep whatever state checkbox is in.
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // On very small screens, ensure collapsed class is removed (mobile overlay will be used)
+                if (window.innerWidth <= 900) {
+                    document.documentElement.classList.remove('sidebar-collapsed');
+                } else {
+                    // on larger screens, respect the checkbox state
+                    syncBodyCollapsed();
+                }
+                // allow overlay positioning code in sidebar-user to update if open
+                const ev = new Event('resize');
+                window.dispatchEvent(ev);
+            }, 120);
+        });
 
     } catch (err) {
         console.error('sidebar-loader: fallo cargando sidebar:', err);

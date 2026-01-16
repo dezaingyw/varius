@@ -23,15 +23,6 @@ body {
   height: 100%;
 }
 
-body {
-  margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: var(--bg);
-  color: #0f172a;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  line-height: 1.35;
-}
 
 /* hide real checkbox */
 .nav-toggle {
@@ -170,70 +161,7 @@ nav .nav-list {
   padding-top: 28px;
 }
 
-/* grid for KPIs */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--gap);
-  margin-bottom: 18px;
-}
 
-/* KPI card tweaks */
-.kpi-card { cursor: pointer; }
-.kpi-card:focus { outline: 3px solid rgba(43, 110, 246, 0.12); outline-offset: 2px; }
-
-/* --- NUEVOS ESTILOS KPI Y ACCIONES RÁPIDAS --- */
-/* tarjetas KPI más espaciosas y con icono a la derecha */
-.kpi-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px;
-  gap: 12px;
-  border-radius: 10px;
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
-  min-height: 88px;
-}
-
-/* izquierdo con texto */
-.kpi-card .kpi-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* pequeño título */
-.kpi-card .kpi-title {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* número grande o valor */
-.kpi-card .kpi-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-/* meta secundaria */
-.kpi-card .kpi-meta {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* recuadro del icono a la derecha */
-.kpi-icon .icon-square {
-  width: 46px;
-  height: 46px;
-  border-radius: 8px;
-  background: #f3f4f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: #374151;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.02);
-}
 
 /* Quick actions container */
 .quick-actions-card {
@@ -296,13 +224,6 @@ nav .nav-list {
 }
 
 /* card base */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
-}
 
 .card-title {
   font-size: 13px;
@@ -475,13 +396,7 @@ nav .nav-list {
   font-size: 13px;
 }
 
-/* Filters improvements: more responsive, wrapping and clearer layout */
-.filters-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  padding: 16px;
-  border-radius: 8px;
-}
+
 
 /* Grid de filtros: desktop optimizado, tablet 2 columnas, mobile apilado */
 .filters-grid {
@@ -560,12 +475,6 @@ nav .nav-list {
   background: #eff6ff;
   color: #2563eb;
   border: 1px solid rgba(59, 130, 246, 0.06);
-}
-
-.badge.delivered {
-  background: #f1f5f9;
-  color: #0f172a;
-  border: 1px solid rgba(15, 23, 42, 0.03);
 }
 
 /* Order product mini list and customer card styles for modal */
