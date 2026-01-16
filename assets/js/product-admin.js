@@ -512,15 +512,30 @@ function renderProducts(list) {
 
         const tr = document.createElement('tr');
 
-        // Determine stock and low-stock state
+        // Determine stock and status
         const stockNum = Number(prod.stock ?? 0);
-        const isLowStock = Number.isFinite(stockNum) && stockNum < 5;
+        const st = (prod.status || 'Activo').toLowerCase();
+        const suspended = (st === 'suspendido' || st === 'suspended');
 
-        if (isLowStock) {
-            tr.style.backgroundColor = '#fff5f5';
-            tr.style.borderLeft = '4px solid #ef4444';
-            tr.setAttribute('data-low-stock', 'true');
-            tr.setAttribute('aria-label', `Stock bajo: ${stockNum}`);
+        // Suspended rows: gray and pinned visual attribute (take priority)
+        if (suspended) {
+            tr.style.backgroundColor = '#f3f4f6'; // light gray
+        
+            tr.setAttribute('data-suspended', 'true');
+            tr.setAttribute('aria-label', 'Producto suspendido');
+        } else {
+            // Visual cues for stock only when not suspended:
+            if (Number.isFinite(stockNum) && stockNum === 0) {
+                tr.style.backgroundColor = '#fff5f5'; // light red
+                
+                tr.setAttribute('data-low-stock', 'true');
+                tr.setAttribute('aria-label', `Sin stock`);
+            } else if (Number.isFinite(stockNum) && stockNum < 5) {
+                tr.style.backgroundColor = '#fff7ed'; // light orange
+                
+                tr.setAttribute('data-low-stock', 'true');
+                tr.setAttribute('aria-label', `Stock bajo: ${stockNum}`);
+            }
         }
 
         // Images mini-slider cell
@@ -586,8 +601,8 @@ function renderProducts(list) {
         // Stock
         const tdStock = document.createElement('td'); tdStock.setAttribute('data-label', 'Stock');
         tdStock.textContent = prod.stock ?? 0;
-        if (isLowStock) {
-            tdStock.style.color = '#991b1b';
+        if (!suspended && Number.isFinite(stockNum) && stockNum < 5) {
+            tdStock.style.color = stockNum === 0 ? '#991b1b' : '#92400e';
             tdStock.style.fontWeight = '700';
         }
         tr.appendChild(tdStock);
@@ -596,7 +611,6 @@ function renderProducts(list) {
         const tdState = document.createElement('td'); tdState.setAttribute('data-label', 'Estado');
         const stateBadge = document.createElement('span');
         stateBadge.className = 'badge-state';
-        const st = (prod.status || 'Activo').toLowerCase();
         if (st === 'activo' || st === 'active') { stateBadge.classList.add('state-active'); stateBadge.textContent = 'Activo'; }
         else if (st === 'inactivo' || st === 'inactive') { stateBadge.classList.add('state-inactive'); stateBadge.textContent = 'Inactivo'; }
         else if (st === 'suspendido' || st === 'suspended') { stateBadge.classList.add('state-suspended'); stateBadge.textContent = 'Suspendido'; }
@@ -610,7 +624,7 @@ function renderProducts(list) {
 
         // Copy link - always visible
         const btnCopy = document.createElement('button');
-        btnCopy.className = 'btn-small btn-view';
+        btnCopy.className = 'btn-small btn-copy';
         btnCopy.title = 'Copiar Enlace';
         btnCopy.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg" viewBox="0 0 16 16">
                                 <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
@@ -619,7 +633,7 @@ function renderProducts(list) {
         btnCopy.addEventListener('click', () => copyProductLink(prod.id));
         actions.appendChild(btnCopy);
 
-        // Admin actions: edit and soft-delete
+        // Admin actions: edit and soft-delete / activate
         if (currentUserRole === 'administrador') {
             const btnEdit = document.createElement('button');
             btnEdit.className = 'btn-small btn-assign';
@@ -631,15 +645,27 @@ function renderProducts(list) {
             btnEdit.addEventListener('click', () => openEditProduct(prod.id));
             actions.appendChild(btnEdit);
 
-            const btnDelete = document.createElement('button');
-            btnDelete.className = 'btn-small btn-suspender';
-            btnDelete.title = 'Suspender';
-            btnDelete.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                                    </svg>`;
-            btnDelete.addEventListener('click', () => softDeleteProduct(prod.id));
-            actions.appendChild(btnDelete);
+            // If suspended -> show activate, else show suspend
+            if (suspended) {
+                const btnActivate = document.createElement('button');
+                btnActivate.className = 'btn-small btn-view';
+                btnActivate.title = 'Activar';
+                btnActivate.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg" viewBox="0 0 16 16">
+                                        <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+                                        </svg>`;
+                btnActivate.addEventListener('click', () => activateProduct(prod.id));
+                actions.appendChild(btnActivate);
+            } else {
+                const btnDelete = document.createElement('button');
+                btnDelete.className = 'btn-small btn-suspender';
+                btnDelete.title = 'Suspender';
+                btnDelete.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                                            <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                                        </svg>`;
+                btnDelete.addEventListener('click', () => softDeleteProduct(prod.id));
+                actions.appendChild(btnDelete);
+            }
         }
 
         tdActions.appendChild(actions);
@@ -674,6 +700,22 @@ function renderProductsAsCards(list) {
         card.className = 'product-card';
         card.setAttribute('role', 'listitem');
         card.dataset.id = prod.id || '';
+        const stockNum = Number(prod.stock ?? 0);
+        const st = (prod.status || 'Activo').toLowerCase();
+        const suspended = (st === 'suspendido' || st === 'suspended');
+
+        // Suspended card styling takes priority
+        if (suspended) {
+            card.style.backgroundColor = '#f3f4f6';
+            card.style.borderLeft = '4px solid #9ca3af';
+        } else if (Number.isFinite(stockNum) && stockNum === 0) {
+            card.style.backgroundColor = '#fff5f5';
+            card.style.borderLeft = '4px solid #ef4444';
+        } else if (Number.isFinite(stockNum) && stockNum < 5) {
+            card.style.backgroundColor = '#fff7ed';
+            card.style.borderLeft = '4px solid #f97316';
+        }
+
         if (Number(prod.stock ?? 0) < 5) card.dataset.lowStock = 'true';
 
         // MEDIA: banner image (use first image if available)
@@ -775,7 +817,6 @@ function renderProductsAsCards(list) {
 
         const stateBadge = document.createElement('span');
         stateBadge.className = 'badge-state card-state-badge';
-        const st = (prod.status || 'Activo').toLowerCase();
         if (st === 'activo' || st === 'active') { stateBadge.classList.add('state-active'); stateBadge.textContent = 'Activo'; }
         else if (st === 'inactivo' || st === 'inactive') { stateBadge.classList.add('state-inactive'); stateBadge.textContent = 'Inactivo'; }
         else if (st === 'suspendido' || st === 'suspended') { stateBadge.classList.add('state-suspended'); stateBadge.textContent = 'Suspendido'; }
@@ -814,16 +855,23 @@ function renderProductsAsCards(list) {
             btnEdit.addEventListener('click', () => openEditProduct(prod.id));
             actionsRow.appendChild(btnEdit);
 
-            const btnDelete = document.createElement('button');
-            btnDelete.className = 'btn-small btn-suspend';
-            btnDelete.type = 'button';
-            btnDelete.title = 'Suspender';
-            btnDelete.innerHTML = `<span class="btn-label"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                                    </svg></span>`;
-            btnDelete.addEventListener('click', () => softDeleteProduct(prod.id));
-            actionsRow.appendChild(btnDelete);
+            if (suspended) {
+                const btnActivate = document.createElement('button');
+                btnActivate.className = 'btn-small btn-activate';
+                btnActivate.type = 'button';
+                btnActivate.title = 'Activar';
+                btnActivate.innerHTML = `<span class="btn-label">Activar</span>`;
+                btnActivate.addEventListener('click', () => activateProduct(prod.id));
+                actionsRow.appendChild(btnActivate);
+            } else {
+                const btnDelete = document.createElement('button');
+                btnDelete.className = 'btn-small btn-suspend';
+                btnDelete.type = 'button';
+                btnDelete.title = 'Suspender';
+                btnDelete.innerHTML = `<span class="btn-label">Suspender</span>`;
+                btnDelete.addEventListener('click', () => softDeleteProduct(prod.id));
+                actionsRow.appendChild(btnDelete);
+            }
         }
 
         body.appendChild(actionsRow);
@@ -881,6 +929,22 @@ async function softDeleteProduct(id) {
     } catch (err) {
         console.error('softDeleteProduct error', err);
         showToast('Error al suspender producto');
+    }
+}
+
+/* ---------------- Activate product (set status to Activo) ---------------- */
+async function activateProduct(id) {
+    if (!currentUser) { showToast('No autenticado'); return; }
+    if (currentUserRole !== 'administrador') { showToast('No autorizado'); return; }
+    const ok = confirm('¿Activar este producto?');
+    if (!ok) return;
+    try {
+        const ref = doc(db, 'product', id);
+        await updateDoc(ref, { status: 'Activo', updatedAt: serverTimestamp() });
+        showToast('Producto activado');
+    } catch (err) {
+        console.error('activateProduct error', err);
+        showToast('Error al activar producto');
     }
 }
 
@@ -962,9 +1026,32 @@ window.addEventListener('resize', onResizeCheckMode);
 
 /* ---------------- Realtime listener ---------------- */
 function startRealtimeListener() {
-    const q = query(productsCol, orderBy('name_lower', 'asc'));
+    // Order by createdAt desc to show newest first; we'll still move 'suspendido' to the end in-memory
+    const q = query(productsCol, orderBy('createdAt', 'desc'));
     onSnapshot(q, snapshot => {
-        productsLocal = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // helper to get milliseconds from possible Firestore Timestamp / Date / object
+        function createdAtMs(item) {
+            const t = item && item.createdAt;
+            if (!t) return 0;
+            if (typeof t.toMillis === 'function') return t.toMillis();
+            if (typeof t.seconds === 'number') return (t.seconds || 0) * 1000 + (t.nanoseconds ? Math.floor((t.nanoseconds || 0) / 1000000) : 0);
+            if (t instanceof Date) return t.getTime();
+            return 0;
+        }
+
+        // Move suspended items to the end, keep newest-first within each group
+        docs.sort((a, b) => {
+            const aSusp = ((a.status || '').toLowerCase() === 'suspendido');
+            const bSusp = ((b.status || '').toLowerCase() === 'suspendido');
+            if (aSusp && !bSusp) return 1;
+            if (!aSusp && bSusp) return -1;
+            // both same suspension state -> order by createdAt desc
+            return createdAtMs(b) - createdAtMs(a);
+        });
+
+        productsLocal = docs;
         applyFilters();
     }, err => {
         console.error('Error listening products', err);

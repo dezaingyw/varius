@@ -101,7 +101,8 @@
           <div class="form-row">
             <label for="cust_age">Edad</label>
             <!-- usar text + inputmode para controlar mejor la sanitización; maxlength evita valores grandes -->
-            <input id="cust_age" name="age" type="text" inputmode="numeric" pattern="\d*" maxlength="3" placeholder="Edad">
+            <input id="cust_age" name="age" type="text" inputmode="numeric" pattern="\d*" maxlength="3"
+              placeholder="Edad">
             <div id="cust_age_err" class="field-err" aria-live="polite"></div>
           </div>
 
@@ -199,6 +200,7 @@
   </footer>
 
   <script type="module" src="assets/js/pedidos-data.js"></script>
+  <script type="module" src="assets/js/contact-layout.js"></script>
   <script type="module" src="assets/js/ui-animations.js"></script>
   <script>
     const ribbon = document.getElementById('productRibbon');

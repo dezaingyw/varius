@@ -1935,3 +1935,227 @@ a:focus-visible {
   flex: 1;
   border-bottom: 1px solid var(--border); /* Usa el color de borde de tu app */
 }
+
+/* Enhancements para layout de operadora/teléfono y extensión/correo */
+    .field-inline {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    /* Contenedor que mantiene los controles lado a lado */
+    .field-controls {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      width: 100%;
+    }
+
+    /* Estilos para el select de operadora (compacto) */
+    .operator-select {
+      min-width: 96px;
+      max-width: 120px;
+      padding: 0.7rem 0.6rem;
+      border-radius: 0.6rem;
+      border: 2px solid #e6eef6;
+      background: #fff;
+      font-weight: 600;
+      color: #1d2a3b;
+      box-sizing: border-box;
+    }
+
+    /* Estilo para el input de teléfono (ocupando el resto) */
+    .phone-input-adj {
+      flex: 1 1 auto;
+      padding: 0.75rem 0.9rem;
+      border-radius: 0.6rem;
+      border: 2px solid #e6eef6;
+      background: #fff;
+      font-weight: 600;
+      color: #1d2a3b;
+      box-sizing: border-box;
+    }
+
+    /* Estilo para el select de dominio de email */
+    .email-domain-select {
+      min-width: 140px;
+      max-width: 210px;
+      padding: 0.7rem 0.6rem;
+      border-radius: 0.6rem;
+      border: 2px solid #e6eef6;
+      background: #fff;
+      font-weight: 600;
+      color: #1d2a3b;
+      box-sizing: border-box;
+    }
+
+    /* Ajustar el input de email para compartir fila con el select */
+    .email-input-adj {
+      flex: 1 1 auto;
+      padding: 0.75rem 0.9rem;
+      border-radius: 0.6rem;
+      border: 2px solid #e6eef6;
+      background: #fff;
+      font-weight: 600;
+      color: #1d2a3b;
+      box-sizing: border-box;
+    }
+
+    /* Responsivo: en pantallas pequeñas, apilar vertical */
+    @media (max-width: 600px) {
+      .field-controls {
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      .operator-select,
+      .email-domain-select {
+        width: 100%;
+        max-width: 100%;
+      }
+    }
+
+    /* Focus visible consistente */
+    .operator-select:focus,
+    .email-domain-select:focus,
+    .phone-input-adj:focus,
+    .email-input-adj:focus {
+      outline: 3px solid rgba(189, 180, 255, 0.45);
+      outline-offset: 2px;
+      border-color: #bdb4ff;
+    }
+
+    /* Mantener siempre select + input en la misma fila (no apilar en móviles)
+   Estilos no invasivos que respetan los IDs y listeners existentes.
+   Cargar este archivo después de carrito.css para que tenga prioridad.
+*/
+
+    /* Wrapper de fila de campo (label arriba, controles en línea debajo) */
+    .field-inline {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    /* Contenedor que mantiene los controles lado a lado y centrados */
+    .field-controls {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      width: 100%;
+      /* Mantener siempre en fila, evitar que se apilen */
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      /* Centrar el grupo bajo la label para aspecto similar a la imagen */
+      justify-content: center;
+      box-sizing: border-box;
+    }
+
+    /* Forzar que los selects mantengan tamaño compacto y no colapsen */
+    .operator-select,
+    .email-domain-select {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border-radius: 0.6rem;
+      border: 2px solid #e6eef6;
+      background: #fff;
+      color: #1d2a3b;
+      font-weight: 600;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
+      padding: 0.6rem 0.75rem;
+      height: 2.9rem;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: none;
+    }
+
+    /* Tamaños sugeridos (ajustables) */
+    .operator-select {
+      min-width: 84px;
+      max-width: 110px;
+      width: auto;
+    }
+
+    .email-domain-select {
+      min-width: 120px;
+      max-width: 180px;
+      width: auto;
+    }
+
+    /* Input que comparte la fila: ocupa el espacio restante */
+    .phone-input-adj,
+    .email-input-adj {
+      flex: 1 1 auto;
+      min-width: 0;
+      /* importante para que flex funcione en móviles */
+      padding: 0.75rem 0.9rem;
+      border-radius: 0.6rem;
+      border: 2px solid #e6eef6;
+      background: #fff;
+      font-weight: 600;
+      color: #1d2a3b;
+      box-sizing: border-box;
+      height: 2.9rem;
+    }
+
+    /* Alineación vertical para el caso email donde el input y select están alineados */
+    .field-controls .email-input-adj {
+      align-self: center;
+    }
+
+    /* Si hay label con texto largo, limitar ancho del conjunto para que se vea centrado */
+    .form-row .field-controls {
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Ajustes para la vista del placeholder (consistencia visual) */
+    .phone-input-adj::placeholder,
+    .email-input-adj::placeholder {
+      color: #c9d6df;
+      font-weight: 500;
+    }
+
+    /* Focus visible consistente y accesible */
+    .operator-select:focus,
+    .email-domain-select:focus,
+    .phone-input-adj:focus,
+    .email-input-adj:focus {
+      outline: 3px solid rgba(189, 180, 255, 0.45);
+      outline-offset: 2px;
+      border-color: #bdb4ff;
+      box-shadow: 0 6px 20px rgba(11, 99, 209, 0.06);
+    }
+
+    /* Override: asegurar que no haya stacking incluso en pantallas muy pequeñas */
+    @media (max-width: 420px) {
+      .field-controls {
+        /* seguimos en fila; pero permitimos un pequeño wrap si es absolutamente necesario */
+        flex-wrap: nowrap;
+        gap: 0.45rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+        justify-content: center;
+      }
+
+      .operator-select,
+      .email-domain-select {
+        min-width: 72px;
+        padding: 0.5rem 0.6rem;
+        height: 2.6rem;
+        font-size: 0.95rem;
+      }
+
+      .phone-input-adj,
+      .email-input-adj {
+        height: 2.6rem;
+        padding: 0.6rem 0.7rem;
+        font-size: 0.98rem;
+      }
+    }

@@ -1,5 +1,9 @@
-// Archivo JavaScript proporcionado por el usuario
-// Mejorado: Geolocalización, edad, teléfono limpio, lat/lng y dirección legible
+// Archivo JavaScript completo y funcional (modificado según solicitudes):
+// - Control +/- en modal persistente y sincronizado con carrito (sin duplicar listeners)
+// - Oculta botón "Agregar" en modal cuando existe el control +/-
+// - Select "Operadora" antes del teléfono y select "Extensión" al lado del email
+// - Validaciones: teléfono = 7 dígitos + operadora; email usuario solo [A-Za-z0-9._-]
+// - Mantiene todas las funcionalidades originales (Firestore, Storage, carousel, etc.)
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -167,15 +171,11 @@ async function resolveProductImages(product) {
 }
 
 /* ---------------------- Utilidades UI ---------------------- */
-// Formateador actualizado: dólares, formato venezolano (coma decimal), siempre mostrar decimales:
-// - si el número es entero se muestran 2 decimales (,00)
-// - si tiene decimales se respetan (hasta 6 decimales)
 function formatCurrency(n) {
     if (n === null || typeof n === 'undefined' || n === '') return '';
     const num = Number(n);
     if (!isFinite(num)) return String(n);
 
-    // Intentamos detectar la cantidad de decimales "reales" del valor original
     let s = (typeof n === 'string') ? n.trim() : String(num);
     let decimals = 0;
     if (s.indexOf('.') >= 0) {
@@ -192,8 +192,6 @@ function formatCurrency(n) {
     const fractionDigits = Math.max(2, Math.min(6, decimals));
 
     try {
-        // Usamos Intl para formatear número con configuración de Venezuela (coma decimal),
-        // pero no usamos la opción 'currency' directamente para evitar el prefijo "US$" en algunos navegadores.
         const nf = new Intl.NumberFormat('es-VE', {
             minimumFractionDigits: fractionDigits,
             maximumFractionDigits: fractionDigits
@@ -251,16 +249,12 @@ function removeItem(productId) {
     CART.items = CART.items.filter(i => i.productId !== productId); recalcCart(); persistCart();
 }
 function clearCart() { CART = createEmptyCart(); persistCart(); showToast('Carrito vaciado'); }
-
-/* ---------------------- Helpers de cantidad modal/carrito ---------------------- */
 function getCartQuantity(productId) {
     const it = CART.items.find(i => i.productId === productId);
     return it ? it.quantity : 0;
 }
 
-/* ----------------------
-   Confirm modal (mejor estilo) - retorna Promise<boolean>
-   ---------------------- */
+/* ---------------------- Confirm modal ---------------------- */
 function showConfirm(message = '¿Estás seguro?') {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirmModal');
@@ -424,7 +418,6 @@ function renderCartPanel() {
             const div = document.createElement('div');
             div.className = 'avail-item';
 
-            // Construir HTML de precio con estilo claro (antes) y nuevo más grande (descuento)
             let priceHtml = '';
             if (p.discountPrice && Number(p.discountPrice) < Number(p.price)) {
                 priceHtml = `
@@ -513,9 +506,7 @@ function renderCartPanel() {
     renderCartCount();
 }
 
-/* ----------------------
-   Product cards + carousel
-   ---------------------- */
+/* ---------------------- Product cards + carousel ---------------------- */
 function createProductCardHtml(p, resolvedImages = []) {
     const isOffer = !!(p.isOnSale || (p.discountPrice && p.discountPrice < p.price));
     let priceHtml = '';
@@ -601,7 +592,7 @@ async function renderProductsGrid() {
     });
 }
 
-/* Carousel: versión infinito mediante clones de los slides */
+/* Carousel: versión infinito mediante clones de los slides (completa) */
 async function setupCarousel() {
     const track = document.getElementById('carouselTrack');
     const indicators = document.getElementById('carouselIndicators');
@@ -747,7 +738,6 @@ async function setupCarousel() {
             track.style.transition = 'none';
             carouselIndex = baseIndex + ((carouselIndex - baseIndex) % total);
             update();
-            // restaurar transition en el siguiente frame
             requestAnimationFrame(() => { requestAnimationFrame(() => { track.style.transition = 'transform 400ms ease'; }); });
         } else if (carouselIndex < total) {
             // saltó al bloque de clones inicial -> reposicionar al bloque central equivalente
@@ -790,13 +780,11 @@ async function setupCarousel() {
 }
 
 /* ----------------------
-   Product modal implementation
+   Product modal implementation (corregida y completa)
    ---------------------- */
 let _productModalCurrentIndex = 0;
 let _productModalImages = [];
 let _productModalCurrentProduct = null;
-
-// Reemplaza la función openProductModal en tu pedidos-data.js por esta versión corregida
 
 function openProductModal(product) {
     const modal = document.getElementById('productModal');
@@ -887,7 +875,7 @@ function openProductModal(product) {
                 minusBtn.textContent = '−';
                 minusBtn.style.padding = '8px 12px';
                 minusBtn.style.borderRadius = '10px';
-                minusBtn.style.background = '#cdb4ff';
+                minusBtn.style.background = '#e9d5ff';
                 minusBtn.style.border = 'none';
                 minusBtn.style.cursor = 'pointer';
 
@@ -898,7 +886,7 @@ function openProductModal(product) {
                 plusBtn.textContent = '+';
                 plusBtn.style.padding = '8px 12px';
                 plusBtn.style.borderRadius = '10px';
-                plusBtn.style.background = '#cdb4ff';
+                plusBtn.style.background = '#c8f7ee';
                 plusBtn.style.border = 'none';
                 plusBtn.style.cursor = 'pointer';
 
@@ -1136,7 +1124,6 @@ function hideGeoButton() {
     const geoBtn = document.getElementById('btnGeoLocation');
     if (geoBtn) geoBtn.style.display = 'none';
 }
-
 function showGeoButton() {
     const geoBtn = document.getElementById('btnGeoLocation');
     if (geoBtn) geoBtn.style.display = '';
@@ -1147,8 +1134,6 @@ function geoSetFields(address, lat, lng) {
     const lngf = document.getElementById('cust_lng');
     if (addr) {
         addr.value = address;
-        // No disables! addr.disabled = true; 
-        // Dispatch input event for validation:
         addr.dispatchEvent(new Event('input', { bubbles: true }));
     }
     if (latf) latf.value = lat || '';
@@ -1182,7 +1167,6 @@ function setupGeolocationButton() {
             const data = await resp.json();
             if (data.status === "OK" && data.results[0]) {
                 geoSetFields(data.results[0].formatted_address, latitude, longitude);
-                // Oculta el botón de ubicación
                 hideGeoButton();
             } else {
                 geoError('No se pudo traducir tu ubicación a dirección.');
@@ -1195,6 +1179,68 @@ function setupGeolocationButton() {
     });
 }
 window.addEventListener('DOMContentLoaded', setupGeolocationButton);
+
+/* ----------------------
+   Form changes: operator & email domain select
+   ---------------------- */
+const VENEZUELA_OPERATORS = [
+    { value: '0412', label: '0412' },
+    { value: '0414', label: '0414' },
+    { value: '0416', label: '0416' },
+    { value: '0424', label: '0424' },
+    { value: '0426', label: '0426' },
+    { value: '0212', label: '0212' },
+    { value: 'other', label: 'Otro' }
+];
+const COMMON_EMAIL_DOMAINS = [
+    'gmail.com',
+    'hotmail.com',
+    'yahoo.com',
+    'outlook.com',
+    'live.com'
+];
+
+function transformContactFields() {
+    // Operadora select before phone input
+    const phoneInput = document.getElementById('cust_phone');
+    if (phoneInput && !document.getElementById('cust_operator')) {
+        const select = document.createElement('select');
+        select.id = 'cust_operator';
+        select.name = 'operator';
+        select.style.width = '92px';
+        select.style.padding = '8px';
+        select.style.borderRadius = '8px';
+        select.style.marginRight = '8px';
+        select.setAttribute('aria-label', 'Operadora');
+        VENEZUELA_OPERATORS.forEach(op => {
+            const opt = document.createElement('option');
+            opt.value = op.value;
+            opt.textContent = op.label;
+            select.appendChild(opt);
+        });
+        phoneInput.parentElement.insertBefore(select, phoneInput);
+    }
+
+    // Email domain select next to email input
+    const emailInput = document.getElementById('cust_email');
+    if (emailInput && !document.getElementById('cust_email_domain')) {
+        const select = document.createElement('select');
+        select.id = 'cust_email_domain';
+        select.name = 'email_domain';
+        select.style.width = '140px';
+        select.style.padding = '8px';
+        select.style.borderRadius = '8px';
+        select.style.marginLeft = '8px';
+        select.setAttribute('aria-label', 'Extensión de correo');
+        COMMON_EMAIL_DOMAINS.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.textContent = d;
+            select.appendChild(opt);
+        });
+        emailInput.parentElement.insertBefore(select, emailInput.nextSibling);
+    }
+}
 
 /* ---------------------- Form validation (tiempo real) ---------------------- */
 function validateName() {
@@ -1209,12 +1255,26 @@ function validateName() {
 }
 function validateEmail() {
     const el = document.getElementById('cust_email');
+    const domain = document.getElementById('cust_email_domain');
     const err = document.getElementById('cust_email_err');
     if (!el) return true; // opcional
-    const v = el.value.trim();
-    if (!v) { if (err) err.textContent = ''; return true; }
+    const user = el.value.trim();
+    if (!user) { if (err) err.textContent = ''; return true; }
+    // Solo permitir caracteres alfanuméricos, punto, guion y guion bajo.
+    if (!/^[A-Za-z0-9._-]+$/.test(user)) {
+        if (err) err.textContent = 'Caracteres inválidos en usuario. Solo letras, números, ., - y _';
+        return false;
+    }
+    if (!domain || !domain.value) {
+        if (err) err.textContent = 'Selecciona una extensión de correo.';
+        return false;
+    }
+    const email = `${user}@${domain.value}`;
     const re = /^\S+@\S+\.\S+$/;
-    if (!re.test(v)) { if (err) err.textContent = 'Formato de correo inválido (ejemplo@ejemplo.com).'; return false; }
+    if (!re.test(email)) {
+        if (err) err.textContent = 'Correo inválido.';
+        return false;
+    }
     if (err) err.textContent = '';
     return true;
 }
@@ -1231,18 +1291,19 @@ function validateAge() {
     return true;
 }
 function validatePhone() {
+    const op = document.getElementById('cust_operator');
     const el = document.getElementById('cust_phone');
     const err = document.getElementById('cust_phone_err');
     if (!el) return false;
     const v = el.value.trim();
     if (!v) {
-        if (err) err.textContent = 'El teléfono es obligatorio.';
-        return false;
+        if (err) err.textContent = 'El teléfono es obligatorio.'; return false;
     }
-    // Solo dígitos, sin +, sin espacios, 8 a 15 dígitos
-    if (!/^\d{8,15}$/.test(v.replace(/\s/g, ""))) {
-        if (err) err.textContent = 'Número inválido. Ejemplo: "04121234567".';
-        return false;
+    if (!/^\d{7}$/.test(v)) {
+        if (err) err.textContent = 'Teléfono inválido. Debe contener exactamente 7 dígitos.'; return false;
+    }
+    if (!op || !op.value) {
+        if (err) err.textContent = 'Selecciona una operadora.'; return false;
     }
     if (err) err.textContent = '';
     return true;
@@ -1263,7 +1324,6 @@ if (addressInput) {
         if (!addressInput.value.trim()) {
             showGeoButton();
         }
-        // Validar de nuevo para que reaccione el botón de confirmar pedido
         validateFormAll();
     });
 }
@@ -1278,8 +1338,12 @@ function validateFormAll() {
 function submitHandler(e) {
     e.preventDefault();
     const name = document.getElementById('cust_name').value.trim();
-    const email = document.getElementById('cust_email').value.trim();
+    const emailUser = document.getElementById('cust_email').value.trim();
+    const emailDomain = document.getElementById('cust_email_domain')?.value || '';
+    const emailFull = emailUser ? `${emailUser}@${emailDomain}` : '';
+    const operator = document.getElementById('cust_operator')?.value || '';
     const phoneRaw = document.getElementById('cust_phone').value.trim();
+    const phoneFull = operator && phoneRaw ? `${operator}${phoneRaw}` : phoneRaw;
     const age = document.getElementById('cust_age')?.value.trim() || "";
     const address = document.getElementById('cust_address').value.trim();
     const lat = document.getElementById('cust_lat')?.value || "";
@@ -1289,11 +1353,10 @@ function submitHandler(e) {
         if (msg) { msg.textContent = 'Corrige los campos indicados antes de enviar.'; msg.style.color = '#ef4444'; }
         return;
     }
-    // No se añade + ni nada. Solo el número puro.
-    submitOrder({ name, email, phone: phoneRaw, age, address, lat, lng });
+    submitOrder({ name, email: emailFull, phone: phoneFull, age, address, lat, lng });
 }
 
-/* ---------------------- Enviar order a Firebase con DATOS NUEVOS ---------------------- */
+/* ---------------------- Enviar order a Firebase ---------------------- */
 let IS_SUBMITTING = false;
 let ORDER_CONFIRM_SHOWN = false;
 function hideAllOrderConfirmations() {
@@ -1314,13 +1377,10 @@ function openConfirmInline(msg) {
     modal.scrollIntoView({ behavior: 'smooth', block: 'center' });
     ORDER_CONFIRM_SHOWN = true;
 
-    // Solución: cerrar modal pedido enviado con el botón
     document.getElementById('closeConfirm')?.addEventListener('click', function () {
         document.getElementById('orderConfirmInline').classList.add('hidden');
     });
 }
-
-
 
 async function submitOrder(customerData) {
     if (!CART.items.length) { showToast('El carrito está vacío'); return; }
@@ -1371,22 +1431,41 @@ async function submitOrder(customerData) {
 }
 
 /* ---------------------- Global events & interactions ---------------------- */
-// ... permanece igual, pero después de attachGlobalEvents agrega geo y focus ...
 function attachGlobalEvents() {
-    // ... igual ...
+    // Transformar campos (si no están en el HTML)
+    transformContactFields();
+
     const nameEl = document.getElementById('cust_name');
     const emailEl = document.getElementById('cust_email');
+    const emailDomainEl = document.getElementById('cust_email_domain');
+    const phoneOpEl = document.getElementById('cust_operator');
     const phoneEl = document.getElementById('cust_phone');
     const addrEl = document.getElementById('cust_address');
     const ageEl = document.getElementById('cust_age');
 
     if (nameEl) { nameEl.addEventListener('input', () => { validateName(); validateFormAll(); }); nameEl.addEventListener('blur', validateName); }
-    if (emailEl) { emailEl.addEventListener('input', () => { validateEmail(); validateFormAll(); }); emailEl.addEventListener('blur', validateEmail); }
+    if (emailEl) {
+        // Aceptar solo caracteres permitidos en tiempo real
+        emailEl.addEventListener('input', (e) => {
+            const v = e.currentTarget.value;
+            const cleaned = v.replace(/[^A-Za-z0-9._-]/g, '');
+            if (cleaned !== v) e.currentTarget.value = cleaned;
+            validateEmail();
+            validateFormAll();
+        });
+        emailEl.addEventListener('blur', validateEmail);
+    }
+    if (emailDomainEl) {
+        emailDomainEl.addEventListener('change', () => { validateEmail(); validateFormAll(); });
+    }
+    if (phoneOpEl) {
+        phoneOpEl.addEventListener('change', () => { validatePhone(); validateFormAll(); });
+    }
     if (phoneEl) {
-        // sanitizar: solo dígitos en tiempo real
+        // sanitizar: solo dígitos y máximo 7
         phoneEl.addEventListener('input', (e) => {
             const v = e.currentTarget.value;
-            const cleaned = v.replace(/\D+/g, '');
+            const cleaned = v.replace(/\D+/g, '').slice(0, 7);
             if (cleaned !== v) e.currentTarget.value = cleaned;
             validatePhone();
             validateFormAll();
@@ -1395,7 +1474,6 @@ function attachGlobalEvents() {
     }
     if (addrEl) { addrEl.addEventListener('input', () => { validateAddress(); validateFormAll(); }); addrEl.addEventListener('blur', validateAddress); }
     if (ageEl) {
-        // sanitizar edad: solo dígitos y máximo 3 caracteres
         ageEl.addEventListener('input', (e) => {
             const v = e.currentTarget.value;
             const cleaned = v.replace(/\D+/g, '').slice(0, 3);
@@ -1411,23 +1489,24 @@ function attachGlobalEvents() {
         try { checkoutForm.removeEventListener('submit', submitHandler); } catch (e) { }
         checkoutForm.addEventListener('submit', submitHandler);
     }
-    // ...
 }
 
 /* ---------------------- Bootstrapping ---------------------- */
 async function boot() {
     loadCartFromCookie();
     attachGlobalEvents();
-    setupGeolocationButton(); // <-- INICIA Botón de ubicación
+    setupGeolocationButton();
     renderCartCount();
     try {
         await fetchAllProductsFromFirestore();
         if (document.getElementById('productsGrid')) {
             const spinner = document.getElementById('productsSpinner'); spinner?.remove();
             renderProductsGrid();
-            setupCarousel();
+            if (typeof setupCarousel === 'function') setupCarousel();
         }
-        if (document.getElementById('productArea')) await renderProductPage();
+        if (document.getElementById('productArea')) {
+            if (typeof renderProductPage === 'function') await renderProductPage();
+        }
         await Promise.all(PRODUCTS.map(p => resolveProductImages(p)));
         await handleUrlAddParams();
         renderCartPanel();
@@ -1441,4 +1520,3 @@ async function boot() {
 
 window.addEventListener('load', boot);
 export { };
-// FIN

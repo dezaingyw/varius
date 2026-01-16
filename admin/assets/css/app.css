@@ -1542,13 +1542,19 @@ table#ordersTable tbody td {
 }
 
 .btn-view {
-  background: linear-gradient(180deg, #e6fbf4, #dff7ef);
+  background: linear-gradient(180deg, #dffff4, #c6ffec);
   color: #0f5f4a;
   border-color: rgba(34, 197, 94, 0.06);
 }
 
+.btn-copy {
+  background: linear-gradient(180deg, #ede3ff, #dac4ff);
+  color: #5320ab;
+  border-color: rgba(34, 197, 94, 0.06);
+}
+
 .btn-assign {
-  background: linear-gradient(180deg, #e9f7ff, #e0f3ff);
+  background: linear-gradient(180deg, #ddf3ff, #c6e9ff);
   color: #075985;
   border-color: rgba(6, 182, 212, 0.06);
 }
@@ -1578,7 +1584,7 @@ table#ordersTable tbody td {
 }
 
 .btn-suspender {
-  background: linear-gradient(180deg, #fff3f3, #ffeaea);
+  background: linear-gradient(180deg, #ffe2e2, #ffd7d7);
   color: #7a3b3b;
   border-color: rgba(245, 11, 11, 0.04);
 }

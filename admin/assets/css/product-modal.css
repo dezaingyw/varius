@@ -19,7 +19,8 @@
 /* Grid layout: main column + side column for compact fields */
 #productModal .modal-form {
   display: grid;
-  grid-template-columns: 1fr 240px; /* main + side */
+  grid-template-columns: 1fr 240px;
+  /* main + side */
   gap: 12px 16px;
   align-items: start;
   padding: 6px 0 10px 0;
@@ -32,13 +33,16 @@
 
 /* Two-col rows that should keep their children as columns */
 #productModal .modal-form .two-col {
-  display: contents; /* keep grid children to occupy the defined columns */
+  display: contents;
+  /* keep grid children to occupy the defined columns */
 }
+
 /* Ensure its direct children occupy each column */
-#productModal .modal-form .two-col > div:first-child {
+#productModal .modal-form .two-col>div:first-child {
   grid-column: 1 / 2;
 }
-#productModal .modal-form .two-col > div:last-child {
+
+#productModal .modal-form .two-col>div:last-child {
   grid-column: 2 / 3;
 }
 
@@ -64,8 +68,8 @@
   height: 44px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #e6e8eb;
-  background: #fff;
+  border: 1px solid #cdcdcd;
+  background: #f9f9f9;
   font-size: 14px;
   box-sizing: border-box;
 }
@@ -100,6 +104,7 @@
   min-height: 60px;
   margin-top: 6px;
 }
+
 #productModal .image-dropzone .dz-instructions {
   color: #6b7280;
   font-size: 14px;
@@ -110,7 +115,7 @@
 /* Dragover visual */
 #productModal .image-dropzone.dragover {
   border-color: #7c3aed;
-  box-shadow: 0 6px 20px rgba(124,58,237,0.08);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.08);
 }
 
 /* Slider preview */
@@ -120,6 +125,7 @@
   align-items: center;
   gap: 8px;
 }
+
 #productModal .slide-track {
   display: flex;
   gap: 8px;
@@ -128,6 +134,7 @@
   flex: 1;
   scroll-behavior: smooth;
 }
+
 #productModal .slide-item {
   min-width: 92px;
   height: 64px;
@@ -140,6 +147,7 @@
   background: #fff;
   position: relative;
 }
+
 #productModal .slide-item img {
   width: 100%;
   height: 100%;
@@ -149,7 +157,7 @@
 
 /* Remove / move buttons inside thumbnails */
 #productModal .img-remove {
-  background: rgba(0,0,0,0.48);
+  background: rgba(0, 0, 0, 0.48);
   width: 26px;
   height: 26px;
   border-radius: 999px;
@@ -176,10 +184,11 @@
   z-index: 4;
   border-bottom: 1px solid #eef1f4;
 }
+
 #productModal .modal-footer {
   position: sticky;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.9), #fff);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), #fff);
   padding: 10px 0;
   border-top: 1px solid #eef1f4;
   z-index: 4;
@@ -205,10 +214,10 @@
 
 /* Make primary stand out but keep existing palette */
 #productModal .btn-primary {
-  background: linear-gradient(180deg,#7c3aed,#6d28d9);
+  background: linear-gradient(180deg, #7c3aed, #6d28d9);
   color: #fff;
   border: none;
-  box-shadow: 0 8px 20px rgba(124,58,237,0.08);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.08);
 }
 
 /* Small visual for cancel */
@@ -224,7 +233,7 @@
 #productModal .modal-form textarea:focus,
 #productModal .modal-content .btn-primary:focus,
 #productModal .modal-content .btn-secondary:focus {
-  outline: 3px solid rgba(124,58,237,0.12);
+  outline: 3px solid rgba(124, 58, 237, 0.12);
   outline-offset: 2px;
 }
 
@@ -233,12 +242,13 @@
   #productModal .modal-form {
     grid-template-columns: 1fr;
     gap: 10px;
-    padding-bottom: 72px; /* espacio para footer sticky */
+    padding-bottom: 72px;
+    /* espacio para footer sticky */
   }
 
   /* two-col children stack */
-  #productModal .modal-form .two-col > div:first-child,
-  #productModal .modal-form .two-col > div:last-child {
+  #productModal .modal-form .two-col>div:first-child,
+  #productModal .modal-form .two-col>div:last-child {
     grid-column: 1 / -1;
   }
 
@@ -249,14 +259,16 @@
     left: 0;
     right: 0;
     padding: 12px 0;
-    background: linear-gradient(180deg, rgba(255,255,255,0), #fff);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff);
     display: flex;
     flex-direction: column-reverse;
     gap: 8px;
   }
+
   #productModal .form-actions .btn-primary {
     width: 100%;
   }
+
   #productModal .form-actions .btn-secondary {
     width: 100%;
   }
@@ -272,6 +284,7 @@
 #productModal .modal-form input[type="number"] {
   -moz-appearance: textfield;
 }
+
 #productModal .modal-form input[type="number"]::-webkit-outer-spin-button,
 #productModal .modal-form input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;

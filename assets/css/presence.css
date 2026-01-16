@@ -323,9 +323,9 @@
 .logout-btn {
     padding: 10px;
     border-radius: 10px;
-    border: 1px solid var(--border-color);
-    background: white;
-    color: #6b7280;
+    border: 1px solid #a6b79e;
+    background: #bfe6ad;
+    color: #324628;
     text-decoration: none;
     display: flex;
     align-items: center;
@@ -511,15 +511,19 @@
     align-items: center;
     gap: 10px;
     padding: 8px 16px;
-    border-radius: 999px; /* pill */
+    border-radius: 999px;
+    /* pill */
     font-weight: 600;
     font-size: 14px;
-    color: #062; /* fallback */
-    background: linear-gradient(180deg, #f0fdf4, #ecfdf3); /* fallback */
-    border: 1px solid rgba(0,0,0,0.06);
-    box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+    color: #062;
+    /* fallback */
+    background: linear-gradient(180deg, #f0fdf4, #ecfdf3);
+    /* fallback */
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.06);
     user-select: none;
-    cursor: default; /* no es interactivo */
+    cursor: default;
+    /* no es interactivo */
     transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
     white-space: nowrap;
     margin-left: 12px;
@@ -528,30 +532,30 @@
 /* Hover ligero para resaltar, sin comportarse como boton real */
 .presence-pill:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 22px rgba(2,6,23,0.08);
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.08);
 }
 
 /* Estados */
 .presence-pill.online {
     color: #04291b;
     background: linear-gradient(135deg, #34d399, #10b981);
-    box-shadow: 0 6px 20px rgba(16,185,129,0.12);
-    border: 1px solid rgba(16,185,129,0.2);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .presence-pill.offline {
     color: #374151;
     background: linear-gradient(180deg, #f3f4f6, #e5e7eb);
     box-shadow: none;
-    border: 1px solid rgba(55,65,81,0.06);
+    border: 1px solid rgba(55, 65, 81, 0.06);
     opacity: 0.95;
 }
 
 .presence-pill.error {
     color: #4b0b0b;
     background: linear-gradient(135deg, #f87171, #ef4444);
-    box-shadow: 0 6px 20px rgba(239,68,68,0.12);
-    border: 1px solid rgba(239,68,68,0.18);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.18);
 }
 
 /* pequeño icono opcional dentro de la pill */
@@ -560,22 +564,38 @@
     height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
-    box-shadow: 0 0 0 2px rgba(255,255,255,0.2) inset;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2) inset;
 }
 
 /* colores para el dot */
-.presence-pill.online .dot { background: #065f46; }
-.presence-pill.offline .dot { background: #6b7280; }
-.presence-pill.error .dot { background: #7f1d1d; }
+.presence-pill.online .dot {
+    background: #065f46;
+}
+
+.presence-pill.offline .dot {
+    background: #6b7280;
+}
+
+.presence-pill.error .dot {
+    background: #7f1d1d;
+}
 
 /* Focus visible para accesibilidad (si decides hacerlo focusable) */
 .presence-pill:focus-visible {
-    outline: 3px solid rgba(59,130,246,0.18);
+    outline: 3px solid rgba(59, 130, 246, 0.18);
     outline-offset: 3px;
 }
 
 /* Adaptaciones responsivas: tamaño y padding en mobile */
 @media (max-width: 900px) {
-    .presence-pill { padding: 6px 12px; font-size: 13px; margin-left: 8px; }
-    .presence-pill .dot { width: 8px; height: 8px; }
+    .presence-pill {
+        padding: 6px 12px;
+        font-size: 13px;
+        margin-left: 8px;
+    }
+
+    .presence-pill .dot {
+        width: 8px;
+        height: 8px;
+    }
 }
