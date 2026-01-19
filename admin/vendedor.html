@@ -15,66 +15,100 @@
   <input id="nav-toggle" type="checkbox" class="nav-toggle" aria-hidden="true">
 
   <header class="topbar">
-        <div class="top-left">
-            <label for="nav-toggle" class="hamburger" aria-hidden="true">
-                <span class="hamburger-box"><span class="hamburger-inner"></span></span>
-            </label>
-            <a class="brand" href="./" aria-label="Dashboard">
-                <img src="assets/img/logo.png" alt="Varius" width="14%">
-                <span class="brand-text">VARIUS</span>
-            </a>
-        </div>
+    <div class="top-left">
+      <label for="nav-toggle" class="hamburger" aria-hidden="true">
+        <span class="hamburger-box"><span class="hamburger-inner"></span></span>
+      </label>
+      <a class="brand" href="./" aria-label="Dashboard">
+        <img src="assets/img/logo.png" alt="Varius" width="14%">
+        <span class="brand-text">VARIUS</span>
+      </a>
+    </div>
 
-        <div class="top-search">
-            <!-- input eliminado intencionalmente -->
-            <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
-                <span class="dot"></span>
-                <span class="label">Desconectado</span>
-            </div>
-        </div>
-    </header>
+    <div class="top-search">
+      <!-- input eliminado intencionalmente -->
+      <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
+        <span class="dot"></span>
+        <span class="label">Desconectado</span>
+      </div>
+    </div>
+  </header>
 
   <div id="app-sidebar"></div>
 
   <main class="main">
+
     <section class="kpis" aria-label="Indicadores rápidos">
-      <article class="card kpi-card" id="kpi-card-orders" data-kpi="orders-today" tabindex="0" role="button"
-        aria-pressed="false">
-        <div class="kpi-info">
-          <div class="kpi-title">Pedidos hoy (tuyos)</div>
-          <div class="kpi-value" id="kpi-orders-today">—</div>
-          <div class="kpi-meta muted">Comparado con ayer</div>
+      <!-- Pedidos hoy -->
+      <article class="card kpi-card kpi-modern kpi-variant-info" id="kpi-card-orders" data-kpi="orders-today"
+        tabindex="0" role="button" aria-pressed="false">
+        <div class="kpi-top">
+          <div class="kpi-avatar" aria-hidden="true">📦</div>
+          <div>
+            <div class="kpi-title">Pedidos hoy (tuyos)</div>
+            <div class="kpi-sub">Comparado con ayer</div>
+          </div>
         </div>
-        <div class="kpi-icon" aria-hidden="true">
-          <div class="icon-square">📦</div>
+
+        <div class="kpi-divider" role="separator"></div>
+
+        <div>
+          <div class="kpi-amount kpi-value" id="kpi-orders-today">—</div>
+        </div>
+
+        <div class="kpi-bottom">
+          <div class="kpi-meta muted">Última actualización</div>
+          <button class="kpi-action" aria-label="Abrir detalles">→</button>
         </div>
       </article>
 
-      <article class="card kpi-card" id="kpi-card-sales" data-kpi="sales-today" tabindex="0" role="button"
-        aria-pressed="false">
-        <div class="kpi-info">
-          <div class="kpi-title">Ventas hoy (tuyas)</div>
-          <div class="kpi-value">$<span id="kpi-sales">—</span></div>
-          <div class="kpi-meta muted">Total diario</div>
+      <!-- Ventas hoy -->
+      <article class="card kpi-card kpi-modern kpi-variant-info" id="kpi-card-sales" data-kpi="sales-today" tabindex="0"
+        role="button" aria-pressed="false">
+        <div class="kpi-top">
+          <div class="kpi-avatar" aria-hidden="true">💲</div>
+          <div>
+            <div class="kpi-title">Ventas hoy (tuyas)</div>
+            <div class="kpi-sub">Total diario</div>
+          </div>
         </div>
-        <div class="kpi-icon" aria-hidden="true">
-          <div class="icon-square">💲</div>
+
+        <div class="kpi-divider"></div>
+
+        <div>
+          <div class="kpi-amount">$<span id="kpi-sales">—</span></div>
+        </div>
+
+        <div class="kpi-bottom">
+          <div class="kpi-meta muted">Ingresos verificados</div>
+          <button class="kpi-action" aria-label="Ver ventas">→</button>
         </div>
       </article>
 
-      <article class="card kpi-card" id="kpi-card-assigned" data-kpi="assigned" tabindex="0" role="button"
-        aria-pressed="false">
-        <div class="kpi-info">
-          <div class="kpi-title">Pedidos asignados</div>
-          <div class="kpi-value" id="kpi-assigned">—</div>
-          <div class="kpi-meta muted">En curso</div>
+      <!-- Pedidos asignados -->
+      <article class="card kpi-card kpi-modern kpi-variant-info" id="kpi-card-assigned" data-kpi="assigned" tabindex="0"
+        role="button" aria-pressed="false">
+        <div class="kpi-top">
+          <div class="kpi-avatar" aria-hidden="true">🏷️</div>
+          <div>
+            <div class="kpi-title">Pedidos asignados</div>
+            <div class="kpi-sub">En curso</div>
+          </div>
         </div>
-        <div class="kpi-icon" aria-hidden="true">
-          <div class="icon-square">🏷️</div>
+
+        <div class="kpi-divider"></div>
+
+        <div>
+          <div class="kpi-amount" id="kpi-assigned">—</div>
+        </div>
+
+        <div class="kpi-bottom">
+          <div class="kpi-meta muted">En proceso</div>
+          <button class="kpi-action" aria-label="Ver asignados">→</button>
         </div>
       </article>
     </section>
-
+    
     <section class="table-wrap card quick-actions-card" aria-label="Acciones rápidas">
       <div class="table-header" style="padding: 18px 12px;">
         <h3>Acciones Rápidas</h3>
