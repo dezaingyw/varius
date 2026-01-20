@@ -197,7 +197,7 @@ nav .nav-list {
 /* estilo para el botón principal */
 .action-primary {
   background: var(--btn-bg);
-  color: #ffffff;
+  color: #20104d;
   border: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 }

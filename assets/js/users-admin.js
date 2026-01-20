@@ -217,20 +217,24 @@ function renderTable() {
         } else if (statusLower === 'inactivo') {
             tr.classList.add('row-inactivo');
         }
+        const formatName = (name) => {
+            if (!name) return '—';
+            return name.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+        };
 
         const tdName = document.createElement('td');
         tdName.innerHTML = `
             <div class="user-cell">
                 <div class="${dotClass}" title="${state === 'online' ? 'Conectado' : 'Desconectado'}" aria-hidden="true"></div>
                 <div class="user-meta-stack">
-                    <div class="user-name">${escapeHtml(u.name || '—')}</div>
+                    <div class="user-name">${escapeHtml(formatName(u.name))}</div>
                     <div class="user-email">${escapeHtml(u.email || '')}</div>
                 </div>
             </div>
         `;
 
         const tdRole = document.createElement('td');
-        tdRole.innerHTML = `<span class="role-badge ${roleClass(u.role)}">${escapeHtml(u.role || '')}</span>`;
+        tdRole.innerHTML = `<span class="role-badge ${roleClass(u.role)}" style="text-transform: capitalize;">${escapeHtml(u.role || '')}</span>`;
 
         const tdPhone = document.createElement('td');
         tdPhone.textContent = u.phone || '';
@@ -669,7 +673,7 @@ userForm?.addEventListener('submit', async (e) => {
             try {
                 // tratamos de parsear JSON si viene como JSON
                 textBody = await res.text();
-                try { 
+                try {
                     const jsonBody = JSON.parse(textBody);
                     console.log('[users-admin] respuesta JSON:', jsonBody);
                 } catch (parseErr) {

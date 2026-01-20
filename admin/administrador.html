@@ -59,7 +59,13 @@
 
                 <div class="kpi-bottom">
                     <div class="kpi-meta">Revisar inventario</div>
-                    <button class="kpi-action" aria-label="Ver stock">→</button>
+                    <button class="kpi-action" aria-label="Ver stock">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-caret-right-fill" viewBox="0 0 16 16">
+                            <path
+                                d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
+                        </svg>
+                    </button>
                 </div>
             </article>
 
@@ -80,7 +86,13 @@
 
                 <div class="kpi-bottom">
                     <div class="kpi-meta">Última actualización</div>
-                    <button class="kpi-action" aria-label="Abrir detalles">→</button>
+                    <button class="kpi-action" aria-label="Abrir detalles">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-caret-right-fill" viewBox="0 0 16 16">
+                            <path
+                                d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
+                        </svg>
+                    </button>
                 </div>
             </article>
 
@@ -100,7 +112,13 @@
 
                 <div class="kpi-bottom">
                     <div class="kpi-meta">Ingresos verificados</div>
-                    <button class="kpi-action" aria-label="Ver ventas">→</button>
+                    <button class="kpi-action" aria-label="Ver ventas">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-caret-right-fill" viewBox="0 0 16 16">
+                            <path
+                                d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
+                        </svg>
+                    </button>
                 </div>
             </article>
 
@@ -120,7 +138,14 @@
 
                 <div class="kpi-bottom">
                     <div class="kpi-meta">Últ. cierre: —</div>
-                    <button class="kpi-action" aria-label="Acciones caja">→</button>
+                    <button class="kpi-action" aria-label="Acciones caja"
+                        onclick="window.location.href='cierre-caja.html'">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-caret-right-fill" viewBox="0 0 16 16">
+                            <path
+                                d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
+                        </svg>
+                    </button>
                 </div>
             </article>
         </section>
@@ -131,23 +156,20 @@
                 <h3>Acciones Rápidas</h3>
             </div>
             <div class="quick-actions" style="padding: 12px;">
-                <button class="btn btn-view action-primary" data-action="crear-producto">
-                    <span class="action-icon">＋</span>
-                    <span>Crear producto</span>
+                <button class="btn btn-view action-primary" data-action="crear-producto"
+                    onclick="window.location.href='product.html'">
+                    <span class="action-icon">🏬</span>
+                    <span>Ver Productos</span>
                 </button>
 
                 <button class="btn btn-view" data-action="gestionar-usuarios"
                     onclick="window.location.href='usuarios.html'">
                     <span class="action-icon">👥</span>
-                    <span>Gestionar usuarios</span>
+                    <span>Gestionar Usuarios</span>
                 </button>
 
-                <button class="btn btn-view" data-action="inventario" onclick="window.location.href='product.html'">
-                    <span class="action-icon">🏬</span>
-                    <span>Inventario</span>
-                </button>
-
-                <button class="btn btn-view" data-action="cierre-caja" onclick="window.location.href='cierre-caja.html'">
+                <button class="btn btn-view" data-action="cierre-caja"
+                    onclick="window.location.href='cierre-caja.html'">
                     <span class="action-icon">🧾</span>
                     <span>Cierre de caja</span>
                 </button>
@@ -306,6 +328,22 @@
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOW STOCK Modal (agregado para kpis.js) -->
+    <div id="lowStockModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-content modal-lg" role="document">
+            <div class="modal-header">
+                <h2>Productos con stock bajo</h2>
+                <button class="close-btn" id="lowStockModalClose" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="lowStockModalBody" style="padding:12px 18px;">
+                <div id="lowStockList" style="display:grid;gap:8px;"></div>
+            </div>
+            <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+                <button id="lowStockModalOk" class="btn-secondary">Cerrar</button>
             </div>
         </div>
     </div>

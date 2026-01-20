@@ -68,20 +68,69 @@ function recalcCart() {
 /* ---------------------- Productos: fetch + normalize ---------------------- */
 let PRODUCTS = [];
 let PRODUCTS_BY_ID = new Map();
+
+function toTitleCase(str) {
+    if (!str) return '';
+    return String(str).trim().split(/\s+/).map(word => {
+        // mantener guiones y apóstrofes con capitalización por segmento
+        return word.split(/([-'])/).map(seg => {
+            if (seg === '-' || seg === "'") return seg;
+            return seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase();
+        }).join('');
+    }).join(' ');
+}
+
 function normalizeProduct(doc) {
     const data = doc.data();
     const price = Number(data.price) || 0;
-    const discountPrice = (data.discountPrice !== undefined && data.discountPrice !== null)
-        ? Number(data.discountPrice)
-        : (data.discount ? Math.max(0, price - Number(data.discount)) : null);
+
+    // Calcular discountPrice de forma robusta:
+    // - si data.discountPrice está presente se usa tal cual
+    // - si existe data.discount se interpreta según su valor:
+    //    * 0 < d <= 1    => fracción (0.5 = 50%)
+    //    * 1 < d <= 100  => porcentaje (50 = 50%)
+    //    * de otro modo   => cantidad absoluta a restar (ej. 15)
+    let discountPrice = null;
+    if (data.discountPrice !== undefined && data.discountPrice !== null && data.discountPrice !== '') {
+        const dp = Number(data.discountPrice);
+        if (isFinite(dp)) discountPrice = dp;
+    } else if (data.discount !== undefined && data.discount !== null && data.discount !== '') {
+        const d = Number(data.discount);
+        if (isFinite(d)) {
+            if (d > 0 && d <= 1) {
+                // fracción (ej. 0.5 -> 50%)
+                discountPrice = Math.max(0, price * (1 - d));
+            } else if (d > 1 && d <= 100) {
+                // porcentaje (ej. 50 -> 50%)
+                discountPrice = Math.max(0, price * (1 - d / 100));
+            } else {
+                // tratar como cantidad absoluta a restar (ej. 15)
+                discountPrice = Math.max(0, price - d);
+            }
+        }
+    }
+
+    // Normalizar: si discountPrice no tiene sentido o no reduce el precio, dejar null
+    if (discountPrice !== null) {
+        discountPrice = Number(discountPrice);
+        if (!isFinite(discountPrice) || discountPrice <= 0 || discountPrice >= price) {
+            discountPrice = null;
+        }
+    }
+
     const isOnSale = !!(data.onOffer || data.isOnSale || data.onoffer || (discountPrice && discountPrice < price));
     const images = Array.isArray(data.imageUrls) && data.imageUrls.length ? data.imageUrls.slice()
         : (data.imageUrl ? [data.imageUrl] : (data.image ? [data.image] : (Array.isArray(data.imagePaths) ? data.imagePaths.slice() : [])));
+
+    // aplicar capitalización a los títulos (Primer letra mayúscula, resto minúscula por palabra)
+    const rawName = data.name || data.title || '';
+    const name = toTitleCase(rawName);
+
     return {
         id: doc.id,
-        name: data.name || data.title || '',
+        name,
         price,
-        discountPrice: (discountPrice && discountPrice > 0) ? discountPrice : null,
+        discountPrice: (discountPrice && Number(discountPrice) > 0) ? discountPrice : null,
         isOnSale,
         images,
         image: images && images.length ? images[0] : '',
@@ -206,7 +255,10 @@ function formatCurrency(n) {
 function isProductVisible(p) {
     if (!p || !p.status) return true;
     const s = String(p.status).toLowerCase().trim();
-    return !(s === 'suspendido' || s === 'suspended' || s === 'inactivo' || s === 'inactive');
+    if (s === 'suspendido' || s === 'suspended' || s === 'inactivo' || s === 'inactive') return false;
+    // ocultar productos con stock declarado y = 0
+    if (typeof p.stock === 'number' && p.stock <= 0) return false;
+    return true;
 }
 const toastEl = document.getElementById('toast');
 let toastTimeout = null;
@@ -1266,14 +1318,12 @@ function validateEmail() {
         return false;
     }
     if (!domain || !domain.value) {
-        if (err) err.textContent = 'Selecciona una extensión de correo.';
-        return false;
+        if (err) err.textContent = 'Selecciona una extensión de correo.'; return false;
     }
     const email = `${user}@${domain.value}`;
     const re = /^\S+@\S+\.\S+$/;
     if (!re.test(email)) {
-        if (err) err.textContent = 'Correo inválido.';
-        return false;
+        if (err) err.textContent = 'Correo inválido.'; return false;
     }
     if (err) err.textContent = '';
     return true;
@@ -1284,8 +1334,7 @@ function validateAge() {
     if (!el) return true;
     const v = el.value.trim();
     if (v && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > 120)) {
-        if (err) err.textContent = 'Edad inválida.';
-        return false;
+        if (err) err.textContent = 'Edad inválida.'; return false;
     }
     if (err) err.textContent = '';
     return true;

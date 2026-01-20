@@ -320,6 +320,12 @@ function render(list) {
     else if (chatColumn) chatColumn.style.display = 'none';
 }
 
+
+function formatTitleCase(str) {
+    if (!str) return '';
+    return str.toLowerCase().replace(/\b\w/g, s => s.toUpperCase());
+}
+
 /* Table */
 function renderTable(list) {
     if (!tbody) return;
@@ -330,7 +336,8 @@ function renderTable(list) {
         const idTd = document.createElement('td'); idTd.textContent = o.id || ''; tr.appendChild(idTd);
 
         const clientTd = document.createElement('td');
-        const cname = (o.data && o.data.customerData && (o.data.customerData.Customname || o.data.customerData.name)) || (o.data && o.data.customer && o.data.customer.name) || 'Sin nombre';
+        const rawName = (o.data && o.data.customerData && (o.data.customerData.Customname || o.data.customerData.name)) || (o.data && o.data.customer && o.data.customer.name) || 'Sin nombre';
+        const cname = formatTitleCase(rawName);
         const clienteReg = (o.data && o.data.customerData && o.data.customerData.clienteReg) || '';
         clientTd.innerHTML = `<div style="font-weight:700">${escapeHtml(cname)}</div><div class="small-muted">${escapeHtml(clienteReg)}</div>`;
         tr.appendChild(clientTd);
@@ -669,31 +676,123 @@ function renderChatSidebarList() {
 }
 
 /* ================= FILTERS ================= */
+function debounce(fn, wait = 200) {
+    let t;
+    return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(this, args), wait);
+    };
+}
+
+// --- Actualiza las opciones del select de estado basadas en los pedidos cargados ---
+function updateStatusFilterOptions(ordersList = orders) {
+    if (!filterStatus) return;
+    try {
+        const currentVal = filterStatus.value || '';
+        const statuses = new Set();
+        (ordersList || []).forEach(o => {
+            const rawStatus = (o.data && o.data.status) || '';
+            const rawShipping = (o.data && o.data.shippingStatus) || '';
+            const rawPayment = (o.data && o.data.paymentStatus) || '';
+
+            let displayStatus = translateStatus(rawStatus);
+            if (String(rawStatus || '').toLowerCase() === 'asignado' || String(rawStatus || '').toLowerCase() === 'assigned') {
+                if (rawPayment) displayStatus = translateStatus(rawPayment) || displayStatus;
+            }
+
+            const isDelivered = rawShipping && (String(rawShipping).toLowerCase() === 'entregado' || String(rawShipping).toLowerCase() === 'delivered');
+            if (isDelivered) statuses.add('Entregado');
+            else if (displayStatus) statuses.add(displayStatus);
+        });
+
+        const arr = Array.from(statuses).sort((a, b) => a.localeCompare(b, 'es'));
+
+        filterStatus.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = '';
+        optAll.text = 'Todos';
+        filterStatus.appendChild(optAll);
+
+        arr.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.toLowerCase();
+            opt.text = s;
+            filterStatus.appendChild(opt);
+        });
+
+        if (currentVal) {
+            const found = Array.from(filterStatus.options).some(o => o.value === currentVal.toLowerCase());
+            filterStatus.value = found ? currentVal.toLowerCase() : '';
+        }
+    } catch (e) {
+        console.warn('updateStatusFilterOptions error', e);
+    }
+}
+
+// --- applyFilters modificado (sin fecha) ---
 function applyFilters() {
     const s = (filterStatus && filterStatus.value) || '';
-    const d = (filterDate && filterDate.value) || '';
-    const c = (filterClient && filterClient.value || '').toLowerCase();
+    const c = (filterClient && filterClient.value || '').toLowerCase().trim();
 
     filteredOrders = orders.filter(o => {
         const od = o.data || {};
-        if (s && ((od.status || '').toLowerCase() !== s.toLowerCase())) return false;
-        if (d) {
-            let odDate = '';
-            const dField = od.orderDate || od.timestamp || od.assignedAt;
-            if (dField && typeof dField.toDate === 'function') odDate = dField.toDate().toISOString().slice(0, 10);
-            else if (typeof dField === 'string') odDate = (new Date(dField)).toISOString().slice(0, 10);
-            if (!odDate || odDate !== d) return false;
+
+        if (s) {
+            const rawStatus = (od.status) || '';
+            const rawShipping = (od.shippingStatus) || '';
+            const rawPayment = (od.paymentStatus) || '';
+
+            let displayStatus = translateStatus(rawStatus);
+            if (String(rawStatus || '').toLowerCase() === 'asignado' || String(rawStatus || '').toLowerCase() === 'assigned') {
+                if (rawPayment) displayStatus = translateStatus(rawPayment) || displayStatus;
+            }
+            const isDelivered = rawShipping && (String(rawShipping).toLowerCase() === 'entregado' || String(rawShipping).toLowerCase() === 'delivered');
+            const finalDisplay = isDelivered ? 'Entregado' : displayStatus;
+
+            if (!finalDisplay) return false;
+            if (finalDisplay.toLowerCase() !== s.toLowerCase()) return false;
         }
+
         if (c) {
             const cname = ((od.customerData && (od.customerData.Customname || od.customerData.name)) || (od.customer && od.customer.name) || '').toLowerCase();
             if (!cname.includes(c)) return false;
         }
+
         return true;
     });
 
     render(filteredOrders);
+    updateStatusFilterOptions(filteredOrders.length ? filteredOrders : orders);
 }
 
+// --- Ocultar filtro de fecha en DOM ---
+if (filterDate && filterDate.parentElement) {
+    try {
+        // filterDate.parentElement.remove(); // altern. remover
+        filterDate.parentElement.style.display = 'none';
+    } catch (e) { /* ignore */ }
+}
+
+// --- Event wiring: búsqueda en tiempo real, clear funcional, status reactivo ---
+if (filterClient) {
+    filterClient.addEventListener('input', debounce(() => {
+        applyFilters();
+    }, 200));
+}
+if (filterStatus) {
+    filterStatus.addEventListener('change', () => applyFilters());
+}
+if (btnFilter) {
+    btnFilter.addEventListener('click', (e) => { e.preventDefault(); applyFilters(); });
+}
+if (btnClear) {
+    btnClear.addEventListener('click', (e) => {
+        e && e.preventDefault();
+        if (filterStatus) filterStatus.value = '';
+        if (filterClient) filterClient.value = '';
+        applyFilters();
+    });
+}
 /* ================= FIRESTORE QUERY & LISTENER ================= */
 function buildOrdersQueryForRole(uid, role) {
     const col = collection(db, 'orders');
@@ -802,7 +901,7 @@ async function openViewModal(order) {
             const imgsHtml = imgs.map(src => `<img src="${escapeHtml(src)}" alt="${escapeHtml(it.name || '')}" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-right:6px;">`).join('');
             imgCellHtml = `<div class="mini-slider" style="display:flex;align-items:center;"><div class="mini-track">${imgsHtml}</div></div>`;
         } else {
-            const initials = escapeHtml(((it.name || '').slice(0,2) || 'IMG').toUpperCase());
+            const initials = escapeHtml(((it.name || '').slice(0, 2) || 'IMG').toUpperCase());
             imgCellHtml = `<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:#f3f4f6;color:#9aa0a6;font-weight:700">${initials}</div>`;
         }
 
@@ -860,6 +959,74 @@ function closeViewModal() {
 }
 
 /* Abre editor: prepara select de motorizados y lista de items */
+function _editShouldRequireMotorComment() {
+    if (!currentEditOrder) return false;
+    // datos originales actuales en la lista orders (no la copia editable)
+    const original = orders.find(x => x.id === currentEditOrder.id);
+    const originalData = (original && original.data) || {};
+    const oldAssignedMotorUid = originalData.assignedMotor || '';
+    const oldAssignedMotorEmail = originalData.assignedMotorName || originalData.assignedMotorEmail || '';
+    const oldAssignedMotorName = originalData.assignedMotorizedName || originalData.assignedDriverName || originalData.motorizadoName || originalData.assignedMotorizado || '';
+
+    // obtener valores seleccionados actualmente en el editor
+    const selectedMotorId = editMotorizadoSelect ? (editMotorizadoSelect.value || '') : '';
+    const freeEntry = editMotorizadoFree ? (editMotorizadoFree.value || '').trim() : '';
+
+    let newAssignedMotorUid = '';
+    let newAssignedMotorEmail = '';
+    let newAssignedMotorName = '';
+
+    if (selectedMotorId) {
+        const found = motorizados.find(m => m.id === selectedMotorId);
+        if (found) {
+            newAssignedMotorUid = found.id;
+            newAssignedMotorEmail = found.email || '';
+            newAssignedMotorName = found.name || found.email || found.id || '';
+        } else {
+            // seleccionado id que no está en caché -> tratamos como uid
+            newAssignedMotorUid = selectedMotorId;
+        }
+    } else if (freeEntry) {
+        const looksLikeEmail = /\S+@\S+\.\S+/.test(freeEntry);
+        if (looksLikeEmail) {
+            newAssignedMotorEmail = freeEntry;
+            newAssignedMotorName = freeEntry.split('@')[0];
+        } else {
+            newAssignedMotorName = freeEntry;
+        }
+    }
+
+    const changed = (
+        (newAssignedMotorUid && newAssignedMotorUid !== oldAssignedMotorUid) ||
+        (!newAssignedMotorUid && (newAssignedMotorEmail && newAssignedMotorEmail !== oldAssignedMotorEmail)) ||
+        (!newAssignedMotorUid && !newAssignedMotorEmail && newAssignedMotorName && newAssignedMotorName !== oldAssignedMotorName)
+    );
+
+    const oldExists = Boolean(oldAssignedMotorUid || oldAssignedMotorEmail || oldAssignedMotorName);
+
+    // requerir comentario solo si se cambió Y ya existía un motorizado antes
+    return changed && oldExists;
+}
+
+function _applyEditMotCommentVisibility() {
+    try {
+        const req = _editShouldRequireMotorComment();
+        // intentar detectar contenedor del comment (por si hay label / wrapper)
+        if (editMotComment) {
+            const container = editMotComment.parentElement || editMotComment.closest('.form-group') || editMotComment;
+            if (container) {
+                container.style.display = req ? '' : 'none';
+            }
+            // si se requiere, no tocar el valor; si no se requiere, limpiar el campo
+            if (!req) editMotComment.value = '';
+        }
+    } catch (e) {
+        // no bloquear
+        console.warn('_applyEditMotCommentVisibility error', e);
+    }
+}
+
+/* Abre editor: prepara select de motorizados y lista de items */
 function openEditModal(order) {
     clearFieldErrors();
     currentEditOrder = JSON.parse(JSON.stringify(order));
@@ -882,6 +1049,21 @@ function openEditModal(order) {
     }
     if (editMotorizadoFree) editMotorizadoFree.value = '';
     if (editMotComment) editMotComment.value = '';
+
+    // Ajustar visibilidad del campo de comentario según si ya existía motorizado
+    _applyEditMotCommentVisibility();
+
+    // Add listeners so that when user changes select/free input we update visibility/requirement dynamically
+    if (editMotorizadoSelect) {
+        // Remove previous listener by replacing with a fresh one (best-effort)
+        try { editMotorizadoSelect.removeEventListener('change', _applyEditMotCommentVisibility); } catch (e) { }
+        editMotorizadoSelect.addEventListener('change', _applyEditMotCommentVisibility);
+    }
+    if (editMotorizadoFree) {
+        try { editMotorizadoFree.removeEventListener('input', _applyEditMotCommentVisibility); } catch (e) { }
+        editMotorizadoFree.addEventListener('input', _applyEditMotCommentVisibility);
+    }
+
     buildItemsList(o.items || []);
     computeEditTotal();
     renderAvailableProductsList();
@@ -903,7 +1085,11 @@ function loadMotorizados() {
             motorizados = [];
             snap.forEach(s => {
                 const d = s.data() || {};
-                motorizados.push({ id: s.id, name: d.name || d.displayName || '', email: d.email || '', ...d });
+                // Asegurarnos de incluir solo motorizados con status = "activo" (case-insensitive)
+                const st = (d.status || '').toString().toLowerCase();
+                if (st === 'activo' || st === 'active') {
+                    motorizados.push({ id: s.id, name: d.name || d.displayName || '', email: d.email || '', ...d });
+                }
             });
             populateMotorizadoSelect();
         }, err => {
@@ -1223,14 +1409,16 @@ async function saveEditForm(e) {
     const oldAssignedMotorEmail = original.data && (original.data.assignedMotorName || original.data.assignedMotorEmail) || '';
     const oldAssignedMotorName = original.data && (original.data.assignedMotorizedName || original.data.motorizadoName) || '';
 
-    // If motorizado changed, comment mandatory
+    // If motorizado changed
     const isMotorChanged = (
         (newAssignedMotorUid && newAssignedMotorUid !== oldAssignedMotorUid) ||
         (!newAssignedMotorUid && (newAssignedMotorEmail && newAssignedMotorEmail !== oldAssignedMotorEmail)) ||
         (!newAssignedMotorUid && !newAssignedMotorEmail && newAssignedMotorName && newAssignedMotorName !== oldAssignedMotorName)
     );
 
-    if (isMotorChanged && !(editMotComment && editMotComment.value.trim())) {
+    // REQUERIR comentario solo si SE CAMBIÓ Y YA HABÍA un motorizado asignado antes
+    const oldHadMotor = Boolean(oldAssignedMotorUid || oldAssignedMotorEmail || oldAssignedMotorName);
+    if (isMotorChanged && oldHadMotor && !(editMotComment && editMotComment.value.trim())) {
         showFieldError(editMotComment || (editMotorizadoSelect || editMotorizadoFree), 'Debes justificar el cambio de motorizado.');
         showToast('Falta justificar el cambio de motorizado.');
         return;
