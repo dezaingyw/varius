@@ -228,7 +228,7 @@ function renderTable() {
                 <div class="${dotClass}" title="${state === 'online' ? 'Conectado' : 'Desconectado'}" aria-hidden="true"></div>
                 <div class="user-meta-stack">
                     <div class="user-name">${escapeHtml(formatName(u.name))}</div>
-                    <div class="user-email">${escapeHtml(u.email || '')}</div>
+                    <div class="user-email">${escapeHtml((u.email || '').toLowerCase())}</div>
                 </div>
             </div>
         `;

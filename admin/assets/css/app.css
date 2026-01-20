@@ -793,10 +793,7 @@ table#ordersTable tbody td {
   border: 1px solid rgba(239, 68, 68, 0.06);
 }
 
-/* hover polish for table rows */
-.products-table tbody tr:hover {
-  background: linear-gradient(180deg, #fff, #fcfdff);
-}
+
 
 /* pagination */
 .pagination-controls {

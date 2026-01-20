@@ -69,6 +69,103 @@ let lowStockProducts = []; // cached list of products with stock < 5
     .no-data { color:var(--muted,#6b7280); padding:12px; }
 
     button.btn-secondary.kpi { background:transparent; border:1px solid rgba(2,6,23,0.08); padding:8px 12px; border-radius:6px; cursor:pointer; }
+
+    /* ---- New compare modal styles (adapted from your provided design) ---- */
+    .compare-modal-overlay {
+        display:none;
+        position:fixed;
+        inset:0;
+        background: rgba(2,6,23,0.6);
+        z-index:1400;
+        padding:20px;
+        backdrop-filter: blur(4px);
+        overflow-y:auto;
+    }
+    .compare-modal-overlay.active {
+        display:flex;
+        align-items:flex-start;
+        justify-content:center;
+        padding-top:40px;
+        padding-bottom:40px;
+    }
+    .compare-modal-panel {
+        background: #fff;
+        border-radius: 14px;
+        width:100%;
+        max-width:1200px;
+        box-shadow: 0 20px 60px rgba(2,6,23,0.3);
+        position:relative;
+        animation: compareModalIn .28s ease-out;
+        overflow:hidden;
+    }
+    @keyframes compareModalIn {
+        from { opacity:0; transform: translateY(-20px) scale(.995); }
+        to { opacity:1; transform: translateY(0) scale(1); }
+    }
+    .compare-modal-header { padding:20px 28px; border-bottom:1px solid #eef2f7; }
+    .compare-modal-title { font-size:22px; font-weight:650; color:#111827; display:flex; gap:10px; align-items:center; }
+    .compare-modal-subtitle { font-size:13px; color:#6b7280; margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .compare-close-btn {
+        position:absolute; top:18px; right:18px; width:36px; height:36px; border-radius:8px; background:#f3f4f6; border:none; cursor:pointer; font-size:18px; color:#6b7280;
+    }
+    .compare-modal-body { padding:24px 28px; max-height:72vh; overflow:auto; }
+
+    .metrics-grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+        gap:16px;
+        margin-bottom:22px;
+    }
+    .metric-card {
+        background:#fbfdff;
+        border:1px solid #eef2f7;
+        border-radius:12px;
+        padding:16px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+    }
+    .metric-icon {
+        width:44px;height:44px;border-radius:10px;background:#667eea;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;margin-right:10px;
+    }
+    .metric-info { flex:1; min-width:0; }
+    .metric-label { font-size:12px;color:#6b7280; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .metric-value { font-size:20px;font-weight:650;color:#111827; }
+    .change-badge { padding:6px 10px; border-radius:8px; font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:6px; }
+    .change-positive { background:#dcfce7; color:#15803d; }
+    .change-negative { background:#fee2e2; color:#dc2626; }
+
+    .section-divider { height:1px; background:#eef2f7; margin:22px 0; border-radius:2px; }
+
+    .products-grid { display:grid; grid-template-columns:1fr; gap:16px; }
+    @media(min-width:1024px){ .products-grid { grid-template-columns:1fr 1fr; } }
+    .product-card { background:#fbfdff; border:1px solid #eef2f7; border-radius:12px; padding:16px; }
+    .product-list { display:flex; flex-direction:column; gap:12px; }
+    .product-item { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .product-meta { display:flex; gap:12px; align-items:center; min-width:0; }
+    .product-rank { width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800; }
+    .product-details { min-width:0; overflow:hidden; }
+    .product-name { font-weight:700; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .product-id { font-size:12px; color:#9ca3af; margin-top:4px; }
+
+    .orders-grid { display:grid; grid-template-columns:1fr; gap:16px; margin-top:14px; }
+    @media(min-width:768px){ .orders-grid { grid-template-columns:1fr 1fr; } }
+    .order-card { background:#fbfdff; border:1px solid #eef2f7; border-radius:12px; padding:18px; }
+    .order-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f5f9; }
+    .order-row:last-child { border-bottom:none; }
+
+    .comparison-summary { background:#f8fafc; border-radius:12px; padding:16px; display:flex; gap:18px; align-items:center; justify-content:center; margin-top:18px; flex-wrap:wrap; }
+    .summary-item { display:flex; gap:8px; align-items:center; }
+    .summary-value.positive { color:#15803d; font-weight:800; }
+    .summary-value.negative { color:#dc2626; font-weight:800; }
+
+    /* Responsive */
+    @media(max-width:640px){
+        .compare-modal-panel { border-radius:10px; margin:8px; }
+        .compare-modal-header { padding:16px; }
+        .compare-modal-body { padding:16px; }
+    }
     `;
     const s = document.createElement('style');
     s.textContent = css;
@@ -373,81 +470,213 @@ if (lowStockArticle) {
     lowStockArticle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLowStockModal(); } });
 }
 
-// Comparativa modal
+// --- REPLACED: Comparativa modal (nuevo diseño acorde a tu ejemplo) ---
+
+function buildTopProductsArray(productCountsMap, limit = 5) {
+    if (!productCountsMap || !(productCountsMap instanceof Map)) return [];
+    const arr = Array.from(productCountsMap.entries()).map(([name, qty]) => ({ name, qty }));
+    arr.sort((a, b) => b.qty - a.qty);
+    return arr.slice(0, limit);
+}
+
 function createOrdersCompareModal() {
     let existing = document.getElementById('ordersCompareModal');
     if (existing) return existing;
 
     const overlay = document.createElement('div');
     overlay.id = 'ordersCompareModal';
-    overlay.className = 'kpi-modal-overlay';
+    overlay.className = 'compare-modal-overlay';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
 
-    overlay.innerHTML = `<div class="kpi-modal-panel" role="document"><div class="modal-header"><h2>Comparativa de pedidos</h2><button id="ordersCompareClose" aria-label="Cerrar" class="close-btn">&times;</button></div><div id="ordersCompareContent"></div></div>`;
+    overlay.innerHTML = `
+      <div class="compare-modal-panel" role="document">
+        <button class="compare-close-btn" id="ordersCompareClose" aria-label="Cerrar">✕</button>
+        <div class="compare-modal-header">
+          <div class="compare-modal-title">📈 Comparación de Pedidos</div>
+          <div class="compare-modal-subtitle" id="ordersCompareSubtitle"></div>
+        </div>
+        <div class="compare-modal-body" id="ordersCompareContent"></div>
+      </div>
+    `;
     document.body.appendChild(overlay);
-    const panel = overlay.querySelector('.kpi-modal-panel'); if (panel) { panel.tabIndex = -1; panel.focus(); }
 
+    // focus handling & events
+    const panel = overlay.querySelector('.compare-modal-panel'); if (panel) { panel.tabIndex = -1; panel.focus(); }
     const closeBtn = overlay.querySelector('#ordersCompareClose');
     if (closeBtn) closeBtn.addEventListener('click', () => overlay.remove());
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-    document.addEventListener('keydown', function onEsc(e) { if (e.key === 'Escape') { const el = document.getElementById('ordersCompareModal'); if (el) el.remove(); document.removeEventListener('keydown', onEsc); } });
+    const onEsc = function onEsc(e) { if (e.key === 'Escape') { const el = document.getElementById('ordersCompareModal'); if (el) el.remove(); document.removeEventListener('keydown', onEsc); } };
+    document.addEventListener('keydown', onEsc);
     return overlay;
 }
-function topProductFromMap(productCounts) {
-    if (!productCounts || productCounts.size === 0) return null;
-    let topName = null, topQty = 0;
-    for (const [name, qty] of productCounts.entries()) {
-        if (qty > topQty) { topQty = qty; topName = name; }
-    }
-    return topName ? { name: topName, qty: topQty } : null;
-}
+
 function openOrdersCompareModal() {
     const cache = window.__kpis_cache || {};
-    const todayKey = cache.todayKey;
-    const prevKey = cache.prevKey;
-    const today = cache.todayBucket || { count: 0, sales: 0, deliveredCount: 0, customers: new Set(), productCounts: new Map(), maxOrder: { id: null, total: 0 } };
-    const prev = cache.prevBucket || { count: 0, sales: 0, deliveredCount: 0, customers: new Set(), productCounts: new Map(), maxOrder: { id: null, total: 0 } };
+    const todayKey = cache.todayKey || dateKeyFromDate(new Date());
+    const prevKey = cache.prevKey || null;
+    const today = cache.todayBucket || { count: 0, sales: 0, deliveredCount: 0, customers: new Set(), productCounts: new Map(), maxOrder: { id: null, total: 0 }, orders: [] };
+    const prev = cache.prevBucket || { count: 0, sales: 0, deliveredCount: 0, customers: new Set(), productCounts: new Map(), maxOrder: { id: null, total: 0 }, orders: [] };
 
     const modal = createOrdersCompareModal();
+
+    // IMPORTANT: activar la clase 'active' para que el overlay sea visible
+    if (modal && modal.classList) modal.classList.add('active');
+
+    const subtitleEl = modal.querySelector('#ordersCompareSubtitle');
+    if (subtitleEl) subtitleEl.innerHTML = `<span><span class="date-badge">${escapeHtml(todayKey)}</span> (Actual)</span> <span>vs</span> <span><span class="date-badge">${escapeHtml(prevKey || '—')}</span> (Anterior)</span>`;
+
     const content = modal.querySelector('#ordersCompareContent');
 
-    const topToday = topProductFromMap(today.productCounts);
-    const topPrev = topProductFromMap(prev.productCounts);
+    // Metrics (Total orders, Sales pagadas, Clientes únicos, Entregas)
+    const metrics = [
+        { icon: '📦', label: 'Total Pedidos', current: today.count || 0, previous: prev.count || 0 },
+        { icon: '💰', label: 'Ventas Pagadas', current: formatMoney(today.sales || 0), previous: formatMoney(prev.sales || 0), isMoney: true },
+        { icon: '👥', label: 'Clientes Únicos', current: (today.customers && today.customers.size) || 0, previous: (prev.customers && prev.customers.size) || 0 },
+        { icon: '🚚', label: 'Entregas', current: today.deliveredCount || 0, previous: prev.deliveredCount || 0 }
+    ];
 
-    content.innerHTML = `
-      <div class="compare-grid" style="margin-bottom:12px;">
-        <div class="compare-card"><div class="muted">Fecha</div><div class="stat">${escapeHtml(todayKey)}</div></div>
-        <div class="compare-card"><div class="muted">Fecha comparativa</div><div class="stat">${escapeHtml(prevKey || '—')}</div></div>
+    // Build metrics grid HTML
+    const metricsHtml = metrics.map(m => {
+        // compute percentage change if numeric
+        let changeHtml = '';
+        try {
+            const currNum = Number(String(m.current).replace(/[^0-9.-]+/g, '')) || 0;
+            const prevNum = Number(String(m.previous).replace(/[^0-9.-]+/g, '')) || 0;
+            if (prevNum > 0) {
+                const diff = currNum - prevNum;
+                const pct = Math.round((diff / prevNum) * 1000) / 10; // one decimal
+                const cls = (diff >= 0) ? 'change-positive' : 'change-negative';
+                const arrow = (diff >= 0) ? '↑' : '↓';
+                changeHtml = `<div><div class="change-badge ${cls}">${arrow} ${Math.abs(pct)}%</div><div class="previous-value">vs ${m.isMoney ? '$' + escapeHtml(m.previous) : escapeHtml(String(m.previous))}</div></div>`;
+            } else {
+                // no prev
+                changeHtml = `<div><div class="previous-value">vs ${m.isMoney ? '$' + escapeHtml(m.previous) : escapeHtml(String(m.previous))}</div></div>`;
+            }
+        } catch (e) {
+            changeHtml = `<div class="previous-value">vs ${escapeHtml(String(m.previous))}</div>`;
+        }
 
-        <div class="compare-card"><div class="muted">Pedidos</div><div class="stat">${escapeHtml(String(today.count || 0))}</div><div class="small">vs ${escapeHtml(String(prev.count || 0))}</div></div>
-        <div class="compare-card"><div class="muted">Ventas totales (solo "pagado")</div><div class="stat">$ ${escapeHtml(formatMoney(today.sales || 0))}</div><div class="small">vs $ ${escapeHtml(formatMoney(prev.sales || 0))}</div></div>
+        return `<div class="metric-card">
+            <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
+                <div class="metric-icon" aria-hidden="true">${m.icon}</div>
+                <div class="metric-info">
+                    <div class="metric-label">${escapeHtml(m.label)}</div>
+                    <div class="metric-value">${m.isMoney ? '$' + escapeHtml(String(m.current)) : escapeHtml(String(m.current))}</div>
+                </div>
+            </div>
+            <div style="text-align:right;">${changeHtml}</div>
+        </div>`;
+    }).join('');
 
-        <div class="compare-card"><div class="muted">Clientes únicos</div><div class="stat">${escapeHtml(String((today.customers && today.customers.size) || 0))}</div><div class="small">vs ${escapeHtml(String((prev.customers && prev.customers.size) || 0))}</div></div>
-        <div class="compare-card"><div class="muted">Entregas</div><div class="stat">${escapeHtml(String(today.deliveredCount || 0))}</div><div class="small">vs ${escapeHtml(String(prev.deliveredCount || 0))}</div></div>
+    // Build top products lists
+    const topToday = buildTopProductsArray(today.productCounts, 5);
+    const topPrev = buildTopProductsArray(prev.productCounts, 5);
 
-        <div class="compare-card" style="grid-column:1 / -1;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div><div class="muted">Producto más vendido</div><div class="stat">${topToday ? escapeHtml(titleCase(topToday.name)) + ' (' + escapeHtml(String(topToday.qty)) + ')' : '—'}</div></div>
-            <div style="text-align:right;"><div class="muted">Vs</div><div class="stat">${topPrev ? escapeHtml(titleCase(topPrev.name)) + ' (' + escapeHtml(String(topPrev.qty)) + ')' : '—'}</div></div>
+    function productListHtml(arr, tag) {
+        if (!arr || !arr.length) return `<div class="no-data">No hay datos</div>`;
+        return `<div class="product-list">` + arr.map((p, i) => {
+            return `<div class="product-item">
+                <div class="product-meta">
+                    <div class="product-rank" style="background:${i === 0 ? '#ddd6fe' : '#eef2ff'}; color:${i === 0 ? '#6d28d9' : '#6b7280'}">${i + 1}</div>
+                    <div class="product-details">
+                        <div class="product-name">${escapeHtml(titleCase(p.name))}</div>
+                        <div class="product-id">cantidad: ${escapeHtml(String(p.qty))}</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:800">${escapeHtml(String(p.qty))} uds</div>
+                </div>
+            </div>`;
+        }).join('') + `</div>`;
+    }
+
+    // Biggest orders
+    const todayMax = today.maxOrder || { id: null, total: 0 };
+    const prevMax = prev.maxOrder || { id: null, total: 0 };
+
+    // Orders and lists (we won't show full details, just summary)
+    const html = `
+      <div class="metrics-grid">${metricsHtml}</div>
+      <div class="section-divider"></div>
+
+      <div class="section-title" style="font-weight:650;margin-bottom:12px;display:flex;align-items:center;gap:10px;">🛒 Productos Más Vendidos</div>
+      <div class="products-grid">
+        <div class="product-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-weight:700">${escapeHtml(todayKey)}</div>
+            <div class="badge badge-current" style="background:#667eea;color:#fff;padding:6px 10px;border-radius:8px;font-weight:650;">Actual</div>
+          </div>
+          ${productListHtml(topToday, 'actual')}
+        </div>
+
+        <div class="product-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-weight:650">${escapeHtml(prevKey || '—')}</div>
+            <div class="badge badge-previous" style="background:#fff;border:1px solid #eef2f7;color:#6b7280;padding:6px 10px;border-radius:8px;font-weight:650;">Anterior</div>
+          </div>
+          ${productListHtml(topPrev, 'prev')}
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;">
+        <div style="flex:1;min-width:280px;">
+          <div style="font-weight:650;margin-bottom:10px;">📦 Detalles del Pedido Más Grande</div>
+          <div class="orders-grid">
+            <div class="order-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="font-weight:650">${escapeHtml(todayKey)}</div>
+                <div style="background:#667eea;color:#fff;padding:6px 10px;border-radius:8px;font-weight:650;">Actual</div>
+              </div>
+              <div class="order-row"><div class="order-label">ID del Pedido</div><div class="order-value order-id">${todayMax.id ? escapeHtml(todayMax.id) : '—'}</div></div>
+              <div class="order-row"><div class="order-label">Monto Total</div><div class="order-value large">$ ${escapeHtml(formatMoney(todayMax.total || 0))}</div></div>
+              <div class="order-row"><div class="order-label">Artículos</div><div class="order-value">${(today.orders && today.orders.length) ? today.orders.reduce((acc, o) => acc + ((o.data && o.data.items && o.data.items.length) || 0), 0) : '—'}</div></div>
+            </div>
+
+            <div class="order-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="font-weight:700">${escapeHtml(prevKey || '—')}</div>
+                <div style="background:#fff;border:1px solid #eef2f7;color:#6b7280;padding:6px 10px;border-radius:8px;font-weight:650;">Anterior</div>
+              </div>
+              <div class="order-row"><div class="order-label">ID del Pedido</div><div class="order-value order-id">${prevMax.id ? escapeHtml(prevMax.id) : '—'}</div></div>
+              <div class="order-row"><div class="order-label">Monto Total</div><div class="order-value">$ ${escapeHtml(formatMoney(prevMax.total || 0))}</div></div>
+              <div class="order-row"><div class="order-label">Artículos</div><div class="order-value">${(prev.orders && prev.orders.length) ? prev.orders.reduce((acc, o) => acc + ((o.data && o.data.items && o.data.items.length) || 0), 0) : '—'}</div></div>
+            </div>
           </div>
         </div>
 
-        <div class="compare-card" style="grid-column:1 / -1;">
-          <div class="muted">Pedido más grande</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-            <div><div class="small">ID</div><div class="stat">${today.maxOrder && today.maxOrder.id ? escapeHtml(today.maxOrder.id) : '—'}</div></div>
-            <div><div class="small">Total</div><div class="stat">$ ${escapeHtml(formatMoney(today.maxOrder && today.maxOrder.total || 0))}</div></div>
-            <div style="text-align:right;"><div class="small">Vs</div><div class="small">ID: ${prev.maxOrder && prev.maxOrder.id ? escapeHtml(prev.maxOrder.id) : '—'}</div><div class="stat">$ ${escapeHtml(formatMoney(prev.maxOrder && prev.maxOrder.total || 0))}</div></div>
+        <div style="flex:1;min-width:260px;">
+          <div style="font-weight:650;margin-bottom:10px;">📋 Resumen Rápido</div>
+          <div class="comparison-summary">
+            <div class="summary-item">
+              <div class="summary-label">Diferencia en Valor:</div>
+              <div class="summary-value ${(today.sales - prev.sales) >= 0 ? 'positive' : 'negative'}">
+                ${(today.sales - prev.sales) >= 0 ? '↑' : '↓'} $ ${escapeHtml(formatMoney(Math.abs((today.sales || 0) - (prev.sales || 0))))}
+              </div>
+            </div>
+            <div class="divider-vertical" style="width:1px;height:36px;background:#e6eef7;border-radius:2px;"></div>
+            <div class="summary-item">
+              <div class="summary-label">Diferencia en Artículos:</div>
+              <div class="summary-value ${((Array.from(today.productCounts.values()).reduce((a, b) => a + b, 0)) - (Array.from(prev.productCounts.values()).reduce((a, b) => a + b, 0))) >= 0 ? 'positive' : 'negative'}">
+                ${((Array.from(today.productCounts.values()).reduce((a, b) => a + b, 0)) - (Array.from(prev.productCounts.values()).reduce((a, b) => a + b, 0))) >= 0 ? '↑' : '↓'} ${escapeHtml(String(Math.abs((Array.from(today.productCounts.values()).reduce((a, b) => a + b, 0)) - (Array.from(prev.productCounts.values()).reduce((a, b) => a + b, 0)))))} artículos
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;"><button id="ordersCompareCloseBtn" class="btn-secondary kpi">Cerrar</button></div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button id="ordersCompareCloseBtn" class="btn-secondary kpi" style="border-radius:8px;padding:8px 12px;">Cerrar</button>
+      </div>
     `;
+
+    content.innerHTML = html;
 
     const closeBtn2 = modal.querySelector('#ordersCompareCloseBtn');
     if (closeBtn2) closeBtn2.addEventListener('click', () => modal.remove());
-    const panel = modal.querySelector('.kpi-modal-panel'); if (panel) panel.focus();
+    const panel = modal.querySelector('.compare-modal-panel'); if (panel) panel.focus();
 }
 
 // --- NUEVO: Modal de ventas (lista de pedidos del día) ---
@@ -548,34 +777,93 @@ function openSalesModal() {
 }
 
 // Attach click to the "Pedidos hoy" KPI (existente)
+// Reemplazar attachOrdersKpiClick y attachSalesKpiClick por lo siguiente:
+
 (function attachOrdersKpiClick() {
-    if (!ordersTodayEl) return;
-    let parent = ordersTodayEl;
-    while (parent && parent.tagName && parent.tagName.toLowerCase() !== 'article') {
-        parent = parent.parentElement;
+    const el = document.getElementById('kpi-orders-today');
+    if (!el) {
+        console.warn('attachOrdersKpiClick: no se encontró #kpi-orders-today');
+        return;
     }
-    const kpiArticle = parent;
-    if (!kpiArticle) return;
+
+    // usa closest para mayor robustez
+    const kpiArticle = el.closest('article') || el.parentElement;
+    if (!kpiArticle) {
+        console.warn('attachOrdersKpiClick: no se encontró elemento article padre');
+        return;
+    }
+
     kpiArticle.style.cursor = 'pointer';
-    kpiArticle.setAttribute('tabindex', '0');
-    kpiArticle.addEventListener('click', () => { openOrdersCompareModal(); });
-    kpiArticle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openOrdersCompareModal(); } });
+    // si ya tiene tabindex no lo cambiamos, pero nos aseguramos que exista para accesibilidad
+    if (!kpiArticle.hasAttribute('tabindex')) kpiArticle.setAttribute('tabindex', '0');
+
+    const openHandler = (evt) => {
+        // si se hizo click en un control que no debe abrir el modal (ej. botón interno), ignorar
+        if (evt && evt.target && evt.target.closest && evt.target.closest('button.kpi-action')) {
+            // dejamos pasar para que el botón haga lo suyo; no abrimos el modal por ese click
+            return;
+        }
+        openOrdersCompareModal();
+    };
+
+    kpiArticle.addEventListener('click', openHandler);
+    kpiArticle.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openHandler(e);
+        }
+    });
+
+    // también enlazamos el botón interno .kpi-action (si existe) para que abra el modal, 
+    // y evitamos que detenga la propagación si queremos que funcione desde ahí.
+    const actionBtn = kpiArticle.querySelector('.kpi-action, button.kpi-action');
+    if (actionBtn) {
+        // Si el botón ya tenía lógica distinta, puedes quitar esto.
+        actionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openOrdersCompareModal();
+        });
+    }
 })();
 
-// --- NUEVO: Attach click to Sales KPI (kpi-sales span inside) ---
 (function attachSalesKpiClick() {
-    if (!salesEl) return;
-    // encontrar el artículo padre
-    let parent = salesEl;
-    while (parent && parent.tagName && parent.tagName.toLowerCase() !== 'article') {
-        parent = parent.parentElement;
+    const el = document.getElementById('kpi-sales');
+    if (!el) {
+        console.warn('attachSalesKpiClick: no se encontró #kpi-sales');
+        return;
     }
-    const kpiArticle = parent;
-    if (!kpiArticle) return;
+
+    const kpiArticle = el.closest('article') || el.parentElement;
+    if (!kpiArticle) {
+        console.warn('attachSalesKpiClick: no se encontró elemento article padre');
+        return;
+    }
+
     kpiArticle.style.cursor = 'pointer';
-    kpiArticle.setAttribute('tabindex', '0');
-    kpiArticle.addEventListener('click', () => { openSalesModal(); });
-    kpiArticle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSalesModal(); } });
+    if (!kpiArticle.hasAttribute('tabindex')) kpiArticle.setAttribute('tabindex', '0');
+
+    const openHandler = (evt) => {
+        if (evt && evt.target && evt.target.closest && evt.target.closest('button.kpi-action')) {
+            return;
+        }
+        openSalesModal();
+    };
+
+    kpiArticle.addEventListener('click', openHandler);
+    kpiArticle.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openHandler(e);
+        }
+    });
+
+    const actionBtn = kpiArticle.querySelector('.kpi-action, button.kpi-action');
+    if (actionBtn) {
+        actionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openSalesModal();
+        });
+    }
 })();
 
 // Attach modal close handlers (low stock)

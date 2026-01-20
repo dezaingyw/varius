@@ -1,9 +1,6 @@
 // assets/js/history-admin.js
-// Versión funcional conservando la estructura original y con KPIs sobre los filtros.
-// - KPIs (arriba de filtros): veces compradas, monto total gastado, cantidad total de productos
-// - Una sola tabla de pedidos (Fecha | Total por compra | Productos | Estado de pago)
-// - Totales consideran solo órdenes pagadas
-// - Export CSV mantiene la información completa
+// Versión con badges en columna "Estado de Pago" y fila naranja (#fff7ed) para pendientes.
+// Corregido: referencias a los IDs de los KPIs actualizados en history.html.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -26,9 +23,10 @@ const histOrdersContainer = document.getElementById('histOrdersContainer');
 const exportCsvBtn = document.getElementById('exportCsv');
 const toastEl = document.getElementById('toast');
 
-const kpiPurchasesEl = document.getElementById('kpi-purchases');
-const kpiTotalEl = document.getElementById('kpi-total');
-const kpiProductsEl = document.getElementById('kpi-products');
+// CORRECCIÓN: usar los IDs actuales en history.html
+const kpiPurchasesEl = document.getElementById('kpi-purchases-amount');
+const kpiTotalEl = document.getElementById('kpi-total-amount');
+const kpiProductsEl = document.getElementById('kpi-products-amount');
 
 let currentUser = null;
 let currentUserRole = null;
@@ -168,12 +166,20 @@ function renderHistoryOrders(orders) {
         const dateStr = d ? d.toLocaleString('es-ES') : '—';
         const totalStr = o.total ? formatCurrency(o.total) : '—';
         const prodText = buildProductsText(Array.isArray(o.items) ? o.items : []);
-        const pay = o.paymentStatus || (isOrderPaid(o) ? 'Pagado' : 'Pendiente');
+
+        // Build payment status badge and apply pending-row for non-paid
+        let payHtml = '';
+        if (isOrderPaid(o)) {
+            payHtml = `<span class="status-badge status-activo">Pagado</span>`;
+        } else {
+            payHtml = `<span class="status-badge status-inactivo">Pendiente</span>`;
+            tr.classList.add('pending-row');
+        }
 
         tr.innerHTML = `<td data-label="Fecha">${escapeHtml(dateStr)}</td>
                         <td data-label="Total">${escapeHtml(totalStr)}</td>
                         <td data-label="Productos">${escapeHtml(prodText)}</td>
-                        <td data-label="Estado de Pago">${escapeHtml(pay)}</td>`;
+                        <td data-label="Estado de Pago">${payHtml}</td>`;
         tbody.appendChild(tr);
     });
 
@@ -214,9 +220,9 @@ function exportOrdersToCsv(orders) {
 }
 
 async function loadAndRender() {
-    const from = histFrom.value || null;
-    const to = histTo.value || null;
-    const search = (histSearch.value || '').trim();
+    const from = histFrom ? histFrom.value : null;
+    const to = histTo ? histTo.value : null;
+    const search = (histSearch && histSearch.value || '').trim();
     const customerIdParam = qParam('customerId') || qParam('phone') || qParam('name') || '';
 
     histOrdersContainer.innerHTML = '<div style="display:flex;align-items:center;gap:8px"><div class="loader" aria-hidden="true"></div><div>Cargando pedidos...</div></div>';
@@ -226,7 +232,7 @@ async function loadAndRender() {
         renderHistoryOrders(orders);
         const kpis = computeKPIs(orders);
         renderKPIs(kpis);
-        exportCsvBtn.onclick = () => exportOrdersToCsv(orders);
+        if (exportCsvBtn) exportCsvBtn.onclick = () => exportOrdersToCsv(orders);
     } catch (err) {
         console.error('Error loading history:', err);
         histOrdersContainer.innerHTML = '<div class="small-muted">Error cargando historial (ver consola).</div>';
@@ -234,8 +240,8 @@ async function loadAndRender() {
     }
 }
 
-applyHistFilters.addEventListener('click', loadAndRender);
-clearHistFilters.addEventListener('click', () => { histFrom.value = ''; histTo.value = ''; histSearch.value = ''; loadAndRender(); });
+if (applyHistFilters) applyHistFilters.addEventListener('click', loadAndRender);
+if (clearHistFilters) clearHistFilters.addEventListener('click', () => { if (histFrom) histFrom.value = ''; if (histTo) histTo.value = ''; if (histSearch) histSearch.value = ''; loadAndRender(); });
 
 onAuthStateChanged(auth, async (user) => {
     if (!user) { window.location.href = '/index.html'; return; }
@@ -249,7 +255,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     const nameParam = qParam('name') || '';
     const phoneParam = qParam('phone') || '';
-    if (nameParam && !histSearch.value) histSearch.value = nameParam;
-    if (phoneParam && !histSearch.value) histSearch.value = phoneParam;
+    if (nameParam && histSearch && !histSearch.value) histSearch.value = nameParam;
+    if (phoneParam && histSearch && !histSearch.value) histSearch.value = phoneParam;
     await loadAndRender();
 });
