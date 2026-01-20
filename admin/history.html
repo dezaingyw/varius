@@ -18,14 +18,26 @@
             margin-bottom: 12px;
         }
 
+        .history-header .title-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .client-name-pill {
+            background: linear-gradient(135deg, #34d399, #10b981);
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 14px;
+            color: #fff;
+        }
+
         .history-kpis {
             display: flex;
             gap: 12px;
             margin-bottom: 12px;
             flex-wrap: wrap;
         }
-
-
 
         .history-filters {
             display: flex;
@@ -79,32 +91,66 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
+
         .kpis {
             display: flex;
             gap: 12px;
             margin-bottom: 12px;
             flex-wrap: wrap;
         }
+
         .kpi-card {
             min-width: 260px;
             flex: 1 1 260px;
         }
-        .kpi-top { display:flex; gap:12px; align-items:center; }
-        .kpi-avatar { font-size:20px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(0,0,0,0.04); }
-        .kpi-title { font-weight:700; }
-        .kpi-sub { font-size:13px; color:var(--muted); }
-        .kpi-divider { height:1px; background:rgba(0,0,0,0.04); margin:8px 0; }
-        .kpi-amount { font-size:20px; font-weight:800; }
-        .kpi-bottom { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
-        .kpi-meta.muted { color:var(--muted); font-size:12px; }
 
-        .orders-list {
-            border: 1px solid var(--border);
+        .kpi-top {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .kpi-avatar {
+            font-size: 20px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             border-radius: 8px;
-            padding: 12px;
-            background: var(--card-bg);
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .kpi-title {
+            font-weight: 700;
+        }
+
+        .kpi-sub {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .kpi-divider {
+            height: 1px;
+            background: rgba(0, 0, 0, 0.04);
+            margin: 8px 0;
+        }
+
+        .kpi-amount {
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .kpi-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .kpi-meta.muted {
+            color: var(--muted);
+            font-size: 12px;
         }
 
         .small-muted {
@@ -230,13 +276,22 @@
     <main class="main">
         <section class="card">
             <div class="history-header">
-                <h3>Historial de Compras</h3>
+                <div class="title-row" style="display: flex; align-items: center; gap: 8px;" bis_skin_checked="1">
+                    <h3 style="margin: 0;">Historial de Compras</h3>
+
+                    <div id="clientName" class="client-name-pill"
+                        style="display: inline-flex; align-items: center; text-transform: capitalize;"
+                        aria-live="polite" bis_skin_checked="1">
+
+                    </div>
+                </div>
                 <div class="actions">
-                    <a href="orders.html" class="btn-apply" title="Volver a Pedidos" aria-label="Volver a Pedidos" style="display:inline-flex;gap:8px;align-items:center;">
+                    <a href="orders.html" class="btn-apply" title="Volver a Pedidos" aria-label="Volver a Pedidos"
+                        style="display:inline-flex;gap:8px;align-items:center;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                            class="bi bi-arrow-left-circle" viewBox="0 0 16 16" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                            <path fill-rule="evenodd" d="M8.5 11a.5.5 0 0 1-.5-.5V9H5.707a.5.5 0 0 1-.354-.854l2.5-2.5a.5.5 0 0 1 .707.708L6.707 8H8v2.5a.5.5 0 0 1-.5.5z"/>
+                            class="bi bi-caret-left-fill" viewBox="0 0 16 16">
+                            <path
+                                d="m3.86 8.753 5.482 4.796c.646.566 1.658.106 1.658-.753V3.204a1 1 0 0 0-1.659-.753l-5.48 4.796a1 1 0 0 0 0 1.506z" />
                         </svg>
                         Regresar
                     </a>
@@ -258,7 +313,7 @@
                     <div>
                         <div class="kpi-amount kpi-value"><span id="kpi-purchases-amount">—</span></div>
                     </div>
-                
+
                 </article>
 
                 <article class="card kpi-card kpi-modern kpi-variant-info" id="kpi-card-total" data-kpi="total-spent"
@@ -290,7 +345,7 @@
                         <div class="kpi-amount"><span id="kpi-products-amount">—</span></div>
                     </div>
                 </article>
-            </section>  
+            </section>
 
             <div class="orders-list">
                 <h4>Pedidos</h4>

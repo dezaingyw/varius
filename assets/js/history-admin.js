@@ -1,6 +1,6 @@
 // assets/js/history-admin.js
-// Versión con badges en columna "Estado de Pago" y fila naranja (#fff7ed) para pendientes.
-// Corregido: referencias a los IDs de los KPIs actualizados en history.html.
+// Versión con badges en columna "Estado de Pago", fila naranja (#fff7ed) para pendientes,
+// y restaurado el nombre del cliente mostrado junto al título.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -27,6 +27,9 @@ const toastEl = document.getElementById('toast');
 const kpiPurchasesEl = document.getElementById('kpi-purchases-amount');
 const kpiTotalEl = document.getElementById('kpi-total-amount');
 const kpiProductsEl = document.getElementById('kpi-products-amount');
+
+// Restaurar referencia al elemento que muestra el nombre del cliente
+const clientNameEl = document.getElementById('clientName');
 
 let currentUser = null;
 let currentUserRole = null;
@@ -233,6 +236,21 @@ async function loadAndRender() {
         const kpis = computeKPIs(orders);
         renderKPIs(kpis);
         if (exportCsvBtn) exportCsvBtn.onclick = () => exportOrdersToCsv(orders);
+
+        // Mostrar nombre del cliente si está disponible: preferir query param customerName,
+        // sino intentar extraerlo de la primera orden encontrada.
+        let clientName = qParam('customerName') || qParam('name') || '';
+        if (!clientName && orders.length > 0) {
+            const o = orders.find(x => x.customerData && (x.customerData.name || x.customerData.Customname));
+            if (o && o.customerData) clientName = o.customerData.name || o.customerData.Customname || '';
+        }
+        if (clientName && clientNameEl) {
+            clientNameEl.textContent = clientName;
+            clientNameEl.style.display = 'inline-block';
+        } else if (clientNameEl) {
+            clientNameEl.textContent = '';
+            clientNameEl.style.display = 'none';
+        }
     } catch (err) {
         console.error('Error loading history:', err);
         histOrdersContainer.innerHTML = '<div class="small-muted">Error cargando historial (ver consola).</div>';
@@ -257,5 +275,13 @@ onAuthStateChanged(auth, async (user) => {
     const phoneParam = qParam('phone') || '';
     if (nameParam && histSearch && !histSearch.value) histSearch.value = nameParam;
     if (phoneParam && histSearch && !histSearch.value) histSearch.value = phoneParam;
+
+    // Si viene customerName via query string, mostrarla inmediatamente
+    const immediateName = qParam('customerName') || qParam('name') || '';
+    if (immediateName && clientNameEl) {
+        clientNameEl.textContent = immediateName;
+        clientNameEl.style.display = 'inline-block';
+    }
+
     await loadAndRender();
 });
