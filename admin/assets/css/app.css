@@ -58,6 +58,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.35;
   min-height: 100vh;
+
 }
 
 a {
@@ -1541,6 +1542,17 @@ table#ordersTable tbody td {
 
 .btn-view {
   background: linear-gradient(180deg, #dffff4, #c6ffec);
+  color: #0f5f4a;
+  border-color: rgba(34, 197, 94, 0.06);
+}
+.btn-inactivate {
+  background: linear-gradient(180deg, #fff2df, #ffebc6);
+  color: #5f430f;
+  border-color: rgba(34, 197, 94, 0.06);
+}
+
+.btn-activate {
+  background: linear-gradient(180deg, #dfffe1, #c6ffc9);
   color: #0f5f4a;
   border-color: rgba(34, 197, 94, 0.06);
 }

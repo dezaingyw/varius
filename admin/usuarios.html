@@ -131,15 +131,19 @@
 
         /* Modal input improvements */
         .modal .modal-content {
+            /* adaptative width, less padding and scroll for very tall content */
             max-width: 720px;
-            width: 95%;
-            padding: 16px;
+            width: min(96%, 720px);
+            padding: 12px;
             border-radius: 12px;
             background: #fff;
+            box-sizing: border-box;
+            max-height: calc(100vh - 80px);
+            overflow-y: auto;
         }
 
         .modal-form .form-row {
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             display: flex;
             flex-direction: column;
             gap: 6px;
@@ -157,6 +161,8 @@
             background: #f9f9f9;
             font-size: 14px;
             transition: box-shadow 120ms ease, border-color 120ms ease;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .modal-form input:focus,
@@ -218,18 +224,6 @@
             align-items: center;
         }
 
-        .icon-btn.small {
-            padding: 6px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: #fff;
-        }
-
-        .icon-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
 
         /* Layout utilities */
         .two-col {
@@ -280,15 +274,17 @@
                 display: none;
             }
 
-            .two-col,
-            .row-2 {
+            /* Mantener row-2 (correo/ext y operadora/numero) lado a lado,
+               pero convertir two-col (passwords) a columna */
+            .two-col {
                 flex-direction: column;
             }
+
+            /* row-2 stays horizontal so correo + ext and operadora + numero remain side-by-side */
         }
 
         /* target very small screens including < 380px */
         @media (max-width: 380px) {
-
 
             .modal-form input[type="text"],
             .modal-form input[type="tel"],
@@ -314,12 +310,7 @@
             background: #fff1f2;
             /* rosa suave */
         }
-
-        tr.row-suspendido td {
-            /* texto por defecto se mantiene; puedes ajustar color si quieres más contraste */
-        }
-
-        /* barra roja a la izquierda */
+                /* barra roja a la izquierda */
         tr.row-suspendido td:first-child {
             position: relative;
             padding-left: 12px;
@@ -336,6 +327,51 @@
             /* rojo */
             border-radius: 2px;
         }
+
+        /* estilo fila inactiva: fondo naranja suave y barra izquierda naranja */
+        tr.row-inactivo {
+            background: #fff7ed;
+        }
+
+        tr.row-inactivo td:first-child {
+            position: relative;
+            padding-left: 12px;
+        }
+
+        tr.row-inactivo td:first-child::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 10px;
+            bottom: 10px;
+            width: 4px;
+            background: #f59e0b;
+            border-radius: 2px;
+        }
+
+        /* ===== Loader modal styles ===== */
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 5px solid rgba(0, 0, 0, 0.08);
+            border-top-color: #2b6ef6;
+            animation: spin 1s linear infinite;
+            margin: 10px auto 0 auto;
+        }
+
+        .loading-modal-content {
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 360px;
+            text-align: center;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* ============================== */
+
     </style>
 </head>
 
@@ -453,6 +489,8 @@
 
                 <form id="userForm" class="modal-form" novalidate>
                     <input type="hidden" id="userId" />
+                    <!-- Hidden status: el select visible fue removido; este input mantiene el valor -->
+                    <input type="hidden" id="u_status" />
 
                     <div class="form-row">
                         <label for="u_name">Nombre <span class="required">*</span></label>
@@ -472,11 +510,11 @@
                         <div class="form-row w-160">
                             <label for="u_email_ext">Extensión Email</label>
                             <select id="u_email_ext">
-                                <option value="gmail.com">Gmail.com</option>
-                                <option value="hotmail.com">Hotmail.com</option>
-                                <option value="outlook.com">Outlook.com</option>
-                                <option value="yahoo.com">Yahoo.com</option>
-
+                                <option value="gmail.com">@gmail.com</option>
+                                <option value="hotmail.com">@hotmail.com</option>
+                                <option value="outlook.com">@outlook.com</option>
+                                <option value="yahoo.com">@yahoo.com</option>
+                                <option value="otro">Otro</option>
                             </select>
                             <input id="u_email_ext_custom" type="text" placeholder="dominio.com"
                                 style="display:none;margin-top:6px;" />
@@ -490,9 +528,11 @@
                             <select id="u_operator">
                                 <option value="">Seleccionar</option>
                                 <option value="414">0414</option>
-                                <option value="412">0412</option>
                                 <option value="424">0424</option>
+                                <option value="412">0412</option>
+                                <option value="422">0422</option>
                                 <option value="416">0416</option>
+                                <option value="426">0426</option>
                             </select>
                         </div>
 
@@ -517,11 +557,7 @@
                         </div>
 
                         <div style="width:160px;">
-                            <label for="u_status">Estado</label>
-                            <select id="u_status">
-                                <option value="Activo">Activo</option>
-                                <option value="Inactivo">Inactivo</option>
-                            </select>
+                            <!-- select de estado removido visualmente según lo solicitado -->
                         </div>
                     </div>
 
@@ -556,6 +592,14 @@
                         <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Loading modal: mostrado mientras se crea/actualiza el usuario -->
+        <div id="loadingModal" class="modal hidden" aria-hidden="true" role="status" aria-live="polite">
+            <div class="modal-content loading-modal-content" role="presentation" aria-hidden="true">
+                <div class="loading-spinner" aria-hidden="true"></div>
+                <div id="loadingText" style="margin-top:12px; font-weight:700;">Creando usuario...</div>
             </div>
         </div>
 

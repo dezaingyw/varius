@@ -2,7 +2,7 @@
 // Modificado para: email (local + extensión con prevención de '@' en local),
 // phone local EXACTAMENTE 7 dígitos (y aviso si intentan pegar más),
 // mejoras responsive handling en modal.
-// Arreglo: botón "Editar" ahora usa la clase .btn-edit para que el event listener funcione.
+// Cambio: removido select visible de estado y agregado botón para alternar Activo/Inactivo en la fila.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -56,6 +56,9 @@ const pageInfo = document.getElementById('pageInfo');
 const applyFiltersBtn = document.getElementById('applyFilters');
 const clearFiltersBtn = document.getElementById('clearFilters');
 
+const loadingModal = document.getElementById('loadingModal');
+const loadingText = document.getElementById('loadingText');
+
 let allUsers = [];
 let filteredUsers = [];
 let currentPage = 1;
@@ -67,11 +70,26 @@ function showToast(msg, time = 2500) {
     if (!toastEl) { console.log(msg); return; }
     toastEl.textContent = msg;
     toastEl.classList.remove('hidden');
+    // Add show class for transition (app.css has .toast.show but we use .hidden toggle)
     setTimeout(() => toastEl.classList.add('hidden'), time);
 }
 
+// Loading modal helpers
+function showLoading(msg = 'Cargando...') {
+    if (!loadingModal) return;
+    if (loadingText) loadingText.textContent = msg;
+    loadingModal.classList.remove('hidden');
+    loadingModal.setAttribute('aria-hidden', 'false');
+}
+
+function hideLoading() {
+    if (!loadingModal) return;
+    loadingModal.classList.add('hidden');
+    loadingModal.setAttribute('aria-hidden', 'true');
+}
+
 // utils
-function escapeHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHtml(s) { if (!s) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function roleClass(role) {
     if (!role) return 'role-vendedor';
     switch (role) {
@@ -192,8 +210,12 @@ function renderTable() {
         const tr = document.createElement('tr');
 
         // Si está suspendido, marcar la fila con clase para estilo rojo
-        if ((u.status || '').toLowerCase() === 'suspendido') {
+        // Ahora también marcar Inactivo con clase naranja
+        const statusLower = (u.status || '').toLowerCase();
+        if (statusLower === 'suspendido') {
             tr.classList.add('row-suspendido');
+        } else if (statusLower === 'inactivo') {
+            tr.classList.add('row-inactivo');
         }
 
         const tdName = document.createElement('td');
@@ -229,23 +251,45 @@ function renderTable() {
         tdStatus.innerHTML = `<span class="status-badge ${statusClass(u.status)}">${escapeHtml(u.status || 'Activo')}</span>`;
 
         const tdActions = document.createElement('td');
-        // IMPORTANT: usar clase btn-edit para que el listener funcione
+        // Agregamos botón para alternar estado junto a Suspender
+        // Si está Activo -> mostrar botón naranja para Inactivar
+        // Si está Inactivo -> mostrar botón azul para Activar
+        const isActive = ((u.status || '').toLowerCase() === 'activo');
+        const toggleClass = isActive ? 'btn-inactivate' : 'btn-activate';
+        const toggleAction = isActive ? 'inactivate' : 'activate';
+        const toggleTitle = isActive ? 'Inactivar' : 'Activar';
+
+        // Definimos el SVG dependiendo del estado
+        const toggleIcon = isActive
+            ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-slash-circle" viewBox="0 0 16 16">
+          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+          <path d="M11.354 4.646a.5.5 0 0 0-.708 0l-6 6a.5.5 0 0 0 .708.708l6-6a.5.5 0 0 0 0-.708"/>
+       </svg>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16">
+          <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
+       </svg>`;
+
         tdActions.innerHTML = `
-            <div class="actions">
-                <button class="btn-small btn-view" data-id="${u.id}" title="Editar" aria-label="Editar">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
-                        <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
-                        <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
-                    </svg>
-                </button>
-                <button class="btn-small btn-suspender" data-id="${u.id}" title="Suspender" aria-label="Suspender">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                    </svg>
-                </button>
-            </div>
-        `;
+    <div class="actions">
+        <button class="btn-small btn-view" data-id="${u.id}" title="Editar" aria-label="Editar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+                <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+            </svg>
+        </button>
+
+        <button class="btn-small ${toggleClass} btn-toggle-status" data-id="${u.id}" data-action="${toggleAction}" title="${toggleTitle}">
+            ${toggleIcon}
+        </button>
+
+        <button class="btn-small btn-suspender" data-id="${u.id}" title="Suspender" aria-label="Suspender">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+            </svg>
+        </button>
+    </div>
+`;
 
         tr.appendChild(tdName);
         tr.appendChild(tdRole);
@@ -271,12 +315,37 @@ function renderTable() {
             if (!confirm('¿Suspender usuario? Esto marcará su estado como "Suspendido".')) return;
             try {
                 // Ahora guardamos updatedAt para poder mostrar la fecha de suspensión (FS)
+                showLoading('Suspendiendo usuario...');
                 await updateDoc(doc(db, 'users', id), { status: 'Suspendido', updatedAt: serverTimestamp() });
                 showToast('Usuario suspendido.');
                 await loadUsers();
             } catch (err) {
                 console.error('Error suspending user', err);
                 showToast('Error al suspender usuario.');
+            } finally {
+                hideLoading();
+            }
+        });
+    });
+
+    // Toggle status (Activar / Inactivar)
+    usersBody.querySelectorAll('.btn-toggle-status').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            const action = e.currentTarget.getAttribute('data-action'); // 'inactivate' | 'activate'
+            const newStatus = action === 'inactivate' ? 'Inactivo' : 'Activo';
+            const confirmMsg = action === 'inactivate' ? '¿Inactivar usuario?' : '¿Activar usuario?';
+            if (!confirm(confirmMsg)) return;
+            try {
+                showLoading(newStatus === 'Activo' ? 'Activando...' : 'Inactivando...');
+                await updateDoc(doc(db, 'users', id), { status: newStatus, updatedAt: serverTimestamp() });
+                showToast(`Usuario ${newStatus === 'Activo' ? 'activado' : 'inactivado'}.`);
+                await loadUsers();
+            } catch (err) {
+                console.error('Error toggling status', err);
+                showToast('Error cambiando estado.');
+            } finally {
+                hideLoading();
             }
         });
     });
@@ -325,7 +394,7 @@ function openModal(mode = 'add', data = null) {
     if (phoneStored && phoneStored.length >= 7) {
         const norm = normalizePhone(phoneStored);
         if (norm.length >= 10) {
-            const op = norm.slice(0,3);
+            const op = norm.slice(0, 3);
             const local = norm.slice(3);
             operatorEl.value = op;
             phoneLocalEl.value = local;
@@ -339,10 +408,12 @@ function openModal(mode = 'add', data = null) {
     }
 
     document.getElementById('u_role').value = data?.role || '';
+    // Guardamos el estado en campo oculto (ya que removimos el select visible)
     document.getElementById('u_status').value = data?.status || 'Activo';
+
     document.getElementById('u_password').value = '';
     document.getElementById('u_password_confirm').value = '';
-    ['u_name_alert','u_email_alert','u_phone_alert','u_password_alert','u_password_confirm_alert','u_role_alert'].forEach(id => {
+    ['u_name_alert', 'u_email_alert', 'u_phone_alert', 'u_password_alert', 'u_password_confirm_alert', 'u_role_alert'].forEach(id => {
         const el = document.getElementById(id); if (el) el.textContent = '';
     });
 
@@ -350,7 +421,7 @@ function openModal(mode = 'add', data = null) {
     const setRequired = (id, req) => {
         const el = document.getElementById(id);
         if (!el) return;
-        if (req) el.setAttribute('required','true');
+        if (req) el.setAttribute('required', 'true');
         else el.removeAttribute('required');
     };
     const addRequired = mode === 'add';
@@ -359,21 +430,21 @@ function openModal(mode = 'add', data = null) {
     setRequired('u_operator', addRequired);
     setRequired('u_phone_local', addRequired);
     setRequired('u_role', addRequired);
-    setRequired('u_status', addRequired);
+    // no hacemos setRequired en u_status porque es hidden
     setRequired('u_password', addRequired);
     setRequired('u_password_confirm', addRequired);
 
     // si está en 'otro' y es modo add, requerir el custom
-    if (emailExtSelect.value === 'otro' && addRequired) emailExtCustom.setAttribute('required','true');
+    if (emailExtSelect.value === 'otro' && addRequired) emailExtCustom.setAttribute('required', 'true');
     else emailExtCustom.removeAttribute('required');
 
     userModal.classList.remove('hidden');
-    userModal.setAttribute('aria-hidden','false');
+    userModal.setAttribute('aria-hidden', 'false');
 }
 
 function closeModal() {
     userModal.classList.add('hidden');
-    userModal.setAttribute('aria-hidden','true');
+    userModal.setAttribute('aria-hidden', 'true');
 }
 
 function getFullEmailFromForm() {
@@ -453,11 +524,7 @@ function validateForm(values, isEdit = false) {
         if (roleAlertEl) roleAlertEl.textContent = '';
     }
 
-    // estado (por seguridad)
-    if (!values.status) {
-        showToast('Selecciona un estado.');
-        ok = false;
-    }
+    // Nota: el estado ya no es requerido en UI (campo hidden), por lo que no validamos aquí.
 
     // Contraseña: si estamos agregando (no isEdit) o el usuario intentó cambiar password -> validar
     if (!isEdit || (values.password || values.confirm)) {
@@ -489,7 +556,7 @@ function createToggleBtn() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'icon-btn small pwd-toggle';
-    btn.setAttribute('aria-pressed','false');
+    btn.setAttribute('aria-pressed', 'false');
     btn.textContent = '👁️';
     btn.style.marginLeft = '8px';
     btn.style.padding = '4px';
@@ -534,6 +601,9 @@ if (pwdInput && pwdConfirmInput) {
 
 // -----------------------------
 // Form submit (Cloud Function) -----------------------------
+// Reemplaza únicamente el listener existente de submit por este bloque.
+// Busca "userForm?.addEventListener('submit'," y sustituye todo hasta el cierre de la función.
+
 userForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const userId = document.getElementById('userId').value;
@@ -541,7 +611,7 @@ userForm?.addEventListener('submit', async (e) => {
     const email = getFullEmailFromForm();
     const phone = getFullPhoneFromForm();
     const role = document.getElementById('u_role').value;
-    const status = document.getElementById('u_status').value;
+    const status = (document.getElementById('u_status')?.value) || 'Activo';
     const password = document.getElementById('u_password').value;
     const confirm = document.getElementById('u_password_confirm').value;
 
@@ -563,32 +633,83 @@ userForm?.addEventListener('submit', async (e) => {
         return;
     }
 
+    // Show loading modal while creating/updating
+    showLoading(isEdit ? 'Actualizando usuario...' : 'Creando usuario...');
+
     try {
         if (!isEdit) {
-            const idToken = await auth.currentUser.getIdToken(true);
+            // build payload
+            const payload = { name, email, phone, role, status, password };
+            console.log('[users-admin] Crear usuario -> payload:', payload);
+
+            // token (puede fallar si auth.currentUser es null)
+            let idToken = null;
+            try {
+                if (!auth || !auth.currentUser) {
+                    console.warn('[users-admin] auth.currentUser NO disponible al crear usuario.');
+                } else {
+                    idToken = await auth.currentUser.getIdToken(true);
+                    console.log('[users-admin] idToken obtenido (len):', idToken ? idToken.length : null);
+                }
+            } catch (tErr) {
+                console.error('[users-admin] Error obteniendo idToken:', tErr);
+            }
+
+            // petición al Cloud Function con mejor manejo de errores
+            const headers = { 'Content-Type': 'application/json' };
+            if (idToken) headers['Authorization'] = 'Bearer ' + idToken;
+
             const res = await fetch(CREATE_USER_FUNCTION_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
-                body: JSON.stringify({ name, email, phone, role, status, password })
+                headers,
+                body: JSON.stringify(payload),
             });
-            const result = await res.json();
+
+            let textBody = '';
+            try {
+                // tratamos de parsear JSON si viene como JSON
+                textBody = await res.text();
+                try { 
+                    const jsonBody = JSON.parse(textBody);
+                    console.log('[users-admin] respuesta JSON:', jsonBody);
+                } catch (parseErr) {
+                    console.log('[users-admin] respuesta texto:', textBody);
+                }
+            } catch (readErr) {
+                console.error('[users-admin] error leyendo body de la respuesta:', readErr);
+            }
+
             if (!res.ok) {
-                const errMsg = result && result.error ? result.error : 'Error creando usuario.';
-                showToast(errMsg);
-                console.error('createUser error:', result);
+                console.error('[users-admin] createUser NO ok', res.status, textBody);
+                // mostrar mensaje más útil al usuario
+                let userMsg = 'Error creando usuario.';
+                try {
+                    const parsed = JSON.parse(textBody || '{}');
+                    if (parsed && parsed.error) userMsg = parsed.error;
+                    else if (parsed && parsed.message) userMsg = parsed.message;
+                } catch (_) { /* no JSON */ }
+                showToast(userMsg);
                 return;
             }
+
+            // si todo va bien
             showToast('Usuario creado correctamente.');
         } else {
             await updateDoc(doc(db, 'users', userId), { name, phone, role, status, updatedAt: serverTimestamp() });
             if (password) showToast('Datos actualizados. Email para restablecer contraseña enviado.');
             else showToast('Usuario actualizado.');
         }
+
+        // cerrar modal de edición/agregado automáticamente al terminar con éxito
         closeModal();
         await loadUsers();
     } catch (err) {
         console.error('Error saving user', err);
-        showToast('Error guardando usuario. Revisa consola.');
+        // detectar si es error de red / CORS
+        showToast('Error guardando usuario. Revisa consola (Network).');
+    } finally {
+        // asegurar que el loading modal se oculte siempre
+        hideLoading();
     }
 });
 
@@ -604,7 +725,7 @@ if (phoneLocalInput) {
     phoneLocalInput.addEventListener('input', (e) => {
         const cleaned = normalizePhone(e.target.value);
         if (cleaned.length > 7) {
-            e.target.value = cleaned.slice(0,7);
+            e.target.value = cleaned.slice(0, 7);
             document.getElementById('u_phone_alert').textContent = 'Máximo 7 dígitos (parte local).';
             setTimeout(() => { const el = document.getElementById('u_phone_alert'); if (el) el.textContent = ''; }, 2200);
         } else {
@@ -639,7 +760,7 @@ if (emailLocalInput) {
                     emailExtSelectEl.value = 'otro';
                     emailExtCustomEl.style.display = 'block';
                     emailExtCustomEl.value = domainCandidate;
-                    if (modalMode === 'add') emailExtCustomEl.setAttribute('required','true');
+                    if (modalMode === 'add') emailExtCustomEl.setAttribute('required', 'true');
                 }
             }
             document.getElementById('u_email_alert').textContent = '';
@@ -657,7 +778,7 @@ if (emailExtSelectEl) {
         if (emailExtSelectEl.value === 'otro') {
             emailExtCustomEl.style.display = 'block';
             emailExtCustomEl.focus();
-            if (modalMode === 'add') emailExtCustomEl.setAttribute('required','true');
+            if (modalMode === 'add') emailExtCustomEl.setAttribute('required', 'true');
         } else {
             emailExtCustomEl.style.display = 'none';
             emailExtCustomEl.value = '';
