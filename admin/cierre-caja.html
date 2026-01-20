@@ -14,23 +14,92 @@
     <!-- Estilos mínimos para acordeón / aviso de cierre -->
     <style>
         /* Acordeón vendedor */
-        .vendedor { border-radius: 10px; margin: 10px 0; overflow: hidden; background:#eef7ff; border:1px solid #d6eefc; }
-        .vendedor .vh { padding: 12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:pointer; user-select:none; }
-        .vendedor .vh .chev { font-size: 14px; display:inline-block; width: 20px; text-align:center; color:#3b3b3b; }
-        .vendedor .v-content { padding: 10px 14px; border-top:1px solid rgba(0,0,0,0.04); background: #f9feff; }
-        .vendedor.collapsed .v-content { display:none; }
-        .vendedor.expanded .v-content { display:block; }
-        .vendedor .v-title { font-weight:700; }
-        .badge-total { font-weight:700; color:#333; background:transparent; padding-left:8px; }
+        .vendedor {
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+            background: #eef7ff;
+            border: 1px solid #d6eefc;
+        }
+
+        .vendedor .vh {
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .vendedor .vh .chev {
+            font-size: 14px;
+            display: inline-block;
+            width: 20px;
+            text-align: center;
+            color: #3b3b3b;
+        }
+
+        .vendedor .v-content {
+            padding: 10px 14px;
+            border-top: 1px solid rgba(0, 0, 0, 0.04);
+            background: #f9feff;
+        }
+
+        .vendedor.collapsed .v-content {
+            display: none;
+        }
+
+        .vendedor.expanded .v-content {
+            display: block;
+        }
+
+        .vendedor .v-title {
+            font-weight: 700;
+        }
+
+        .badge-total {
+            font-weight: 700;
+            color: #333;
+            background: transparent;
+            padding-left: 8px;
+        }
+
         /* Summary cards small adjustments */
-        .summary-card { padding:10px; border-radius:8px; background:#fff; border:1px solid #ececec; display:flex; justify-content:space-between; align-items:center; gap:8px; }
-        .summary-card .alt { font-size:12px; color:#666; margin-left:8px; }
+        .summary-card {
+            padding: 10px;
+            border-radius: 8px;
+            background: #fff;
+            border: 1px solid #ececec;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .summary-card .alt {
+            font-size: 12px;
+            color: #666;
+            margin-left: 8px;
+        }
+
         /* disabled selects look */
-        select:disabled { opacity:0.6; pointer-events:none; }
+        select:disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         /* small responsive tweaks */
         @media (max-width:700px) {
-            .vendedor .vh { flex-direction:column; align-items:flex-start; gap:6px; }
-            .badge-total { margin-top:6px; }
+            .vendedor .vh {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .badge-total {
+                margin-top: 6px;
+            }
         }
     </style>
 </head>
@@ -93,7 +162,7 @@
 
         <section class="panel" id="cascade-panel">
             <!-- FILTER CARD: arriba de la cascada -->
-            <div class="filter-card card">
+            <div id="filter-card" class="filter-card card">
                 <div class="filter-row">
                     <div class="filter-col">
                         <label for="filter-seller" class="muted">Vendedor</label>
@@ -116,7 +185,8 @@
                 </div>
                 <div style="margin-top:10px">
                     <button id="btn-apply-filters" class="btn-apply">Aplicar filtros</button>
-                    <button id="btn-reset-filters" class="icon-btn" style="margin-left:8px;background:#ffffff;color:#222; border: #d1d1d1;">Limpiar</button>
+                    <button id="btn-reset-filters" class="icon-btn"
+                        style="margin-left:8px;background:#ffffff;color:#222; border: #d1d1d1;">Limpiar</button>
                 </div>
             </div>
 
@@ -124,18 +194,16 @@
         </section>
 
         <section class="panel">
-            <div class="conciliation">
+            <div id="conciliation-section" class="conciliation">
                 <label class="muted">Conciliación (Bs):</label>
                 <input id="conciliation-bs" class="conc-input" type="text" placeholder="0.00" />
                 <label class="muted">Conciliación (USD):</label>
                 <input id="conciliation-usd" class="conc-input" type="text" placeholder="0.00" />
-                <button id="btn-save-conciliation" class="refresh">Guardar conciliación</button>
+                <button id="btn-save-conciliation" class="btn btn-copy">Guardar conciliación</button>
             </div>
 
-            <button id="btn-close-cash" class="close-btn">Cerrar caja del día</button>
-            <div class="muted" style="margin-top:8px; font-size:13px">Al cerrar se guardará un documento en la colección
-                <code>cash_closures</code> con el desglose.
-            </div>
+            <button id="btn-close-cash" class="btn-apply-filters">Cerrar caja del día</button>
+
         </section>
     </main>
 
