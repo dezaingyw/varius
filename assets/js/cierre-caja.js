@@ -5,6 +5,11 @@
 // - KPIs en layout horizontal
 // - Añadida detección de cash_closure para ocultar detalles si la caja ya está cerrada
 // - Acordeón collapsible para vendedores
+// - Botón refrescar ahora vuelve a la fecha actual y limpia filtros
+// - Selección de fecha dispara búsqueda en tiempo real (debounced)
+// - Mejora: filtros ahora aplican automáticamente al cambiar (sin pulsar "Aplicar")
+// - Mejora: botón "Limpiar" restablece y aplica inmediatamente
+// - Mejora: oculta filtros + conciliación + botones de cierre cuando el usuario filtra por un día distinto al día por defecto (hoy)
 
 const modBase = new URL('.', import.meta.url);
 
@@ -235,12 +240,28 @@ const filterPayment = $('#filter-payment');
 const btnApplyFilters = $('#btn-apply-filters');
 const btnResetFilters = $('#btn-reset-filters');
 
+// NEW refs for hiding/showing whole sections
+const filterCard = $('#filter-card');
+const conciliationSection = $('#conciliation-section');
+
 let currentUser = null;
 let lastFetchedOrders = []; // guardamos los pedidos originales para re-filtrar en memoria
 
 function setDefaultDate() { const t = new Date(); if (dateInput) dateInput.value = t.toISOString().slice(0, 10); if (displayDate) displayDate.textContent = formatDateDisplay(t); }
 
 function dayRangeFromISO(isoDate) { const start = new Date(isoDate + 'T00:00:00'); const end = new Date(isoDate + 'T23:59:59.999'); return { start, end }; }
+
+// debounce helper
+function debounce(fn, wait = 300) {
+    let timer = null;
+    return (...args) => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
+// Debounced version of applyFilters to avoid demasiadas ejecuciones rápidas
+const debouncedApplyFilters = debounce(() => { try { applyFilters(); } catch (e) { console.error(e); } }, 200);
 
 // Firestore fetching
 async function fetchOrdersForDate(isoDate) {
@@ -539,6 +560,20 @@ async function calculateAndRender() {
     if (!dateInput) { console.error('#cierre-date no encontrado'); return; }
     const iso = dateInput.value;
     if (!iso) return toast('Selecciona una fecha');
+
+    // Si la fecha seleccionada es distinta de la fecha por defecto (hoy), tratamos como "filtro por día"
+    const defaultISO = new Date().toISOString().slice(0, 10);
+    const isFilteredDay = iso !== defaultISO;
+
+    // Mostrar/ocultar bloques según si el usuario filtró por un día (isFilteredDay)
+    try {
+        if (filterCard) filterCard.style.display = isFilteredDay ? 'none' : '';
+        if (conciliationSection) conciliationSection.style.display = isFilteredDay ? 'none' : '';
+        if (btnCloseCash) btnCloseCash.style.display = isFilteredDay ? 'none' : '';
+    } catch (e) {
+        console.warn('Error mostrando/ocultando secciones:', e);
+    }
+
     const d = new Date(iso); if (displayDate) displayDate.textContent = formatDateDisplay(d);
     if (cascadeContainer) cascadeContainer.innerHTML = '<div class="muted">Cargando...</div>';
 
@@ -550,7 +585,15 @@ async function calculateAndRender() {
             if (cascadeContainer) {
                 cascadeContainer.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><strong>Caja cerrada para ${formatDateDisplay(new Date(iso))}</strong><div class="muted">Los detalles de pedidos no se muestran porque la caja ya fue cerrada. Cambia la fecha y pulsa "Aplicar" para consultar otra fecha.</div></div><div style="text-align:right"><div style="font-weight:700">Totales guardados</div><div>${formatCurrencyBs(closed.data.totals?.bs ?? 0)} ${closed.data.totals?.usd ? ` / ${formatCurrencyUSD(closed.data.totals?.usd)}` : ''}</div></div></div></div>`;
             }
-            // Deshabilitar filtros para evitar confusión
+
+            // Aseguramos que al estar cerrada la caja, las secciones solicitadas queden ocultas
+            try {
+                if (filterCard) filterCard.style.display = 'none';
+                if (conciliationSection) conciliationSection.style.display = 'none';
+                if (btnCloseCash) btnCloseCash.style.display = 'none';
+            } catch (e) { /* noop */ }
+
+            // Deshabilitar selects para evitar confusión
             if (filterSeller) filterSeller.disabled = true;
             if (filterRider) filterRider.disabled = true;
             if (filterPayment) filterPayment.disabled = true;
@@ -566,17 +609,25 @@ async function calculateAndRender() {
             // no continuamos con fetch de pedidos ni renderCascade de pedidos
             return { closed: true, closure: closed };
         } else {
-            // aseguramos que filtros estén habilitados
-            if (filterSeller) filterSeller.disabled = false;
-            if (filterRider) filterRider.disabled = false;
-            if (filterPayment) filterPayment.disabled = false;
-            if (btnApplyFilters) btnApplyFilters.disabled = false;
-            if (btnResetFilters) btnResetFilters.disabled = false;
+            // aseguramos que filtros estén habilitados (si no estamos en modo "filtrado por día")
+            if (!isFilteredDay) {
+                if (filterSeller) filterSeller.disabled = false;
+                if (filterRider) filterRider.disabled = false;
+                if (filterPayment) filterPayment.disabled = false;
+                if (btnApplyFilters) btnApplyFilters.disabled = false;
+                if (btnResetFilters) btnResetFilters.disabled = false;
+            } else {
+                // Si estamos en modo 'filtrado por día' dejamos deshabilitados los selects (además de ocultarlos)
+                if (filterSeller) filterSeller.disabled = true;
+                if (filterRider) filterRider.disabled = true;
+                if (filterPayment) filterPayment.disabled = true;
+            }
         }
 
         const orders = await fetchOrdersForDate(iso);
         lastFetchedOrders = orders.slice(); // guardamos copia
-        populateFilterOptions(lastFetchedOrders);
+        // Solo poblamos las opciones si NO estamos en modo 'filtrado por día'
+        if (!isFilteredDay) populateFilterOptions(lastFetchedOrders);
 
         const { sellers, summary } = buildCascadeData(orders);
         renderKpis(summary);
@@ -611,7 +662,28 @@ async function saveCashClosure(summary, isoDate) {
 
 // listeners
 $('#btn-apply')?.addEventListener('click', () => calculateAndRender());
-$('#btn-calc')?.addEventListener('click', () => calculateAndRender());
+
+// Actualizado: al pulsar refrescar, volver a la fecha actual y limpiar filtros antes de recalcular
+$('#btn-calc')?.addEventListener('click', () => {
+    // restablecer fecha al día actual
+    setDefaultDate();
+
+    // limpiar selects de filtros si existen
+    if (filterSeller) { filterSeller.value = 'all'; filterSeller.disabled = false; }
+    if (filterRider) { filterRider.value = 'all'; filterRider.disabled = false; }
+    if (filterPayment) { filterPayment.value = 'all'; filterPayment.disabled = false; }
+
+    // asegurar que las secciones ocultadas por "filtrar por día" se muestren de nuevo
+    try {
+        if (filterCard) filterCard.style.display = '';
+        if (conciliationSection) conciliationSection.style.display = '';
+        if (btnCloseCash) btnCloseCash.style.display = '';
+    } catch (e) { /* noop */ }
+
+    // recalcular
+    calculateAndRender();
+});
+
 $('#btn-close-cash')?.addEventListener('click', async () => {
     const iso = dateInput?.value; if (!iso) return toast('Selecciona la fecha para cerrar la caja');
     const result = await calculateAndRender(); if (!result) return;
@@ -628,13 +700,35 @@ $('#btn-save-conciliation')?.addEventListener('click', async () => {
     } catch (err) { console.error(err); toast('Error guardando conciliación'); }
 });
 
+// Aplicar filtros manual (se mantiene por compatibilidad)
 btnApplyFilters?.addEventListener('click', () => applyFilters());
+
+// Reset mejorado: restaura selects, rehabilita si es necesario, actualiza opciones y aplica
 btnResetFilters?.addEventListener('click', () => {
-    if (filterSeller) filterSeller.value = 'all';
-    if (filterRider) filterRider.value = 'all';
-    if (filterPayment) filterPayment.value = 'all';
+    if (filterSeller) { filterSeller.value = 'all'; filterSeller.disabled = false; }
+    if (filterRider) { filterRider.value = 'all'; filterRider.disabled = false; }
+    if (filterPayment) { filterPayment.value = 'all'; filterPayment.disabled = false; }
+
+    // Asegurarnos de que las opciones estén sincronizadas con los últimos pedidos fetchados
+    if (lastFetchedOrders && lastFetchedOrders.length) populateFilterOptions(lastFetchedOrders);
+
+    // Aplicar filtros inmediatamente
     applyFilters();
 });
+
+// Auto-aplicar filtros cuando el usuario cambie cualquier select (sin pulsar "Aplicar")
+if (filterSeller) {
+    filterSeller.addEventListener('change', debouncedApplyFilters);
+    filterSeller.addEventListener('input', debouncedApplyFilters);
+}
+if (filterRider) {
+    filterRider.addEventListener('change', debouncedApplyFilters);
+    filterRider.addEventListener('input', debouncedApplyFilters);
+}
+if (filterPayment) {
+    filterPayment.addEventListener('change', debouncedApplyFilters);
+    filterPayment.addEventListener('input', debouncedApplyFilters);
+}
 
 onAuthStateChanged(auth, (u) => currentUser = u);
 
@@ -662,6 +756,16 @@ if (concUsdInput) {
     concUsdInput.addEventListener('keydown', sanitizeInputKey);
     concUsdInput.addEventListener('input', () => formatInputValueForDisplay(concUsdInput, 2));
     concUsdInput.addEventListener('blur', () => formatInputValueForDisplay(concUsdInput, 2));
+}
+
+// Disparar búsqueda en tiempo real al cambiar la fecha (debounced)
+if (dateInput) {
+    const debouncedCalc = debounce(() => {
+        calculateAndRender();
+    }, 300);
+    dateInput.addEventListener('change', () => debouncedCalc());
+    // algunos navegadores disparan input cuando se selecciona desde el datepicker
+    dateInput.addEventListener('input', () => debouncedCalc());
 }
 
 // init
