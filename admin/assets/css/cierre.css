@@ -406,7 +406,7 @@
 
 .main.cierre .close-btn,
 .main.cierre #btn-close-cash {
-  background: linear-gradient(135deg, var(--c-secundario), #45a049);
+background: linear-gradient(135deg, #34d399, #10b981);
   color: #fff;
   padding: 14px 20px;
   border-radius: 12px;
