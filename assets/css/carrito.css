@@ -569,7 +569,7 @@ a.btn-secondary,
   line-height: 5.3;
 }
 
-.product-ribbon {
+product-ribbon {
   position: absolute;
   top: -0.5rem;
   left: 0;
@@ -1730,17 +1730,18 @@ a:focus-visible {
 /* =====================================================
    CONTROL DE VISIBILIDAD DEL GRID
    ===================================================== */
-@media (max-width: 47.99rem) {
-  #productsGrid {
-    display: none !important;
-  }
+
+/* Eliminadas las reglas que ocultaban #productsGrid en móviles.
+   Forzamos que #productsGrid y .products-grid se muestren como grid en todos los tamaños. */
+
+#productsGrid,
+.products-grid {
+  display: grid !important;
 }
 
-@media (min-width: 48rem) {
-  #productsGrid {
-    display: grid !important;
-  }
-}
+/* Mantener soporte de las clases hide/show opcionales:
+   hide-products-mode / show-products-mode todavía funcionan si las usas,
+   pero la regla anterior asegura que, por defecto, el grid será visible. */
 
 .hide-products-mode #productsGrid,
 .hide-products-mode .products-grid {
