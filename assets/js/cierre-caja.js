@@ -13,25 +13,25 @@ const modBase = new URL('.', import.meta.url);
 
 let firebaseConfig;
 try {
-  try { firebaseConfig = (await import(new URL('./firebase-config.js', modBase).href)).firebaseConfig; } catch {}
-  if (!firebaseConfig) try { firebaseConfig = (await import(new URL('../firebase-config.js', modBase).href)).firebaseConfig; } catch {}
-  if (!firebaseConfig) try { firebaseConfig = (await import(new URL('../../firebase-config.js', modBase).href)).firebaseConfig; } catch {}
-  if (!firebaseConfig) throw new Error('firebase-config.js no encontrado en rutas probadas');
+    try { firebaseConfig = (await import(new URL('./firebase-config.js', modBase).href)).firebaseConfig; } catch { }
+    if (!firebaseConfig) try { firebaseConfig = (await import(new URL('../firebase-config.js', modBase).href)).firebaseConfig; } catch { }
+    if (!firebaseConfig) try { firebaseConfig = (await import(new URL('../../firebase-config.js', modBase).href)).firebaseConfig; } catch { }
+    if (!firebaseConfig) throw new Error('firebase-config.js no encontrado en rutas probadas');
 } catch (err) {
-  console.error('Error cargando firebase-config.js:', err);
-  throw err;
+    console.error('Error cargando firebase-config.js:', err);
+    throw err;
 }
 
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs,
-  Timestamp,
-  addDoc,
-  serverTimestamp
+    getFirestore,
+    collection,
+    query,
+    where,
+    getDocs,
+    Timestamp,
+    addDoc,
+    serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 
@@ -45,215 +45,220 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 
 // ---------- Enhanced Toasts ----------
 function showToast(message, opts = {}) {
-  const { type = 'info', duration = 3500 } = opts;
-  const el = $('#toast');
-  if (!el) return alert(message);
-  el.className = '';
-  el.classList.add('toast', `toast-${type}`);
-  el.innerHTML = `
+    const { type = 'info', duration = 3500 } = opts;
+    const el = $('#toast');
+    if (!el) return alert(message);
+    el.className = '';
+    el.classList.add('toast', `toast-${type}`);
+    el.innerHTML = `
     <div class="toast-body">
       <div class="toast-message">${message}</div>
       <button class="toast-close" aria-label="Cerrar">&times;</button>
     </div>
   `;
-  el.style.display = 'block';
-  const closeBtn = el.querySelector('.toast-close');
-  const hide = () => { el.style.display = 'none'; el.className = ''; el.innerHTML = ''; };
-  closeBtn?.addEventListener('click', hide);
-  if (duration > 0) setTimeout(hide, duration);
+    el.style.display = 'block';
+    const closeBtn = el.querySelector('.toast-close');
+    const hide = () => { el.style.display = 'none'; el.className = ''; el.innerHTML = ''; };
+    closeBtn?.addEventListener('click', hide);
+    if (duration > 0) setTimeout(hide, duration);
 }
 const toast = (m, t = 3000) => showToast(m, { type: 'info', duration: t });
 
 // ---------- formatting helpers ----------
 function formatNumberCustom(value, decimals = 2) {
-  if (value == null || isNaN(Number(value))) value = 0;
-  const opts = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
-  return new Intl.NumberFormat('en-US', opts).format(Number(value));
+    if (value == null || isNaN(Number(value))) value = 0;
+    const opts = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+    return new Intl.NumberFormat('en-US', opts).format(Number(value));
 }
 function formatCurrencyBs(v) {
-  if (v == null) v = 0;
-  const hasDecimals = Math.abs(Number(v) - Math.trunc(Number(v))) > 0;
-  const decimals = hasDecimals ? 2 : 0;
-  return `Bs ${formatNumberCustom(Number(v), decimals)}`;
+    if (v == null) v = 0;
+    const hasDecimals = Math.abs(Number(v) - Math.trunc(Number(v))) > 0;
+    const decimals = hasDecimals ? 2 : 0;
+    return `Bs ${formatNumberCustom(Number(v), decimals)}`;
 }
 function formatCurrencyUSD(v) {
-  return `$ ${formatNumberCustom(Number(v), 2)}`;
+    return `$ ${formatNumberCustom(Number(v), 2)}`;
 }
 function formatDateDisplay(d) {
-  try {
-    return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
-  } catch {
-    return String(d);
-  }
+    try {
+        return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch {
+        return String(d);
+    }
 }
+// Reemplaza isoFromDate con esta versión que devuelve la fecha en zona local (YYYY-MM-DD)
 function isoFromDate(d) {
-  return d.toISOString().slice(0, 10);
+    if (!(d instanceof Date)) d = new Date(d);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 }
 function parseFormattedNumber(str) {
-  if (!str && str !== 0) return 0;
-  if (typeof str === 'number') return str;
-  const s = String(str).replace(/[^\d\.\-\,]/g, '');
-  const dots = (s.match(/\./g) || []).length;
-  const commas = (s.match(/,/g) || []).length;
-  let normalized = s;
-  if (commas > 0 && dots === 0) {
-    // e.g., "1,234" -> "1234"
-    normalized = s.replace(/,/g, '');
-  } else if (commas > 0 && dots > 0) {
-    // e.g., "1.234,56" or "1,234.56" -> remove commas
-    normalized = s.replace(/,/g, '');
-  } else {
-    normalized = s;
-  }
-  const n = parseFloat(normalized);
-  return isNaN(n) ? 0 : n;
+    if (!str && str !== 0) return 0;
+    if (typeof str === 'number') return str;
+    const s = String(str).replace(/[^\d\.\-\,]/g, '');
+    const dots = (s.match(/\./g) || []).length;
+    const commas = (s.match(/,/g) || []).length;
+    let normalized = s;
+    if (commas > 0 && dots === 0) {
+        // e.g., "1,234" -> "1234"
+        normalized = s.replace(/,/g, '');
+    } else if (commas > 0 && dots > 0) {
+        // e.g., "1.234,56" or "1,234.56" -> remove commas
+        normalized = s.replace(/,/g, '');
+    } else {
+        normalized = s;
+    }
+    const n = parseFloat(normalized);
+    return isNaN(n) ? 0 : n;
 }
 
 // ---------- normalization helpers ----------
 function toDateFromPossible(value) {
-  if (!value) return null;
-  if (typeof value === 'object' && typeof value.toDate === 'function') {
-    try { return value.toDate(); } catch {}
-  }
-  if (typeof value === 'object' && (value.seconds || value._seconds)) {
-    const s = value.seconds ?? value._seconds;
-    return new Date(s * 1000);
-  }
-  if (typeof value === 'number') return value > 1e12 ? new Date(value) : new Date(value * 1000);
-  if (typeof value === 'string') {
-    const d = new Date(value);
-    return isNaN(d) ? null : d;
-  }
-  if (value instanceof Date) return value;
-  return null;
+    if (!value) return null;
+    if (typeof value === 'object' && typeof value.toDate === 'function') {
+        try { return value.toDate(); } catch { }
+    }
+    if (typeof value === 'object' && (value.seconds || value._seconds)) {
+        const s = value.seconds ?? value._seconds;
+        return new Date(s * 1000);
+    }
+    if (typeof value === 'number') return value > 1e12 ? new Date(value) : new Date(value * 1000);
+    if (typeof value === 'string') {
+        const d = new Date(value);
+        return isNaN(d) ? null : d;
+    }
+    if (value instanceof Date) return value;
+    return null;
 }
 
 function determinePrimaryCurrency(m) {
-  const currency = String((m.currency || '').toLowerCase() || '').trim();
-  const method = String((m.method || m.type || '').toLowerCase() || '').trim();
-  const bs = Number(m.bsAmount ?? m.originalAmount ?? m.amount ?? m.totalBs ?? 0);
-  const usd = Number(m.usdAmount ?? m.usdEquivalent ?? m.usdEquivalentAmount ?? m.totalUsd ?? 0);
+    const currency = String((m.currency || '').toLowerCase() || '').trim();
+    const method = String((m.method || m.type || '').toLowerCase() || '').trim();
+    const bs = Number(m.bsAmount ?? m.originalAmount ?? m.amount ?? m.totalBs ?? 0);
+    const usd = Number(m.usdAmount ?? m.usdEquivalent ?? m.usdEquivalentAmount ?? m.totalUsd ?? 0);
 
-  if (currency) {
-    if (currency.includes('bs') || currency.includes('bol')) return 'bs';
-    if (currency.includes('usd') || currency.includes('dolar') || currency.includes('usd$')) return 'usd';
-  }
-  if (method) {
-    if (method.includes('efectivo') || method.includes('cash')) {
-      if (method.includes('cash') && currency.includes('usd')) return 'usd';
-      return 'bs';
+    if (currency) {
+        if (currency.includes('bs') || currency.includes('bol')) return 'bs';
+        if (currency.includes('usd') || currency.includes('dolar') || currency.includes('usd$')) return 'usd';
     }
-    if (method.includes('usd') || method.includes('dolar') || method.includes('zelle') || method.includes('paypal')) {
-      if (method.includes('paypal') && bs > 0 && usd === 0) return 'bs';
-      return 'usd';
+    if (method) {
+        if (method.includes('efectivo') || method.includes('cash')) {
+            if (method.includes('cash') && currency.includes('usd')) return 'usd';
+            return 'bs';
+        }
+        if (method.includes('usd') || method.includes('dolar') || method.includes('zelle') || method.includes('paypal')) {
+            if (method.includes('paypal') && bs > 0 && usd === 0) return 'bs';
+            return 'usd';
+        }
+        if (method.includes('mobile') || method.includes('pago') || method.includes('mobil') || method.includes('pago-movil')) return 'bs';
     }
-    if (method.includes('mobile') || method.includes('pago') || method.includes('mobil') || method.includes('pago-movil')) return 'bs';
-  }
 
-  if (bs > 0 && usd === 0) return 'bs';
-  if (usd > 0 && bs === 0) return 'usd';
+    if (bs > 0 && usd === 0) return 'bs';
+    if (usd > 0 && bs === 0) return 'usd';
 
-  if (bs > 0 && usd > 0) {
-    if (m.originalAmount && m.currency && String(m.currency).toLowerCase().includes('bs')) return 'bs';
-    if (m.originalAmount && m.currency && String(m.currency).toLowerCase().includes('usd')) return 'usd';
-    if (m.usdEquivalent || m.usdEquivalentAmount) return 'bs';
+    if (bs > 0 && usd > 0) {
+        if (m.originalAmount && m.currency && String(m.currency).toLowerCase().includes('bs')) return 'bs';
+        if (m.originalAmount && m.currency && String(m.currency).toLowerCase().includes('usd')) return 'usd';
+        if (m.usdEquivalent || m.usdEquivalentAmount) return 'bs';
+        return 'bs';
+    }
+
     return 'bs';
-  }
-
-  return 'bs';
 }
 
 function normalizePaymentMethod(raw) {
-  const currency = String((raw.currency || '').toLowerCase()).trim();
-  const method = String((raw.method || raw.type || '').toLowerCase()).trim();
+    const currency = String((raw.currency || '').toLowerCase()).trim();
+    const method = String((raw.method || raw.type || '').toLowerCase()).trim();
 
-  const primary = determinePrimaryCurrency(raw);
+    const primary = determinePrimaryCurrency(raw);
 
-  let key = 'other';
-  let label = raw.method || raw.type || raw.currency || 'Otro';
-  let cls = '';
+    let key = 'other';
+    let label = raw.method || raw.type || raw.currency || 'Otro';
+    let cls = '';
 
-  if ((currency.includes('bs') && method.includes('cash')) || method.includes('efectivo') || (primary === 'bs' && method.includes('cash'))) {
-    key = 'efectivo';
-    label = 'Efectivo';
-    cls = 'payment-efectivo';
-  } else if ((currency.includes('usd') && method.includes('usd')) || method === 'usd' || method.includes('usd') || method.includes('dolar')) {
-    key = 'efectivo-usd';
-    label = 'Efectivo (USD)';
-    cls = 'payment-usd';
-  } else if (method.includes('mobile') || method.includes('pago movil') || method.includes('pago-movil') || method.includes('pago')) {
-    key = 'pago-movil';
-    label = 'Pago Móvil';
-    cls = 'payment-movil';
-  } else if (method.includes('paypal')) {
-    key = 'paypal';
-    label = 'PayPal';
-    cls = 'payment-paypal';
-  } else if (method.includes('zelle')) {
-    key = 'zelle';
-    label = 'Zelle';
-    cls = 'payment-paypal';
-  } else if (method.includes('card') || method.includes('tarjeta')) {
-    key = 'card';
-    label = 'Tarjeta';
-    cls = '';
-  } else if (method.includes('motorizad') || /rider|delivery|motorizado/.test(method) || /motorizad/i.test(label)) {
-    key = 'motorizado';
-    label = 'Pago motorizado';
-    cls = '';
-  } else {
-    if (primary === 'usd') { key = 'efectivo-usd'; label = 'Efectivo (USD)'; cls = 'payment-usd'; }
-    else { key = 'efectivo'; label = 'Efectivo'; cls = 'payment-efectivo'; }
-  }
+    if ((currency.includes('bs') && method.includes('cash')) || method.includes('efectivo') || (primary === 'bs' && method.includes('cash'))) {
+        key = 'efectivo';
+        label = 'Efectivo';
+        cls = 'payment-efectivo';
+    } else if ((currency.includes('usd') && method.includes('usd')) || method === 'usd' || method.includes('usd') || method.includes('dolar')) {
+        key = 'efectivo-usd';
+        label = 'Efectivo (USD)';
+        cls = 'payment-usd';
+    } else if (method.includes('mobile') || method.includes('pago movil') || method.includes('pago-movil') || method.includes('pago')) {
+        key = 'pago-movil';
+        label = 'Pago Móvil';
+        cls = 'payment-movil';
+    } else if (method.includes('paypal')) {
+        key = 'paypal';
+        label = 'PayPal';
+        cls = 'payment-paypal';
+    } else if (method.includes('zelle')) {
+        key = 'zelle';
+        label = 'Zelle';
+        cls = 'payment-paypal';
+    } else if (method.includes('card') || method.includes('tarjeta')) {
+        key = 'card';
+        label = 'Tarjeta';
+        cls = '';
+    } else if (method.includes('motorizad') || /rider|delivery|motorizado/.test(method) || /motorizad/i.test(label)) {
+        key = 'motorizado';
+        label = 'Pago motorizado';
+        cls = '';
+    } else {
+        if (primary === 'usd') { key = 'efectivo-usd'; label = 'Efectivo (USD)'; cls = 'payment-usd'; }
+        else { key = 'efectivo'; label = 'Efectivo'; cls = 'payment-efectivo'; }
+    }
 
-  return { key, label, cls, primary };
+    return { key, label, cls, primary };
 }
 
 function extractPaymentsFromOrder(orderDoc) {
-  const rawPayments = [];
-  const p = orderDoc.payment || orderDoc.payments || {};
-  if (Array.isArray(p.methods) && p.methods.length) rawPayments.push(...p.methods);
-  else if (Array.isArray(orderDoc.methods) && orderDoc.methods.length) rawPayments.push(...orderDoc.methods);
-  else if (Array.isArray(p) && p.length) rawPayments.push(...p);
-  else {
-    rawPayments.push(Object.assign({}, p || {}, { amount: orderDoc.total || 0, currency: orderDoc.currency || '', method: orderDoc.paymentMethod || '' }));
-  }
-
-  const map = new Map();
-  let motorizadoAmountBs = 0;
-  let motorizadoAmountUsd = 0;
-
-  for (const m of rawPayments) {
-    const bs = Number(m.bsAmount ?? m.originalAmount ?? m.amount ?? m.totalBs ?? 0);
-    const usd = Number(m.usdAmount ?? m.usdEquivalent ?? m.usdEquivalentAmount ?? m.totalUsd ?? 0);
-    const norm = normalizePaymentMethod(m);
-    const primary = determinePrimaryCurrency(m); // 'bs'|'usd'
-    const mapKey = `${norm.key}::${primary}`;
-
-    const methodLower = String((m.method || m.type || '').toLowerCase());
-    if (methodLower.includes('motoriz') || methodLower.includes('rider') || methodLower.includes('delivery') || String(m.label || '').toLowerCase().includes('motoriz')) {
-      if (primary === 'bs') motorizadoAmountBs += bs;
-      else motorizadoAmountUsd += usd;
-      continue;
+    const rawPayments = [];
+    const p = orderDoc.payment || orderDoc.payments || {};
+    if (Array.isArray(p.methods) && p.methods.length) rawPayments.push(...p.methods);
+    else if (Array.isArray(orderDoc.methods) && orderDoc.methods.length) rawPayments.push(...orderDoc.methods);
+    else if (Array.isArray(p) && p.length) rawPayments.push(...p);
+    else {
+        rawPayments.push(Object.assign({}, p || {}, { amount: orderDoc.total || 0, currency: orderDoc.currency || '', method: orderDoc.paymentMethod || '' }));
     }
 
-    if (!map.has(mapKey)) map.set(mapKey, { key: norm.key, label: norm.label, cls: norm.cls, primary, bs: 0, usd: 0 });
-    const entry = map.get(mapKey);
-    if (primary === 'bs') entry.bs += bs;
-    else entry.usd += usd;
-  }
+    const map = new Map();
+    let motorizadoAmountBs = 0;
+    let motorizadoAmountUsd = 0;
 
-  const payments = Array.from(map.values());
-  return { payments, motorizado: { bs: motorizadoAmountBs, usd: motorizadoAmountUsd } };
+    for (const m of rawPayments) {
+        const bs = Number(m.bsAmount ?? m.originalAmount ?? m.amount ?? m.totalBs ?? 0);
+        const usd = Number(m.usdAmount ?? m.usdEquivalent ?? m.usdEquivalentAmount ?? m.totalUsd ?? 0);
+        const norm = normalizePaymentMethod(m);
+        const primary = determinePrimaryCurrency(m); // 'bs'|'usd'
+        const mapKey = `${norm.key}::${primary}`;
+
+        const methodLower = String((m.method || m.type || '').toLowerCase());
+        if (methodLower.includes('motoriz') || methodLower.includes('rider') || methodLower.includes('delivery') || String(m.label || '').toLowerCase().includes('motoriz')) {
+            if (primary === 'bs') motorizadoAmountBs += bs;
+            else motorizadoAmountUsd += usd;
+            continue;
+        }
+
+        if (!map.has(mapKey)) map.set(mapKey, { key: norm.key, label: norm.label, cls: norm.cls, primary, bs: 0, usd: 0 });
+        const entry = map.get(mapKey);
+        if (primary === 'bs') entry.bs += bs;
+        else entry.usd += usd;
+    }
+
+    const payments = Array.from(map.values());
+    return { payments, motorizado: { bs: motorizadoAmountBs, usd: motorizadoAmountUsd } };
 }
 
 // ---------- debounce ----------
 function debounce(fn, wait = 300) {
-  let timer = null;
-  return (...args) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), wait);
-  };
+    let timer = null;
+    return (...args) => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
 }
 
 // ---------- DOM refs ----------
@@ -304,691 +309,721 @@ const calState = { currentCalendarMonth: new Date() };
 
 // ---------- Firestore helpers ----------
 function dayRangeFromISO(isoDate) {
-  const start = new Date(isoDate + 'T00:00:00');
-  const end = new Date(isoDate + 'T23:59:59.999');
-  return { start, end };
+    const start = new Date(isoDate + 'T00:00:00');
+    const end = new Date(isoDate + 'T23:59:59.999');
+    return { start, end };
 }
 
 async function fetchOrdersForDate(isoDate) {
-  const { start, end } = dayRangeFromISO(isoDate);
-  const ordersCol = collection(db, 'orders');
+    const { start, end } = dayRangeFromISO(isoDate);
+    const ordersCol = collection(db, 'orders');
 
-  try {
-    const q = query(ordersCol, where('paymentStatus', '==', 'pagado'), where('paidAt', '>=', Timestamp.fromDate(start)), where('paidAt', '<=', Timestamp.fromDate(end)));
-    const snap = await getDocs(q);
-    if (snap && !snap.empty) return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (err) {
-    console.warn('Consulta por paidAt falló (indices/tipos):', err);
-  }
+    try {
+        const q = query(ordersCol, where('paymentStatus', '==', 'pagado'), where('paidAt', '>=', Timestamp.fromDate(start)), where('paidAt', '<=', Timestamp.fromDate(end)));
+        const snap = await getDocs(q);
+        if (snap && !snap.empty) return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+        console.warn('Consulta por paidAt falló (indices/tipos):', err);
+    }
 
-  try {
-    const q2 = query(ordersCol, where('paymentStatus', '==', 'pagado'));
-    const snap2 = await getDocs(q2);
-    const docs = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
-    const filtered = docs.filter(doc => {
-      const candidates = [doc.paidAt, doc.payment?.paidAt, doc.createdAt, doc.paymentUpdatedAt, doc.updatedAt, doc.payment?.conversionRateDate];
-      for (const c of candidates) {
-        const dt = toDateFromPossible(c);
-        if (dt && dt >= start && dt <= end) return true;
-      }
-      return false;
-    });
-    return filtered;
-  } catch (err) {
-    console.error('Error en fallback:', err);
-    return [];
-  }
+    try {
+        const q2 = query(ordersCol, where('paymentStatus', '==', 'pagado'));
+        const snap2 = await getDocs(q2);
+        const docs = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+        const filtered = docs.filter(doc => {
+            const candidates = [doc.paidAt, doc.payment?.paidAt, doc.createdAt, doc.paymentUpdatedAt, doc.updatedAt, doc.payment?.conversionRateDate];
+            for (const c of candidates) {
+                const dt = toDateFromPossible(c);
+                if (dt && dt >= start && dt <= end) return true;
+            }
+            return false;
+        });
+        return filtered;
+    } catch (err) {
+        console.error('Error en fallback:', err);
+        return [];
+    }
 }
 
 async function fetchOrdersForRange(startISO, endISO) {
-  const start = new Date(startISO + 'T00:00:00');
-  const end = new Date(endISO + 'T23:59:59.999');
-  const ordersCol = collection(db, 'orders');
+    const start = new Date(startISO + 'T00:00:00');
+    const end = new Date(endISO + 'T23:59:59.999');
+    const ordersCol = collection(db, 'orders');
 
-  try {
-    const q = query(ordersCol, where('paymentStatus', '==', 'pagado'), where('paidAt', '>=', Timestamp.fromDate(start)), where('paidAt', '<=', Timestamp.fromDate(end)));
-    const snap = await getDocs(q);
-    if (snap && !snap.empty) return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (err) {
-    console.warn('Range query fallback (indices):', err);
-  }
+    try {
+        const q = query(ordersCol, where('paymentStatus', '==', 'pagado'), where('paidAt', '>=', Timestamp.fromDate(start)), where('paidAt', '<=', Timestamp.fromDate(end)));
+        const snap = await getDocs(q);
+        if (snap && !snap.empty) return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+        console.warn('Range query fallback (indices):', err);
+    }
 
-  try {
-    const q2 = query(collection(db, 'orders'), where('paymentStatus', '==', 'pagado'));
-    const snap2 = await getDocs(q2);
-    const docs = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
-    return docs.filter(doc => {
-      const candidates = [doc.paidAt, doc.payment?.paidAt, doc.createdAt, doc.paymentUpdatedAt, doc.updatedAt, doc.payment?.conversionRateDate];
-      for (const c of candidates) {
-        const dt = toDateFromPossible(c);
-        if (!dt) continue;
-        if (dt >= start && dt <= end) return true;
-      }
-      return false;
-    });
-  } catch (err) {
-    console.error('Error en fetchOrdersForRange fallback:', err);
-    return [];
-  }
+    try {
+        const q2 = query(collection(db, 'orders'), where('paymentStatus', '==', 'pagado'));
+        const snap2 = await getDocs(q2);
+        const docs = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+        return docs.filter(doc => {
+            const candidates = [doc.paidAt, doc.payment?.paidAt, doc.createdAt, doc.paymentUpdatedAt, doc.updatedAt, doc.payment?.conversionRateDate];
+            for (const c of candidates) {
+                const dt = toDateFromPossible(c);
+                if (!dt) continue;
+                if (dt >= start && dt <= end) return true;
+            }
+            return false;
+        });
+    } catch (err) {
+        console.error('Error en fetchOrdersForRange fallback:', err);
+        return [];
+    }
 }
 
 async function fetchClosuresInRange(startISO, endISO) {
-  try {
-    const closuresCol = collection(db, 'cash_closures');
-    const q = query(closuresCol, where('dateISO', '>=', startISO), where('dateISO', '<=', endISO));
-    const snap = await getDocs(q);
-    if (snap && !snap.empty) return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    return [];
-  } catch (err) {
-    console.warn('Error fetching cash_closures for calendar:', err);
-    return [];
-  }
+    try {
+        const closuresCol = collection(db, 'cash_closures');
+        const q = query(closuresCol, where('dateISO', '>=', startISO), where('dateISO', '<=', endISO));
+        const snap = await getDocs(q);
+        if (snap && !snap.empty) return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return [];
+    } catch (err) {
+        console.warn('Error fetching cash_closures for calendar:', err);
+        return [];
+    }
 }
 
 async function checkIfClosed(isoDate) {
-  try {
-    const closuresCol = collection(db, 'cash_closures');
-    const q = query(closuresCol, where('dateISO', '==', isoDate));
-    const snap = await getDocs(q);
-    if (snap && !snap.empty) {
-      const doc = snap.docs[0];
-      return { id: doc.id, data: doc.data() };
+    try {
+        const closuresCol = collection(db, 'cash_closures');
+        const q = query(closuresCol, where('dateISO', '==', isoDate));
+        const snap = await getDocs(q);
+        if (snap && !snap.empty) {
+            const doc = snap.docs[0];
+            return { id: doc.id, data: doc.data() };
+        }
+    } catch (err) {
+        console.warn('Error comprobando cash_closures:', err);
     }
-  } catch (err) {
-    console.warn('Error comprobando cash_closures:', err);
-  }
-  return null;
+    return null;
 }
 
 // ---------- Data aggregation & rendering ----------
 function buildCascadeData(orders) {
-  const sellers = new Map();
-  const summary = { totalBs: 0, totalUsd: 0, totalOrders: orders.length, totalsByMethod: {} };
+    const sellers = new Map();
+    const summary = { totalBs: 0, totalUsd: 0, totalOrders: orders.length, totalsByMethod: {} };
 
-  for (const order of orders) {
-    const sellerName = order.assignedSellerName || order.assignedSeller || order.sellerName || order.vendedor || 'Desconocido';
-    const riderName = order.assignedMotorizedName || order.assignedMotorName || order.motorizado || order.riderName || 'Sin asignar';
-    const { payments, motorizado } = extractPaymentsFromOrder(order);
+    for (const order of orders) {
+        const sellerName = order.assignedSellerName || order.assignedSeller || order.sellerName || order.vendedor || 'Desconocido';
+        const riderName = order.assignedMotorizedName || order.assignedMotorName || order.motorizado || order.riderName || 'Sin asignar';
+        const { payments, motorizado } = extractPaymentsFromOrder(order);
 
-    for (const p of payments) {
-      if (p.primary === 'bs') summary.totalBs += Number(p.bs || 0);
-      else summary.totalUsd += Number(p.usd || 0);
+        for (const p of payments) {
+            if (p.primary === 'bs') summary.totalBs += Number(p.bs || 0);
+            else summary.totalUsd += Number(p.usd || 0);
 
-      const key = `${p.key}_${p.primary}`;
-      if (!summary.totalsByMethod[key]) summary.totalsByMethod[key] = { bs: 0, usd: 0, rawMethod: p.key };
-      if (p.primary === 'bs') summary.totalsByMethod[key].bs += Number(p.bs || 0);
-      else summary.totalsByMethod[key].usd += Number(p.usd || 0);
+            const key = `${p.key}_${p.primary}`;
+            if (!summary.totalsByMethod[key]) summary.totalsByMethod[key] = { bs: 0, usd: 0, rawMethod: p.key };
+            if (p.primary === 'bs') summary.totalsByMethod[key].bs += Number(p.bs || 0);
+            else summary.totalsByMethod[key].usd += Number(p.usd || 0);
+        }
+
+        if (motorizado.bs) summary.totalBs += motorizado.bs;
+        if (motorizado.usd) summary.totalUsd += motorizado.usd;
+
+        const sName = String(sellerName);
+        const rName = String(riderName);
+        if (!sellers.has(sName)) sellers.set(sName, new Map());
+        const sellerMap = sellers.get(sName);
+        if (!sellerMap.has(rName)) sellerMap.set(rName, []);
+        sellerMap.get(rName).push({ id: order.id, order, payments, motorizado });
     }
 
-    if (motorizado.bs) summary.totalBs += motorizado.bs;
-    if (motorizado.usd) summary.totalUsd += motorizado.usd;
-
-    const sName = String(sellerName);
-    const rName = String(riderName);
-    if (!sellers.has(sName)) sellers.set(sName, new Map());
-    const sellerMap = sellers.get(sName);
-    if (!sellerMap.has(rName)) sellerMap.set(rName, []);
-    sellerMap.get(rName).push({ id: order.id, order, payments, motorizado });
-  }
-
-  return { sellers, summary };
+    return { sellers, summary };
 }
 
 function renderKpis(summary) {
-  if (!kpiCards) return;
-  kpiCards.innerHTML = '';
-  const kpis = [
-    { label: 'Total Cobrado (Bs)', value: formatCurrencyBs(summary.totalBs) },
-    { label: 'Total Cobrado (USD)', value: formatCurrencyUSD(summary.totalUsd) },
-    { label: 'Pedidos Procesados', value: summary.totalOrders }
-  ];
-  for (const k of kpis) {
-    const el = document.createElement('div'); el.className = 'kpi';
-    el.innerHTML = `<div class="label">${k.label}</div><div class="value">${k.value}</div>`;
-    kpiCards.appendChild(el);
-  }
+    if (!kpiCards) return;
+    kpiCards.innerHTML = '';
+    const kpis = [
+        { label: 'Total Cobrado (Bs)', value: formatCurrencyBs(summary.totalBs) },
+        { label: 'Total Cobrado (USD)', value: formatCurrencyUSD(summary.totalUsd) },
+        { label: 'Pedidos Procesados', value: summary.totalOrders }
+    ];
+    for (const k of kpis) {
+        const el = document.createElement('div'); el.className = 'kpi';
+        el.innerHTML = `<div class="label">${k.label}</div><div class="value">${k.value}</div>`;
+        kpiCards.appendChild(el);
+    }
 }
 
 function renderSummaryCards(summary) {
-  if (!summaryCards) return;
-  summaryCards.innerHTML = '';
-  const entries = Object.entries(summary.totalsByMethod).sort((a, b) => (b[1].bs + b[1].usd) - (a[1].bs + a[1].usd));
-  for (const [key, v] of entries) {
-    const div = document.createElement('div'); div.className = 'card summary-card';
-    const parts = key.split('_');
-    const method = (parts[0] || 'otro').toUpperCase();
-    const currency = (parts[1] || 'bs').toUpperCase();
-    const label = `${method} (${currency})`;
-    const value = currency === 'BS' ? formatCurrencyBs(v.bs) : formatCurrencyUSD(v.usd);
-    const alt = currency === 'BS' ? formatCurrencyUSD(v.usd) : formatCurrencyBs(v.bs);
-    div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div><div class="alt">${alt}</div>`;
-    summaryCards.appendChild(div);
-  }
-  if (entries.length === 0) summaryCards.innerHTML = '<div class="muted">Sin desglose por método</div>';
+    if (!summaryCards) return;
+    summaryCards.innerHTML = '';
+    const entries = Object.entries(summary.totalsByMethod).sort((a, b) => (b[1].bs + b[1].usd) - (a[1].bs + a[1].usd));
+    for (const [key, v] of entries) {
+        const div = document.createElement('div'); div.className = 'card summary-card';
+        const parts = key.split('_');
+        const method = (parts[0] || 'otro').toUpperCase();
+        const currency = (parts[1] || 'bs').toUpperCase();
+        const label = `${method} (${currency})`;
+        const value = currency === 'BS' ? formatCurrencyBs(v.bs) : formatCurrencyUSD(v.usd);
+        const alt = currency === 'BS' ? formatCurrencyUSD(v.usd) : formatCurrencyBs(v.bs);
+        div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div><div class="alt">${alt}</div>`;
+        summaryCards.appendChild(div);
+    }
+    if (entries.length === 0) summaryCards.innerHTML = '<div class="muted">Sin desglose por método</div>';
 }
 
 function renderCascade(sellersMap) {
-  if (!cascadeContainer) return;
-  cascadeContainer.innerHTML = '';
-  if (!sellersMap || sellersMap.size === 0) {
-    cascadeContainer.innerHTML = '<div class="muted">No hay pedidos para la fecha seleccionada.</div>';
-    return;
-  }
-  for (const [sellerName, riderMap] of sellersMap.entries()) {
-    const sv = document.createElement('div'); sv.className = 'vendedor expanded';
-    const sellerTotal = Array.from(riderMap.values()).flat().reduce((acc, item) => {
-      return acc + (item.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (item.motorizado?.bs || 0);
-    }, 0);
-
-    const header = document.createElement('div'); header.className = 'vh clickable';
-    header.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span class="chev">▾</span><div><div class="v-title">👤 Vendedor: ${sellerName}</div><div class="muted">Comisiones / totales mostrados por pedido</div></div></div><div class="badge-total">${formatCurrencyBs(sellerTotal)}</div>`;
-    sv.appendChild(header);
-
-    const content = document.createElement('div'); content.className = 'v-content';
-    for (const [riderName, orders] of riderMap.entries()) {
-      const mv = document.createElement('div'); mv.className = 'motorizado';
-      const riderTotal = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (it.motorizado?.bs || 0), 0);
-      mv.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div><div class="motorizado-badge">${formatCurrencyBs(riderTotal)}</div></div>`;
-
-      for (const o of orders) {
-        const pd = document.createElement('div'); pd.className = 'pedido';
-        const order = o.order;
-        const dtCandidates = [order.paidAt, order.payment?.paidAt, order.createdAt, order.paymentUpdatedAt, order.updatedAt];
-        let paidAt = null;
-        for (const r of dtCandidates) { const dt = toDateFromPossible(r); if (dt) { paidAt = dt; break; } }
-        const dateStr = paidAt ? paidAt.toLocaleDateString() : '—';
-        const cust = order.customerName || order.clientName || order.buyer || order.recipientName || '';
-
-        const paymentsHtml = (o.payments && o.payments.length) ? o.payments.map(p => {
-          const main = p.primary === 'bs' ? formatCurrencyBs(p.bs) : formatCurrencyUSD(p.usd);
-          const alt = p.primary === 'bs' ? (p.usd ? ` ${formatCurrencyUSD(p.usd)}` : '') : (p.bs ? ` ${formatCurrencyBs(p.bs)}` : '');
-          const cls = p.cls || '';
-          let icon = '💰';
-          if (p.key === 'pago-movil') icon = '📱';
-          if (p.key === 'paypal') icon = '💳';
-          if (p.key === 'zelle') icon = '💳';
-          return `<div class="payment-row"><div class="payment-left"><span class="icon">${icon}</span><span class="payment-label ${cls}">${p.label}</span></div><div class="payment-amount ${cls}"><span class="main">${main}</span><span class="small">${alt.trim()}</span></div></div>`;
-        }).join('') : '<div class="muted">Sin detalles de pago</div>';
-
-        const subtotalBs = (o.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0);
-        const subtotalUsd = (o.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? (p.usd || 0) : 0), 0);
-        const motHtml = (o.motorizado && ((o.motorizado.bs || 0) > 0 || (o.motorizado.usd || 0) > 0)) ? (() => {
-          if (o.motorizado.bs) return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyBs(o.motorizado.bs)}</div></div>`;
-          return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyUSD(o.motorizado.usd)}</div></div>`;
-        })() : `<div class="motorizado-fee"><div class="muted" style="font-size:13px"> </div></div>`;
-
-        pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — ${cust} <span class="muted">• ${dateStr}</span></div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>`;
-        mv.appendChild(pd);
-      }
-
-      content.appendChild(mv);
+    if (!cascadeContainer) return;
+    cascadeContainer.innerHTML = '';
+    if (!sellersMap || sellersMap.size === 0) {
+        cascadeContainer.innerHTML = '<div class="muted">No hay pedidos para la fecha seleccionada.</div>';
+        return;
     }
+    for (const [sellerName, riderMap] of sellersMap.entries()) {
+        const sv = document.createElement('div'); sv.className = 'vendedor expanded';
+        const sellerTotal = Array.from(riderMap.values()).flat().reduce((acc, item) => {
+            return acc + (item.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (item.motorizado?.bs || 0);
+        }, 0);
 
-    sv.appendChild(content);
-    cascadeContainer.appendChild(sv);
+        const header = document.createElement('div'); header.className = 'vh clickable';
+        header.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span class="chev">▾</span><div><div class="v-title">👤 Vendedor: ${sellerName}</div><div class="muted">Comisiones / totales mostrados por pedido</div></div></div><div class="badge-total">${formatCurrencyBs(sellerTotal)}</div>`;
+        sv.appendChild(header);
 
-    header.addEventListener('click', () => {
-      const isCollapsed = sv.classList.contains('collapsed');
-      if (isCollapsed) {
-        sv.classList.remove('collapsed'); sv.classList.add('expanded');
-        const chev = header.querySelector('.chev'); if (chev) chev.textContent = '▾';
-      } else {
-        sv.classList.remove('expanded'); sv.classList.add('collapsed');
-        const chev = header.querySelector('.chev'); if (chev) chev.textContent = '▸';
-      }
-    });
-  }
+        const content = document.createElement('div'); content.className = 'v-content';
+        for (const [riderName, orders] of riderMap.entries()) {
+            const mv = document.createElement('div'); mv.className = 'motorizado';
+            const riderTotal = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (it.motorizado?.bs || 0), 0);
+            mv.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div><div class="motorizado-badge">${formatCurrencyBs(riderTotal)}</div></div>`;
+
+            for (const o of orders) {
+                const pd = document.createElement('div'); pd.className = 'pedido';
+                const order = o.order;
+                const dtCandidates = [order.paidAt, order.payment?.paidAt, order.createdAt, order.paymentUpdatedAt, order.updatedAt];
+                let paidAt = null;
+                for (const r of dtCandidates) { const dt = toDateFromPossible(r); if (dt) { paidAt = dt; break; } }
+                const dateStr = paidAt ? paidAt.toLocaleDateString() : '—';
+                const cust = order.customerName || order.clientName || order.buyer || order.recipientName || '';
+
+                const paymentsHtml = (o.payments && o.payments.length) ? o.payments.map(p => {
+                    const main = p.primary === 'bs' ? formatCurrencyBs(p.bs) : formatCurrencyUSD(p.usd);
+                    const alt = p.primary === 'bs' ? (p.usd ? ` ${formatCurrencyUSD(p.usd)}` : '') : (p.bs ? ` ${formatCurrencyBs(p.bs)}` : '');
+                    const cls = p.cls || '';
+                    let icon = '💰';
+                    if (p.key === 'pago-movil') icon = '📱';
+                    if (p.key === 'paypal') icon = '💳';
+                    if (p.key === 'zelle') icon = '💳';
+                    return `<div class="payment-row"><div class="payment-left"><span class="icon">${icon}</span><span class="payment-label ${cls}">${p.label}</span></div><div class="payment-amount ${cls}"><span class="main">${main}</span><span class="small">${alt.trim()}</span></div></div>`;
+                }).join('') : '<div class="muted">Sin detalles de pago</div>';
+
+                const subtotalBs = (o.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0);
+                const subtotalUsd = (o.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? (p.usd || 0) : 0), 0);
+                const motHtml = (o.motorizado && ((o.motorizado.bs || 0) > 0 || (o.motorizado.usd || 0) > 0)) ? (() => {
+                    if (o.motorizado.bs) return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyBs(o.motorizado.bs)}</div></div>`;
+                    return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyUSD(o.motorizado.usd)}</div></div>`;
+                })() : `<div class="motorizado-fee"><div class="muted" style="font-size:13px"> </div></div>`;
+
+                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — ${cust} <span class="muted">• ${dateStr}</span></div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>`;
+                mv.appendChild(pd);
+            }
+
+            content.appendChild(mv);
+        }
+
+        sv.appendChild(content);
+        cascadeContainer.appendChild(sv);
+
+        header.addEventListener('click', () => {
+            const isCollapsed = sv.classList.contains('collapsed');
+            if (isCollapsed) {
+                sv.classList.remove('collapsed'); sv.classList.add('expanded');
+                const chev = header.querySelector('.chev'); if (chev) chev.textContent = '▾';
+            } else {
+                sv.classList.remove('expanded'); sv.classList.add('collapsed');
+                const chev = header.querySelector('.chev'); if (chev) chev.textContent = '▸';
+            }
+        });
+    }
 }
 
 // ---------- Filters population ----------
 function populateFilterOptions(orders) {
-  if (!filterSeller || !filterRider || !filterPayment) return;
-  const sellersSet = new Set(), ridersSet = new Set(), paymentsMap = new Map();
+    if (!filterSeller || !filterRider || !filterPayment) return;
+    const sellersSet = new Set(), ridersSet = new Set(), paymentsMap = new Map();
 
-  for (const order of orders) {
-    const sellerName = order.assignedSellerName || order.assignedSeller || order.sellerName || order.vendedor || 'Desconocido';
-    const riderName = order.assignedMotorizedName || order.assignedMotorName || order.motorizado || order.riderName || 'Sin asignar';
-    sellersSet.add(String(sellerName));
-    ridersSet.add(String(riderName));
-    const { payments, motorizado } = extractPaymentsFromOrder(order);
-    for (const p of payments) {
-      const pk = p.key;
-      if (!paymentsMap.has(pk)) paymentsMap.set(pk, p.label);
+    for (const order of orders) {
+        const sellerName = order.assignedSellerName || order.assignedSeller || order.sellerName || order.vendedor || 'Desconocido';
+        const riderName = order.assignedMotorizedName || order.assignedMotorName || order.motorizado || order.riderName || 'Sin asignar';
+        sellersSet.add(String(sellerName));
+        ridersSet.add(String(riderName));
+        const { payments, motorizado } = extractPaymentsFromOrder(order);
+        for (const p of payments) {
+            const pk = p.key;
+            if (!paymentsMap.has(pk)) paymentsMap.set(pk, p.label);
+        }
+        if (motorizado && ((motorizado.bs || 0) > 0 || (motorizado.usd || 0) > 0)) {
+            if (!paymentsMap.has('motorizado')) paymentsMap.set('motorizado', 'Pago motorizado');
+        }
     }
-    if (motorizado && ((motorizado.bs || 0) > 0 || (motorizado.usd || 0) > 0)) {
-      if (!paymentsMap.has('motorizado')) paymentsMap.set('motorizado', 'Pago motorizado');
-    }
-  }
 
-  const prevSeller = filterSeller.value || 'all';
-  const prevRider = filterRider.value || 'all';
-  const prevPayment = filterPayment.value || 'all';
+    const prevSeller = filterSeller.value || 'all';
+    const prevRider = filterRider.value || 'all';
+    const prevPayment = filterPayment.value || 'all';
 
-  filterSeller.innerHTML = '<option value="all">Todos</option>';
-  filterRider.innerHTML = '<option value="all">Todos</option>';
-  filterPayment.innerHTML = '<option value="all">Todas</option>';
+    filterSeller.innerHTML = '<option value="all">Todos</option>';
+    filterRider.innerHTML = '<option value="all">Todos</option>';
+    filterPayment.innerHTML = '<option value="all">Todas</option>';
 
-  Array.from(sellersSet).sort().forEach(s => {
-    const opt = document.createElement('option'); opt.value = s; opt.textContent = s;
-    filterSeller.appendChild(opt);
-  });
-  Array.from(ridersSet).sort().forEach(r => {
-    const opt = document.createElement('option'); opt.value = r; opt.textContent = r;
-    filterRider.appendChild(opt);
-  });
-  Array.from(paymentsMap.entries()).sort((a, b) => a[1].localeCompare(b[1])).forEach(([k, label]) => {
-    const opt = document.createElement('option'); opt.value = k; opt.textContent = label;
-    filterPayment.appendChild(opt);
-  });
+    Array.from(sellersSet).sort().forEach(s => {
+        const opt = document.createElement('option'); opt.value = s; opt.textContent = s;
+        filterSeller.appendChild(opt);
+    });
+    Array.from(ridersSet).sort().forEach(r => {
+        const opt = document.createElement('option'); opt.value = r; opt.textContent = r;
+        filterRider.appendChild(opt);
+    });
+    Array.from(paymentsMap.entries()).sort((a, b) => a[1].localeCompare(b[1])).forEach(([k, label]) => {
+        const opt = document.createElement('option'); opt.value = k; opt.textContent = label;
+        filterPayment.appendChild(opt);
+    });
 
-  if ([...filterSeller.options].some(o => o.value === prevSeller)) filterSeller.value = prevSeller;
-  if ([...filterRider.options].some(o => o.value === prevRider)) filterRider.value = prevRider;
-  if ([...filterPayment.options].some(o => o.value === prevPayment)) filterPayment.value = prevPayment;
+    if ([...filterSeller.options].some(o => o.value === prevSeller)) filterSeller.value = prevSeller;
+    if ([...filterRider.options].some(o => o.value === prevRider)) filterRider.value = prevRider;
+    if ([...filterPayment.options].some(o => o.value === prevPayment)) filterPayment.value = prevPayment;
 }
 
 // ---------- Filters apply ----------
 function applyFiltersToLastFetched() {
-  if (!lastFetchedOrders || !lastFetchedOrders.length) return;
-  let filtered = lastFetchedOrders.slice();
-  const selSeller = filterSeller?.value || 'all';
-  const selRider = filterRider?.value || 'all';
-  const selPayment = filterPayment?.value || 'all';
+    if (!lastFetchedOrders || !lastFetchedOrders.length) return;
+    let filtered = lastFetchedOrders.slice();
+    const selSeller = filterSeller?.value || 'all';
+    const selRider = filterRider?.value || 'all';
+    const selPayment = filterPayment?.value || 'all';
 
-  filtered = filtered.filter(order => {
-    const sellerName = String(order.assignedSellerName || order.assignedSeller || order.sellerName || order.vendedor || 'Desconocido');
-    const riderName = String(order.assignedMotorizedName || order.assignedMotorName || order.motorizado || order.riderName || 'Sin asignar');
+    filtered = filtered.filter(order => {
+        const sellerName = String(order.assignedSellerName || order.assignedSeller || order.sellerName || order.vendedor || 'Desconocido');
+        const riderName = String(order.assignedMotorizedName || order.assignedMotorName || order.motorizado || order.riderName || 'Sin asignar');
 
-    if (selSeller !== 'all' && sellerName !== selSeller) return false;
-    if (selRider !== 'all' && riderName !== selRider) return false;
+        if (selSeller !== 'all' && sellerName !== selSeller) return false;
+        if (selRider !== 'all' && riderName !== selRider) return false;
 
-    if (selPayment !== 'all') {
-      const { payments, motorizado } = extractPaymentsFromOrder(order);
-      if (selPayment === 'motorizado') {
-        if (!((motorizado?.bs || 0) > 0 || (motorizado?.usd || 0) > 0)) return false;
-      } else {
-        const found = (payments || []).some(p => p.key === selPayment);
-        if (!found) return false;
-      }
-    }
+        if (selPayment !== 'all') {
+            const { payments, motorizado } = extractPaymentsFromOrder(order);
+            if (selPayment === 'motorizado') {
+                if (!((motorizado?.bs || 0) > 0 || (motorizado?.usd || 0) > 0)) return false;
+            } else {
+                const found = (payments || []).some(p => p.key === selPayment);
+                if (!found) return false;
+            }
+        }
 
-    return true;
-  });
+        return true;
+    });
 
-  const { sellers, summary } = buildCascadeData(filtered);
-  renderKpis(summary); renderSummaryCards(summary); renderCascade(sellers);
-  if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
-  if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
+    const { sellers, summary } = buildCascadeData(filtered);
+    renderKpis(summary); renderSummaryCards(summary); renderCascade(sellers);
+    if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
+    if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 }
 
 // ---------- Calendar rendering & selection ----------
 async function renderCalendar() {
-  if (!calGrid || !calMonthName) return;
-  const cur = new Date(calState.currentCalendarMonth.getFullYear(), calState.currentCalendarMonth.getMonth(), 1);
-  const year = cur.getFullYear(), month = cur.getMonth();
-  calMonthName.textContent = cur.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    if (!calGrid || !calMonthName) return;
+    const cur = new Date(calState.currentCalendarMonth.getFullYear(), calState.currentCalendarMonth.getMonth(), 1);
+    const year = cur.getFullYear(), month = cur.getMonth();
+    calMonthName.textContent = cur.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
-  const firstDayOfMonth = new Date(year, month, 1);
-  const lastDayOfMonth = new Date(year, month + 1, 0);
-  const firstISO = isoFromDate(firstDayOfMonth);
-  const lastISO = isoFromDate(lastDayOfMonth);
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const firstISO = isoFromDate(firstDayOfMonth);
+    const lastISO = isoFromDate(lastDayOfMonth);
 
-  const closures = await fetchClosuresInRange(firstISO, lastISO);
-  closuresCache = closures;
-  const ordersInRange = await fetchOrdersForRange(firstISO, lastISO);
+    const closures = await fetchClosuresInRange(firstISO, lastISO);
+    closuresCache = closures;
+    const ordersInRange = await fetchOrdersForRange(firstISO, lastISO);
 
-  const closuresMap = new Map();
-  for (const c of closures) if (c.dateISO) closuresMap.set(c.dateISO, c);
+    const closuresMap = new Map();
+    for (const c of closures) if (c.dateISO) closuresMap.set(c.dateISO, c);
 
-  const ordersMap = new Map();
-  for (const o of ordersInRange) {
-    const candidates = [o.paidAt, o.payment?.paidAt, o.createdAt, o.paymentUpdatedAt, o.updatedAt];
-    for (const c of candidates) {
-      const dt = toDateFromPossible(c);
-      if (!dt) continue;
-      const iso = isoFromDate(dt);
-      if (!ordersMap.has(iso)) ordersMap.set(iso, []);
-      ordersMap.get(iso).push(o);
-      break;
-    }
-  }
-
-  calGrid.innerHTML = '';
-
-  const firstWeekday = firstDayOfMonth.getDay(); // 0 sunday
-  const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
-
-  for (let i = 0; i < offset; i++) {
-    const empty = document.createElement('div');
-    empty.style.minHeight = '96px';
-    empty.style.border = '1px solid #f1f3f5';
-    empty.style.background = '#fff';
-    calGrid.appendChild(empty);
-  }
-
-  const todayISO = isoFromDate(new Date());
-
-  for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
-    const dateObj = new Date(year, month, day);
-    const iso = isoFromDate(dateObj);
-    const closure = closuresMap.get(iso);
-    const ordersForDay = ordersMap.get(iso) || [];
-
-    const cell = document.createElement('div');
-    cell.className = 'calendar-cell';
-    cell.dataset.iso = iso;
-    cell.style.minHeight = '96px';
-    cell.style.border = '1px solid #f1f3f5';
-    cell.style.padding = '10px';
-    cell.style.boxSizing = 'border-box';
-    cell.style.display = 'flex';
-    cell.style.flexDirection = 'column';
-    cell.style.justifyContent = 'space-between';
-    cell.style.cursor = 'pointer';
-
-    if (closure) cell.classList.add('calendar-closed');
-    else if (ordersForDay.length > 0 && iso <= todayISO) cell.classList.add('calendar-pending');
-    else cell.classList.add('calendar-empty');
-
-    if (selectedDates.has(iso)) cell.classList.add('calendar-selected');
-
-    const top = document.createElement('div');
-    top.style.display = 'flex';
-    top.style.justifyContent = 'space-between';
-    top.style.alignItems = 'start';
-
-    const dayLabel = document.createElement('span');
-    dayLabel.textContent = day;
-    dayLabel.style.fontWeight = '700';
-    dayLabel.style.color = closure ? '#065f46' : (ordersForDay.length > 0 && iso <= todayISO ? '#7a1c1c' : '#94a3b8');
-    top.appendChild(dayLabel);
-
-    if (closure) {
-      const icon = document.createElement('span'); icon.innerHTML = '✔'; icon.style.color = '#16a34a'; icon.style.fontSize = '12px';
-      top.appendChild(icon);
-    } else if (ordersForDay.length > 0 && iso <= todayISO) {
-      const icon = document.createElement('span'); icon.innerHTML = '!'; icon.style.color = '#ef4444'; icon.style.fontSize = '12px';
-      top.appendChild(icon);
+    const ordersMap = new Map();
+    for (const o of ordersInRange) {
+        const candidates = [o.paidAt, o.payment?.paidAt, o.createdAt, o.paymentUpdatedAt, o.updatedAt];
+        for (const c of candidates) {
+            const dt = toDateFromPossible(c);
+            if (!dt) continue;
+            const iso = isoFromDate(dt);
+            if (!ordersMap.has(iso)) ordersMap.set(iso, []);
+            ordersMap.get(iso).push(o);
+            break;
+        }
     }
 
-    cell.appendChild(top);
+    calGrid.innerHTML = '';
 
-    if (closure) {
-      const content = document.createElement('div');
-      content.innerHTML = `<div style="margin-top:8px"><div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase">Cierre</div><div style="margin-top:6px;font-weight:800;color:#0f172a">${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
-      cell.appendChild(content);
-    } else if (ordersForDay.length > 0) {
-      const content = document.createElement('div');
-      content.innerHTML = `<div style="margin-top:8px"><div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase">${ordersForDay.length} pedidos</div></div>`;
-      cell.appendChild(content);
-    } else {
-      const placeholder = document.createElement('div'); placeholder.style.height = '20px'; cell.appendChild(placeholder);
+    const firstWeekday = firstDayOfMonth.getDay(); // 0 sunday
+    const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
+
+    for (let i = 0; i < offset; i++) {
+        const empty = document.createElement('div');
+        empty.style.minHeight = '96px';
+        empty.style.border = '1px solid #f1f3f5';
+        empty.style.background = '#fff';
+        calGrid.appendChild(empty);
     }
 
-    cell.addEventListener('click', () => {
-      const isoDay = cell.dataset.iso;
-      if (selectedDates.has(isoDay)) { selectedDates.delete(isoDay); cell.classList.remove('calendar-selected'); }
-      else { selectedDates.add(isoDay); cell.classList.add('calendar-selected'); }
-    });
+    const todayISO = isoFromDate(new Date());
 
-    cell.addEventListener('dblclick', async () => {
-      selectedDates.clear(); selectedDates.add(iso);
-      await applySelectionAndGoToResumen();
-    });
+    for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+        const dateObj = new Date(year, month, day);
+        const iso = isoFromDate(dateObj);
+        const closure = closuresMap.get(iso);
+        const ordersForDay = ordersMap.get(iso) || [];
 
-    calGrid.appendChild(cell);
-  }
+        const cell = document.createElement('div');
+        cell.className = 'calendar-cell';
+        cell.dataset.iso = iso;
+        cell.style.minHeight = '96px';
+        cell.style.border = '1px solid #f1f3f5';
+        cell.style.padding = '10px';
+        cell.style.boxSizing = 'border-box';
+        cell.style.display = 'flex';
+        cell.style.flexDirection = 'column';
+        cell.style.justifyContent = 'space-between';
+        cell.style.cursor = 'pointer';
+
+        if (closure) cell.classList.add('calendar-closed');
+        else if (ordersForDay.length > 0 && iso <= todayISO) cell.classList.add('calendar-pending');
+        else cell.classList.add('calendar-empty');
+
+        if (selectedDates.has(iso)) cell.classList.add('calendar-selected');
+
+        const top = document.createElement('div');
+        top.style.display = 'flex';
+        top.style.justifyContent = 'space-between';
+        top.style.alignItems = 'start';
+
+        const dayLabel = document.createElement('span');
+        dayLabel.textContent = day;
+        dayLabel.style.fontWeight = '700';
+        dayLabel.style.color = closure ? '#065f46' : (ordersForDay.length > 0 && iso <= todayISO ? '#7a1c1c' : '#94a3b8');
+        top.appendChild(dayLabel);
+
+        if (closure) {
+            const icon = document.createElement('span'); icon.innerHTML = '✔'; icon.style.color = '#16a34a'; icon.style.fontSize = '12px';
+            top.appendChild(icon);
+        } else if (ordersForDay.length > 0 && iso <= todayISO) {
+            const icon = document.createElement('span'); icon.innerHTML = '!'; icon.style.color = '#ef4444'; icon.style.fontSize = '12px';
+            top.appendChild(icon);
+        }
+
+        cell.appendChild(top);
+
+        if (closure) {
+            const content = document.createElement('div');
+            content.innerHTML = `<div style="margin-top:8px"><div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase">Cierre</div><div style="margin-top:6px;font-weight:800;color:#0f172a">${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
+            cell.appendChild(content);
+        } else if (ordersForDay.length > 0) {
+            const content = document.createElement('div');
+            content.innerHTML = `<div style="margin-top:8px"><div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase">${ordersForDay.length} pedidos</div></div>`;
+            cell.appendChild(content);
+        } else {
+            const placeholder = document.createElement('div'); placeholder.style.height = '20px'; cell.appendChild(placeholder);
+        }
+
+        cell.addEventListener('click', () => {
+            const isoDay = cell.dataset.iso;
+            if (selectedDates.has(isoDay)) { selectedDates.delete(isoDay); cell.classList.remove('calendar-selected'); }
+            else { selectedDates.add(isoDay); cell.classList.add('calendar-selected'); }
+        });
+
+        cell.addEventListener('dblclick', async () => {
+            selectedDates.clear(); selectedDates.add(iso);
+            await applySelectionAndGoToResumen();
+        });
+
+        calGrid.appendChild(cell);
+    }
 }
 
 // ---------- selection utils ----------
 function clearSelection() {
-  selectedDates.clear();
-  $$('.calendar-cell.calendar-selected').forEach(el => el.classList.remove('calendar-selected'));
+    selectedDates.clear();
+    $$('.calendar-cell.calendar-selected').forEach(el => el.classList.remove('calendar-selected'));
 }
 
 function selectMonth() {
-  clearSelection();
-  const cur = calState.currentCalendarMonth;
-  const first = new Date(cur.getFullYear(), cur.getMonth(), 1);
-  const last = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
-  for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) selectedDates.add(isoFromDate(new Date(d)));
-  $$('.calendar-cell').forEach(el => {
-    if (selectedDates.has(el.dataset.iso)) el.classList.add('calendar-selected'); else el.classList.remove('calendar-selected');
-  });
+    clearSelection();
+    const cur = calState.currentCalendarMonth;
+    const first = new Date(cur.getFullYear(), cur.getMonth(), 1);
+    const last = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
+    for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) selectedDates.add(isoFromDate(new Date(d)));
+    $$('.calendar-cell').forEach(el => {
+        if (selectedDates.has(el.dataset.iso)) el.classList.add('calendar-selected'); else el.classList.remove('calendar-selected');
+    });
 }
 
 function selectWeekOfAnySelected() {
-  if (selectedDates.size === 0) {
-    const isoToday = isoFromDate(new Date());
-    if ($(`[data-iso="${isoToday}"]`)) selectedDates.add(isoToday);
-    else {
-      const firstCell = document.querySelector('.calendar-cell');
-      if (firstCell && firstCell.dataset.iso) selectedDates.add(firstCell.dataset.iso);
+    if (selectedDates.size === 0) {
+        const isoToday = isoFromDate(new Date());
+        if ($(`[data-iso="${isoToday}"]`)) selectedDates.add(isoToday);
+        else {
+            const firstCell = document.querySelector('.calendar-cell');
+            if (firstCell && firstCell.dataset.iso) selectedDates.add(firstCell.dataset.iso);
+        }
     }
-  }
-  const firstIso = Array.from(selectedDates).sort()[0];
-  const dt = new Date(firstIso + 'T00:00:00');
-  const weekday = dt.getDay();
-  const offset = weekday === 0 ? -6 : 1 - weekday;
-  const monday = new Date(dt); monday.setDate(dt.getDate() + offset);
-  clearSelection();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday); d.setDate(monday.getDate() + i);
-    selectedDates.add(isoFromDate(d));
-  }
-  $$('.calendar-cell').forEach(el => {
-    if (selectedDates.has(el.dataset.iso)) el.classList.add('calendar-selected'); else el.classList.remove('calendar-selected');
-  });
+    const firstIso = Array.from(selectedDates).sort()[0];
+    const dt = new Date(firstIso + 'T00:00:00');
+    const weekday = dt.getDay();
+    const offset = weekday === 0 ? -6 : 1 - weekday;
+    const monday = new Date(dt); monday.setDate(dt.getDate() + offset);
+    clearSelection();
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday); d.setDate(monday.getDate() + i);
+        selectedDates.add(isoFromDate(d));
+    }
+    $$('.calendar-cell').forEach(el => {
+        if (selectedDates.has(el.dataset.iso)) el.classList.add('calendar-selected'); else el.classList.remove('calendar-selected');
+    });
 }
 
 async function applySelectionAndGoToResumen() {
-  if (selectedDates.size === 0) {
-    await calculateAndRenderForSelected(null);
-  } else {
-    await calculateAndRenderForSelected(selectedDates);
-  }
-  switchTab('resumen');
+    if (selectedDates.size === 0) {
+        await calculateAndRenderForSelected(null);
+    } else {
+        await calculateAndRenderForSelected(selectedDates);
+    }
+    switchTab('resumen');
 }
 
 // ---------- closure banner in Resumen ----------
 function renderClosureBanner(closuresForRange, datesArray) {
-  const existing = document.getElementById('closure-banner');
-  if (existing) existing.remove();
+    const existing = document.getElementById('closure-banner');
+    if (existing) existing.remove();
 
-  const closedDates = new Map();
-  for (const c of closuresForRange) if (c.dateISO) closedDates.set(c.dateISO, c);
+    const closedDates = new Map();
+    for (const c of closuresForRange) if (c.dateISO) closedDates.set(c.dateISO, c);
 
-  const banner = document.createElement('div');
-  banner.id = 'closure-banner';
-  banner.className = 'card';
-  banner.style.marginBottom = '12px';
-  banner.style.padding = '12px 16px';
-  banner.style.display = 'flex';
-  banner.style.justifyContent = 'space-between';
-  banner.style.alignItems = 'center';
-  banner.style.gap = '12px';
+    const banner = document.createElement('div');
+    banner.id = 'closure-banner';
+    banner.className = 'card';
+    banner.style.marginBottom = '12px';
+    banner.style.padding = '12px 16px';
+    banner.style.display = 'flex';
+    banner.style.justifyContent = 'space-between';
+    banner.style.alignItems = 'center';
+    banner.style.gap = '12px';
 
-  if (!datesArray || datesArray.length === 0) {
-    const todayISO = isoFromDate(new Date());
-    if (closedDates.has(todayISO)) {
-      const closure = closedDates.get(todayISO);
-      banner.innerHTML = `<div><strong>La caja del día ${formatDateDisplay(new Date(todayISO))} ya fue cerrada</strong><div class="muted">Totales guardados: ${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
-      if (conciliationSection) conciliationSection.style.display = 'none';
-      if (btnCloseCash) btnCloseCash.style.display = 'none';
+    if (!datesArray || datesArray.length === 0) {
+        const todayISO = isoFromDate(new Date());
+        if (closedDates.has(todayISO)) {
+            const closure = closedDates.get(todayISO);
+            banner.innerHTML = `<div><strong>La caja del día ${formatDateDisplay(new Date(todayISO))} ya fue cerrada</strong><div class="muted">Totales guardados: ${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
+            if (conciliationSection) conciliationSection.style.display = 'none';
+            if (btnCloseCash) btnCloseCash.style.display = 'none';
+        } else {
+            if (conciliationSection) conciliationSection.style.display = '';
+            if (btnCloseCash) btnCloseCash.style.display = '';
+            return;
+        }
     } else {
-      if (conciliationSection) conciliationSection.style.display = '';
-      if (btnCloseCash) btnCloseCash.style.display = '';
-      return;
+        const closedList = [];
+        for (const d of datesArray) {
+            if (closedDates.has(d)) closedList.push({ date: d, closure: closedDates.get(d) });
+        }
+        if (closedList.length === 0) {
+            if (conciliationSection) conciliationSection.style.display = '';
+            if (btnCloseCash) btnCloseCash.style.display = '';
+            return;
+        }
+        const closedDatesStr = closedList.map(c => `${new Date(c.date).toLocaleDateString('es-ES')}`).join(', ');
+        const totalsSummary = closedList.map(c => `${new Date(c.date).toLocaleDateString('es-ES')}: ${formatCurrencyBs(c.closure.totals?.bs ?? 0)}`).join(' • ');
+        banner.innerHTML = `<div><strong>La(s) caja(s) de las siguientes fecha(s) ya fueron cerradas:</strong><div class="muted" style="margin-top:6px">${closedDatesStr}</div><div style="margin-top:6px;font-weight:700">${totalsSummary}</div></div>`;
+        const allClosed = closedList.length === datesArray.length;
+        if (allClosed) {
+            if (conciliationSection) conciliationSection.style.display = 'none';
+            if (btnCloseCash) btnCloseCash.style.display = 'none';
+        } else {
+            if (conciliationSection) conciliationSection.style.display = '';
+            if (btnCloseCash) btnCloseCash.style.display = '';
+        }
     }
-  } else {
-    const closedList = [];
-    for (const d of datesArray) {
-      if (closedDates.has(d)) closedList.push({ date: d, closure: closedDates.get(d) });
-    }
-    if (closedList.length === 0) {
-      if (conciliationSection) conciliationSection.style.display = '';
-      if (btnCloseCash) btnCloseCash.style.display = '';
-      return;
-    }
-    const closedDatesStr = closedList.map(c => `${new Date(c.date).toLocaleDateString('es-ES')}`).join(', ');
-    const totalsSummary = closedList.map(c => `${new Date(c.date).toLocaleDateString('es-ES')}: ${formatCurrencyBs(c.closure.totals?.bs ?? 0)}`).join(' • ');
-    banner.innerHTML = `<div><strong>La(s) caja(s) de las siguientes fecha(s) ya fueron cerradas:</strong><div class="muted" style="margin-top:6px">${closedDatesStr}</div><div style="margin-top:6px;font-weight:700">${totalsSummary}</div></div>`;
-    const allClosed = closedList.length === datesArray.length;
-    if (allClosed) {
-      if (conciliationSection) conciliationSection.style.display = 'none';
-      if (btnCloseCash) btnCloseCash.style.display = 'none';
-    } else {
-      if (conciliationSection) conciliationSection.style.display = '';
-      if (btnCloseCash) btnCloseCash.style.display = '';
-    }
-  }
 
-  if (cascadeContainer) cascadeContainer.parentNode.insertBefore(banner, cascadeContainer);
+    if (cascadeContainer) cascadeContainer.parentNode.insertBefore(banner, cascadeContainer);
 }
 
 // ---------- main calculate function for selected dates (or today) ----------
+// Reemplaza la versión anterior de calculateAndRenderForSelected con esta
 async function calculateAndRenderForSelected(datesSet = null) {
-  let datesArray;
-  if (!datesSet || datesSet.size === 0) {
-    const todayISO = isoFromDate(new Date());
-    datesArray = [todayISO];
-  } else {
-    datesArray = Array.from(datesSet).sort();
-  }
-
-  if (displayDate) {
-    if (datesArray.length === 1) displayDate.textContent = formatDateDisplay(new Date(datesArray[0]));
-    else {
-      const first = new Date(datesArray[0]); const last = new Date(datesArray[datesArray.length - 1]);
-      displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${datesArray.length} días)`;
+    // Determina las fechas solicitadas (sorted)
+    let datesArray;
+    if (!datesSet || datesSet.size === 0) {
+        const todayISO = isoFromDate(new Date());
+        datesArray = [todayISO];
+    } else {
+        datesArray = Array.from(datesSet).sort();
     }
-  }
-  if (displayDatePill) {
-    if (datesArray.length === 1) displayDatePill.textContent = datesArray[0].split('-').reverse().join('/');
-    else displayDatePill.textContent = `${datesArray[0].split('-').reverse().join('/')} — ${datesArray[datesArray.length-1].split('-').reverse().join('/')}`;
-  }
 
-  const start = datesArray[0], end = datesArray[datesArray.length - 1];
-  if (!start || !end) return;
-  try {
-    const closures = await fetchClosuresInRange(start, end);
-    const closuresMap = new Map();
-    for (const c of closures) if (c.dateISO) closuresMap.set(c.dateISO, c);
+    // fetch closures y orders para el rango (start..end)
+    const start = datesArray[0], end = datesArray[datesArray.length - 1];
+    if (!start || !end) return;
 
-    const orders = await fetchOrdersForRange(start, end);
-    const keep = orders.filter(order => {
-      const candidates = [order.paidAt, order.payment?.paidAt, order.createdAt, order.paymentUpdatedAt, order.updatedAt];
-      for (const c of candidates) {
-        const dt = toDateFromPossible(c);
-        if (!dt) continue;
-        const iso = isoFromDate(dt);
-        if (datesArray.includes(iso)) return true;
-      }
-      return false;
-    });
+    try {
+        // obtener cierres del rango (para banner)
+        const closures = await fetchClosuresInRange(start, end);
+        // obtener pedidos en el rango
+        const orders = await fetchOrdersForRange(start, end);
 
-    lastFetchedOrders = keep.slice();
-    populateFilterOptions(keep);
-    const { sellers, summary } = buildCascadeData(keep);
-    renderKpis(summary); renderSummaryCards(summary); renderCascade(sellers);
-    if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
-    if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
+        // Filtrar pedidos que caen exactamente en las fechas seleccionadas
+        const keep = orders.filter(order => {
+            const candidates = [order.paidAt, order.payment?.paidAt, order.createdAt, order.paymentUpdatedAt, order.updatedAt];
+            for (const c of candidates) {
+                const dt = toDateFromPossible(c);
+                if (!dt) continue;
+                const iso = isoFromDate(dt); // ahora local
+                if (datesArray.includes(iso)) return true;
+            }
+            return false;
+        });
 
-    renderClosureBanner(closures, datesArray);
+        lastFetchedOrders = keep.slice();
+        populateFilterOptions(keep);
+        const { sellers, summary } = buildCascadeData(keep);
+        renderKpis(summary);
+        renderSummaryCards(summary);
+        renderCascade(sellers);
+        if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
+        if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 
-    return { orders: keep, summary, closures };
-  } catch (err) {
-    console.error('Error calculando cierre multi-fecha:', err);
-    showToast('Error cargando datos. Revisa la consola.', { type: 'error', duration: 5000 });
-    if (cascadeContainer) cascadeContainer.innerHTML = '<div class="muted">Error al cargar datos.</div>';
-    return null;
-  }
+        // --- Nuevo: usar las fechas reales de los pedidos para el encabezado ---
+        const orderDateSet = new Set();
+        for (const o of keep) {
+            const candidates = [o.paidAt, o.payment?.paidAt, o.createdAt, o.paymentUpdatedAt, o.updatedAt];
+            for (const c of candidates) {
+                const dt = toDateFromPossible(c);
+                if (!dt) continue;
+                orderDateSet.add(isoFromDate(dt));
+                break;
+            }
+        }
+        const orderDates = Array.from(orderDateSet).sort();
+
+        if (orderDates.length === 1) {
+            // si hay un único día real entre los pedidos
+            if (displayDate) displayDate.textContent = formatDateDisplay(new Date(orderDates[0]));
+            if (displayDatePill) displayDatePill.textContent = orderDates[0].split('-').reverse().join('/');
+        } else if (orderDates.length > 1) {
+            // varios días: mostrar rango según pedidos reales (primero..último)
+            const first = new Date(orderDates[0]), last = new Date(orderDates[orderDates.length - 1]);
+            if (displayDate) displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${orderDates.length} días)`;
+            if (displayDatePill) displayDatePill.textContent = `${orderDates[0].split('-').reverse().join('/')} — ${orderDates[orderDates.length - 1].split('-').reverse().join('/')}`;
+        } else {
+            // no hay pedidos; fallback a la selección (o a hoy)
+            if (datesArray.length === 1) {
+                if (displayDate) displayDate.textContent = formatDateDisplay(new Date(datesArray[0]));
+                if (displayDatePill) displayDatePill.textContent = datesArray[0].split('-').reverse().join('/');
+            } else {
+                const first = new Date(datesArray[0]), last = new Date(datesArray[datesArray.length - 1]);
+                if (displayDate) displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${datesArray.length} días)`;
+                if (displayDatePill) displayDatePill.textContent = `${datesArray[0].split('-').reverse().join('/')} — ${datesArray[datesArray.length - 1].split('-').reverse().join('/')}`;
+            }
+        }
+
+        // Renderiza banner de cierres (usa closures ya obtenidos)
+        renderClosureBanner(closures, datesArray);
+
+        return { orders: keep, summary, closures };
+    } catch (err) {
+        console.error('Error calculando cierre multi-fecha:', err);
+        showToast('Error cargando datos. Revisa la consola.', { type: 'error', duration: 5000 });
+        if (cascadeContainer) cascadeContainer.innerHTML = '<div class="muted">Error al cargar datos.</div>';
+        return null;
+    }
 }
 
 // ---------- Save closure (per day) ----------
 async function saveCashClosure(summary, isoDate) {
-  const closuresCol = collection(db, 'cash_closures');
-  const payload = {
-    dateISO: isoDate,
-    dateLabel: formatDateDisplay(new Date(isoDate)),
-    totals: { bs: summary.totalBs ?? 0, usd: summary.totalUsd ?? 0, totalsByMethod: summary.totalsByMethod || {} },
-    createdAt: serverTimestamp(),
-    createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null,
-    conciliacion: { bs: parseFormattedNumber(concBsInput?.value || 0), usd: parseFormattedNumber(concUsdInput?.value || 0) }
-  };
-  const docRef = await addDoc(closuresCol, payload);
-  return docRef.id;
+    const closuresCol = collection(db, 'cash_closures');
+    const payload = {
+        dateISO: isoDate,
+        dateLabel: formatDateDisplay(new Date(isoDate)),
+        totals: { bs: summary.totalBs ?? 0, usd: summary.totalUsd ?? 0, totalsByMethod: summary.totalsByMethod || {} },
+        createdAt: serverTimestamp(),
+        createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null,
+        conciliacion: { bs: parseFormattedNumber(concBsInput?.value || 0), usd: parseFormattedNumber(concUsdInput?.value || 0) }
+    };
+    const docRef = await addDoc(closuresCol, payload);
+    return docRef.id;
 }
 
 // ---------- Save conciliacion (improved toast) ----------
 $('#btn-save-conciliation')?.addEventListener('click', async () => {
-  const iso = selectedDates.size ? Array.from(selectedDates).sort()[0] : isoFromDate(new Date());
-  try {
-    const coll = collection(db, 'cash_conciliations');
-    const docRef = await addDoc(coll, { dateISO: iso, bs: parseFormattedNumber(concBsInput?.value || 0), usd: parseFormattedNumber(concUsdInput?.value || 0), createdAt: serverTimestamp(), createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null });
-    showToast('Conciliación guardada correctamente', { type: 'success', duration: 3500 });
-    await calculateAndRenderForSelected(selectedDates.size ? selectedDates : null);
-  } catch (err) {
-    console.error(err);
-    showToast('Error guardando conciliación', { type: 'error', duration: 5000 });
-  }
+    const iso = selectedDates.size ? Array.from(selectedDates).sort()[0] : isoFromDate(new Date());
+    try {
+        const coll = collection(db, 'cash_conciliations');
+        const docRef = await addDoc(coll, { dateISO: iso, bs: parseFormattedNumber(concBsInput?.value || 0), usd: parseFormattedNumber(concUsdInput?.value || 0), createdAt: serverTimestamp(), createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null });
+        showToast('Conciliación guardada correctamente', { type: 'success', duration: 3500 });
+        await calculateAndRenderForSelected(selectedDates.size ? selectedDates : null);
+    } catch (err) {
+        console.error(err);
+        showToast('Error guardando conciliación', { type: 'error', duration: 5000 });
+    }
 });
 
 // ---------- Close cash (per selected dates) ----------
 $('#btn-close-cash')?.addEventListener('click', async () => {
-  const toClose = selectedDates.size ? Array.from(selectedDates).sort() : [isoFromDate(new Date())];
-  try {
-    const closures = await fetchClosuresInRange(toClose[0], toClose[toClose.length - 1]);
-    const closedSet = new Set(closures.map(c => c.dateISO));
-    for (const d of toClose) {
-      if (closedSet.has(d)) {
-        showToast(`La fecha ${new Date(d).toLocaleDateString('es-ES')} ya tiene cierre`, { type: 'info', duration: 4000 });
-        return;
-      }
+    const toClose = selectedDates.size ? Array.from(selectedDates).sort() : [isoFromDate(new Date())];
+    try {
+        const closures = await fetchClosuresInRange(toClose[0], toClose[toClose.length - 1]);
+        const closedSet = new Set(closures.map(c => c.dateISO));
+        for (const d of toClose) {
+            if (closedSet.has(d)) {
+                showToast(`La fecha ${new Date(d).toLocaleDateString('es-ES')} ya tiene cierre`, { type: 'info', duration: 4000 });
+                return;
+            }
+        }
+
+        const result = await calculateAndRenderForSelected(selectedDates.size ? selectedDates : null);
+        if (!result) return;
+
+        if (!confirm(`Deseas cerrar la(s) fecha(s) seleccionada(s)? Se guardará en cash_closures.`)) return;
+
+        const closuresSaved = [];
+        for (const d of toClose) {
+            const payload = {
+                dateISO: d,
+                dateLabel: formatDateDisplay(new Date(d)),
+                totals: { bs: result.summary.totalBs ?? 0, usd: result.summary.totalUsd ?? 0, totalsByMethod: result.summary.totalsByMethod || {} },
+                createdAt: serverTimestamp(),
+                createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null,
+                conciliacion: { bs: parseFormattedNumber(concBsInput?.value || 0), usd: parseFormattedNumber(concUsdInput?.value || 0) }
+            };
+            const docRef = await addDoc(collection(db, 'cash_closures'), payload);
+            closuresSaved.push({ id: docRef.id, date: d });
+        }
+
+        const firstId = closuresSaved.length ? closuresSaved[0].id : '';
+        showToast(`Caja cerrada (${closuresSaved.length} registro(s)). ID: ${firstId}`, { type: 'success', duration: 5000 });
+
+        await calculateAndRenderForSelected(selectedDates.size ? selectedDates : null);
+    } catch (err) {
+        console.error(err);
+        showToast('Error guardando cierre de caja', { type: 'error', duration: 5000 });
     }
-
-    const result = await calculateAndRenderForSelected(selectedDates.size ? selectedDates : null);
-    if (!result) return;
-
-    if (!confirm(`Deseas cerrar la(s) fecha(s) seleccionada(s)? Se guardará en cash_closures.`)) return;
-
-    const closuresSaved = [];
-    for (const d of toClose) {
-      const payload = {
-        dateISO: d,
-        dateLabel: formatDateDisplay(new Date(d)),
-        totals: { bs: result.summary.totalBs ?? 0, usd: result.summary.totalUsd ?? 0, totalsByMethod: result.summary.totalsByMethod || {} },
-        createdAt: serverTimestamp(),
-        createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null,
-        conciliacion: { bs: parseFormattedNumber(concBsInput?.value || 0), usd: parseFormattedNumber(concUsdInput?.value || 0) }
-      };
-      const docRef = await addDoc(collection(db, 'cash_closures'), payload);
-      closuresSaved.push({ id: docRef.id, date: d });
-    }
-
-    const firstId = closuresSaved.length ? closuresSaved[0].id : '';
-    showToast(`Caja cerrada (${closuresSaved.length} registro(s)). ID: ${firstId}`, { type: 'success', duration: 5000 });
-
-    await calculateAndRenderForSelected(selectedDates.size ? selectedDates : null);
-  } catch (err) {
-    console.error(err);
-    showToast('Error guardando cierre de caja', { type: 'error', duration: 5000 });
-  }
 });
 
 // ---------- Listeners: tabs, calendar controls, filters ----------
 function switchTab(tab) {
-  if (tab === 'resumen') {
-    tabResumenBtn.classList.add('active'); tabResumenBtn.setAttribute('aria-pressed', 'true');
-    tabCalendarioBtn.classList.remove('active'); tabCalendarioBtn.setAttribute('aria-pressed', 'false');
-    if (contentResumen) contentResumen.classList.remove('hidden');
-    if (contentCalendario) contentCalendario.classList.add('hidden');
-  } else {
-    tabCalendarioBtn.classList.add('active'); tabCalendarioBtn.setAttribute('aria-pressed', 'true');
-    tabResumenBtn.classList.remove('active'); tabResumenBtn.setAttribute('aria-pressed', 'false');
-    if (contentCalendario) contentCalendario.classList.remove('hidden');
-    if (contentResumen) contentResumen.classList.add('hidden');
-    renderCalendar();
-  }
+    if (tab === 'resumen') {
+        tabResumenBtn.classList.add('active'); tabResumenBtn.setAttribute('aria-pressed', 'true');
+        tabCalendarioBtn.classList.remove('active'); tabCalendarioBtn.setAttribute('aria-pressed', 'false');
+        if (contentResumen) contentResumen.classList.remove('hidden');
+        if (contentCalendario) contentCalendario.classList.add('hidden');
+    } else {
+        tabCalendarioBtn.classList.add('active'); tabCalendarioBtn.setAttribute('aria-pressed', 'true');
+        tabResumenBtn.classList.remove('active'); tabResumenBtn.setAttribute('aria-pressed', 'false');
+        if (contentCalendario) contentCalendario.classList.remove('hidden');
+        if (contentResumen) contentResumen.classList.add('hidden');
+        renderCalendar();
+    }
 }
 
 tabResumenBtn?.addEventListener('click', () => switchTab('resumen'));
@@ -1004,19 +1039,19 @@ clearSelectionBtn?.addEventListener('click', () => clearSelection());
 applySelectionBtn?.addEventListener('click', () => applySelectionAndGoToResumen());
 
 $('#btn-calc')?.addEventListener('click', async () => {
-  clearSelection();
-  await calculateAndRenderForSelected(null);
-  switchTab('resumen');
+    clearSelection();
+    await calculateAndRenderForSelected(null);
+    switchTab('resumen');
 });
 
 $('#btn-apply')?.addEventListener('click', () => calculateAndRenderForSelected(selectedDates.size ? selectedDates : null));
 btnApplyFilters?.addEventListener('click', () => applyFiltersToLastFetched());
 btnResetFilters?.addEventListener('click', () => {
-  if (filterSeller) { filterSeller.value = 'all'; filterSeller.disabled = false; }
-  if (filterRider) { filterRider.value = 'all'; filterRider.disabled = false; }
-  if (filterPayment) { filterPayment.value = 'all'; filterPayment.disabled = false; }
-  if (lastFetchedOrders && lastFetchedOrders.length) populateFilterOptions(lastFetchedOrders);
-  applyFiltersToLastFetched();
+    if (filterSeller) { filterSeller.value = 'all'; filterSeller.disabled = false; }
+    if (filterRider) { filterRider.value = 'all'; filterRider.disabled = false; }
+    if (filterPayment) { filterPayment.value = 'all'; filterPayment.disabled = false; }
+    if (lastFetchedOrders && lastFetchedOrders.length) populateFilterOptions(lastFetchedOrders);
+    applyFiltersToLastFetched();
 });
 
 if (filterSeller) { filterSeller.addEventListener('change', () => applyFiltersToLastFetched()); filterSeller.addEventListener('input', () => applyFiltersToLastFetched()); }
@@ -1025,15 +1060,15 @@ if (filterPayment) { filterPayment.addEventListener('change', () => applyFilters
 
 // Conciliation input handling
 function formatInputValueForDisplay(el, decimals = 2) {
-  if (!el) return;
-  const raw = el.value;
-  const n = parseFormattedNumber(raw);
-  el.value = formatNumberCustom(n, decimals);
+    if (!el) return;
+    const raw = el.value;
+    const n = parseFormattedNumber(raw);
+    el.value = formatNumberCustom(n, decimals);
 }
 function sanitizeInputKey(e) {
-  const allowed = ['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab'];
-  if (allowed.includes(e.key)) return;
-  if (!/^[0-9\.,\-]$/.test(e.key)) e.preventDefault();
+    const allowed = ['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab'];
+    if (allowed.includes(e.key)) return;
+    if (!/^[0-9\.,\-]$/.test(e.key)) e.preventDefault();
 }
 if (concBsInput) { concBsInput.addEventListener('keydown', sanitizeInputKey); concBsInput.addEventListener('input', () => formatInputValueForDisplay(concBsInput, 2)); concBsInput.addEventListener('blur', () => formatInputValueForDisplay(concBsInput, 2)); }
 if (concUsdInput) { concUsdInput.addEventListener('keydown', sanitizeInputKey); concUsdInput.addEventListener('input', () => formatInputValueForDisplay(concUsdInput, 2)); concUsdInput.addEventListener('blur', () => formatInputValueForDisplay(concUsdInput, 2)); }
@@ -1042,10 +1077,10 @@ if (concUsdInput) { concUsdInput.addEventListener('keydown', sanitizeInputKey); 
 onAuthStateChanged(auth, (u) => currentUser = u);
 
 (async function init() {
-  // Show today's data by default
-  const t = new Date();
-  if (displayDate) displayDate.textContent = formatDateDisplay(t);
-  if (displayDatePill) displayDatePill.textContent = isoFromDate(t).split('-').reverse().join('/');
-  await calculateAndRenderForSelected(null);
-  switchTab('resumen');
+    // Show today's data by default
+    const t = new Date();
+    if (displayDate) displayDate.textContent = formatDateDisplay(t);
+    if (displayDatePill) displayDatePill.textContent = isoFromDate(t).split('-').reverse().join('/');
+    await calculateAndRenderForSelected(null);
+    switchTab('resumen');
 })();
