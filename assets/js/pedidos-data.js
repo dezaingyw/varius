@@ -1,6 +1,7 @@
 // Archivo JavaScript (actualizado): muestra badge pequeño en carrito para productos en oferta,
-// y mantiene el badge en "Productos Disponibles". Además, posiciona el resumen antes de la lista.
-// Todas las demás funciones se mantienen.
+// y en "Productos Disponibles" ahora SOLO muestra productos en oferta. También ajusta mensaje
+// cuando no hay productos en oferta.
+// Mantengo el resto de la lógica y comentarios intactos.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -445,7 +446,14 @@ function renderCartPanel() {
 
     // Orden: ofertas primero (por mayor descuento) luego resto alfabéticamente
     const inCartIds = new Set(CART.items.map(i => i.productId));
-    const availProducts = PRODUCTS.filter(p => isProductVisible(p) && (typeof p.stock !== 'number' || p.stock > 0) && !inCartIds.has(p.id));
+
+    // MODIFICACIÓN CRÍTICA: aquí filtramos únicamente productos en oferta
+    const availProducts = PRODUCTS.filter(p =>
+        isProductVisible(p) &&
+        (typeof p.stock !== 'number' || p.stock > 0) &&
+        !inCartIds.has(p.id) &&
+        (p.isOnSale || (p.discountPrice && Number(p.discountPrice) < Number(p.price)))
+    );
 
     availProducts.sort((a, b) => {
         const aOffer = (a.isOnSale || (a.discountPrice && a.discountPrice < a.price)) ? 1 : 0;
@@ -461,7 +469,7 @@ function renderCartPanel() {
 
     availableEl.innerHTML = '';
     if (!availProducts.length) {
-        availableEl.innerHTML = '<div style="padding:12px;color:#64748b">No hay productos disponibles.</div>';
+        availableEl.innerHTML = '<div style="padding:12px;color:#64748b">No hay productos en oferta.</div>';
     } else {
         for (const p of availProducts) {
             const resolved = (p.__resolvedImages && p.__resolvedImages[0]) || p.image || '';
@@ -915,7 +923,7 @@ function onProductModalKeydown(e) {
 }
 
 /* ---------------------- URL-handling, geolocation, form validation, submit, boot (sin cambios funcionales) ---------------------- */
-/* ... mantengo el resto del archivo tal como antes (geolocalización, validaciones, envíos a Firestore, boot) ... */
+/* ... mantengo el resto del archivo tal y como estaban en tu archivo original (geolocalización, validaciones, envíos a Firestore, boot) ... */
 
 /* Para abreviar en esta respuesta incluyo las funciones restantes tal y como estaban en tu archivo original:
    handleUrlAddParams, setupGeolocationButton, transformContactFields, validateName, validateEmail, validatePhone,
@@ -1368,4 +1376,5 @@ async function boot() {
 }
 
 window.addEventListener('load', boot);
+
 export { };
