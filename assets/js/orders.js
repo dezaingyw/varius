@@ -15,6 +15,7 @@
 // - Añadido: mostrar imágenes de productos en el modal "Ver detalle" (mini-slider por producto). Si el item no trae imágenes intenta obtenerlas del documento product/{productId}.
 // - Sincronizado con comportamiento de orders-admin en cuanto a botones (cobranza, marcar enviado) y permisos.
 // - Integra apertura de payment-modal para registrar cobranza (si existe).
+// - Añadido flujo motorizado: "Mi ubicación" (guardar coords) -> "Aceptar envío". Los botones aparecen en tiempo real cuando se marca 'enviado'.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -40,8 +41,6 @@ import {
 // Intentar importar el modal de pago (si existe). Si no está disponible, las funciones que lo usan capturarán errores.
 let openPaymentModal = null;
 try {
-    // dynamic import for environments that support modules
-    // Note: si la ruta no existe en tu proyecto, esto lanzará y seguiremos sin bloqueo
     import('./payment-modal.js').then(mod => { openPaymentModal = mod.openPaymentModal; }).catch(() => { /* no payment modal */ });
 } catch (e) {
     // ignore
@@ -107,9 +106,6 @@ let motorizados = []; // [{ id, name, email, ... }]
 let availableProducts = [];
 
 /* ================ MODAL ROTATOR HELPERS ================ */
-/* Minimal modal-only rotator helpers reused from product/other code.
-   They only operate inside the view modal and are cleaned when the modal closes.
-*/
 const modalRotators = new Map();
 
 function fadeImageToModal(imgEl, newSrc, dur = 240) {
@@ -249,7 +245,7 @@ function getIconSvg(name, size = 16) {
     switch ((name || '').toLowerCase()) {
         case 'eye': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></svg>`;
         case 'pencil': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>`;
-        case 'clock': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.350-.378l.758.653a8 8 0 0 1-.401.432z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/></svg>`;
+        case 'clock': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/></svg>`;
         case 'x-circle': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>`;
         case 'cash-coin':
             return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-coin" viewBox="0 0 16 16">
@@ -287,6 +283,73 @@ function showFieldError(element, message) {
         element.appendChild(el);
     }
     if (typeof element.focus === 'function') element.focus();
+}
+
+/* ================= REALTIME / MOTORIZADO HELPERS ================= */
+/* Force-refresh single order locally by fetching it from Firestore.
+   Used after local updateDoc to ensure UI shows latest fields immediately.
+*/
+async function refreshSingleOrderLocal(orderId) {
+    try {
+        const snap = await getDoc(doc(db, 'orders', orderId));
+        if (snap.exists()) {
+            const data = snap.data() || {};
+            const idx = orders.findIndex(x => x.id === orderId);
+            if (idx >= 0) orders[idx] = { id: orderId, data };
+            else orders.unshift({ id: orderId, data });
+            applyFilters();
+        }
+    } catch (e) {
+        console.warn('refreshSingleOrderLocal error', e);
+    }
+}
+
+/* Guardar ubicación del motorizado (navigator.geolocation) */
+async function markMyLocation(order) {
+    if (!order || !order.id) return;
+    if (!navigator.geolocation) {
+        showToast('Geolocalización no soportada en este navegador.');
+        return;
+    }
+    showToast('Obteniendo ubicación...');
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const docRef = doc(db, 'orders', order.id);
+            await updateDoc(docRef, {
+                lastMotorLocation: { lat, lng },
+                lastMotorLocationAt: serverTimestamp(),
+                lastMotorLocationBy: currentUser ? currentUser.uid : null
+            });
+            showToast('Ubicación guardada. Ahora puedes aceptar el envío.');
+            await refreshSingleOrderLocal(order.id);
+        } catch (err) {
+            console.error('Error guardando ubicación:', err);
+            showToast('No se pudo guardar la ubicación. Revisa la consola.');
+        }
+    }, (err) => {
+        console.error('geolocation error', err);
+        showToast('No se pudo obtener la ubicación: ' + (err.message || err.code));
+    }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+/* Motorizado acepta la orden (indica que la tomará) */
+async function acceptOrderAsMotor(order) {
+    if (!order || !order.id) return;
+    const docRef = doc(db, 'orders', order.id);
+    try {
+        await updateDoc(docRef, {
+            assignedMotorAccepted: true,
+            assignedMotorAcceptedAt: serverTimestamp(),
+            assignedMotorAcceptedBy: currentUser ? currentUser.uid : null
+        });
+        showToast('Has aceptado el envío.');
+        await refreshSingleOrderLocal(order.id);
+    } catch (err) {
+        console.error('Error aceptando orden:', err);
+        showToast('No se pudo aceptar el envío. Revisa la consola.');
+    }
 }
 
 /* ================= NAV TO HISTORY HELPERS ================= */
@@ -386,9 +449,13 @@ function renderTable(list) {
         const canMarkSent = (roleLc === 'vendedor' || roleLc === 'administrador' || roleLc === 'admin');
         const isMotorizado = (roleLc === 'motorizado');
 
+        // Helper: comprobar si el pedido tiene motorizado asignado (uid/email/name)
+        const hasAssignedMotor = Boolean(o.data && (o.data.assignedMotor || o.data.assignedMotorName || o.data.assignedMotorizedName || o.data.assignedDriverName || o.data.motorizadoName || o.data.assignedMotorizado));
+
+        // compute sent flag (shippingStatus/status)
+        const isSent = (o.data && ((String(o.data.shippingStatus || '').toLowerCase() === 'enviado') || (String(o.data.status || '').toLowerCase() === 'enviado')));
+
         // Actions behavior:
-        // - For motorizado: ONLY show View and Cobranza (if applicable). No Edit / Suspend / History / Mark as enviado.
-        // - For others: previous behavior
         if (isDelivered) {
             // Delivered: show delivered badge; for motorizado show only 'Ver', for others show delivered + historial
             const deliveredSpan = document.createElement('span');
@@ -417,7 +484,7 @@ function renderTable(list) {
         } else {
             // Non-delivered
             if (isMotorizado) {
-                // Motorizado: only View + Cobranza (if not paid)
+                // Motorizado: only View + Cobranza (if not paid) + location/accept flow when assigned & order marked 'enviado'
                 const viewBtn = document.createElement('button');
                 viewBtn.className = 'btn-small btn-view';
                 viewBtn.title = 'Ver detalles';
@@ -444,6 +511,44 @@ function renderTable(list) {
                     });
                     rowActions.appendChild(cobrarBtn);
                 }
+
+                // Only show motorizado-location / accept buttons if this motorizado is the assigned one AND order is 'enviado'
+                const isThisMotorAssigned = Boolean(currentUser && o.data && o.data.assignedMotor && String(o.data.assignedMotor) === String(currentUser.uid));
+                const hasSavedLocation = Boolean(o.data && o.data.lastMotorLocationAt);
+                const alreadyAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
+
+                if (isThisMotorAssigned && isSent) {
+                    if (!hasSavedLocation && !alreadyAccepted) {
+                        const locBtn = document.createElement('button');
+                        locBtn.className = 'btn-small btn-location';
+                        locBtn.title = 'Mi ubicación';
+                        locBtn.innerText = 'Mi ubicación';
+                        locBtn.addEventListener('click', () => markMyLocation(o));
+                        rowActions.appendChild(locBtn);
+                    }
+
+                    // If location saved but not yet accepted, show Accept button
+                    if ((o.data && o.data.lastMotorLocationAt) && !alreadyAccepted) {
+                        const acceptBtn = document.createElement('button');
+                        acceptBtn.className = 'btn-small btn-accept';
+                        acceptBtn.title = 'Aceptar envío';
+                        acceptBtn.innerText = 'Aceptar envío';
+                        acceptBtn.addEventListener('click', () => {
+                            const conf = window.confirm('¿Confirmas que aceptarás este envío?');
+                            if (!conf) return;
+                            acceptOrderAsMotor(o);
+                        });
+                        rowActions.appendChild(acceptBtn);
+                    }
+
+                    // If already accepted, show a badge
+                    if (alreadyAccepted) {
+                        const acceptedSpan = document.createElement('span');
+                        acceptedSpan.className = 'badge info';
+                        acceptedSpan.textContent = 'Aceptado';
+                        rowActions.appendChild(acceptedSpan);
+                    }
+                }
             } else {
                 // Non-motorizado: previous full set of actions
                 // View button
@@ -462,13 +567,16 @@ function renderTable(list) {
                 editBtn.addEventListener('click', () => openEditModal(o));
                 rowActions.appendChild(editBtn);
 
-                // If user can mark as enviado, show send button (vendedor/admin)
-                if (canMarkSent) {
+                // If user can mark as enviado, show send button (vendedor/admin) BUT ONLY if motorizado assigned
+                if (canMarkSent && hasAssignedMotor) {
                     const sendBtn = document.createElement('button');
                     sendBtn.className = 'btn-small btn-send';
                     sendBtn.title = 'Marcar como enviado';
                     sendBtn.innerHTML = `${getIconSvg('delivery-truck', 14)}`;
-                    sendBtn.addEventListener('click', () => markAsSent(o));
+                    sendBtn.addEventListener('click', async () => {
+                        await markAsSent(o);
+                        await refreshSingleOrderLocal(o.id);
+                    });
                     rowActions.appendChild(sendBtn);
                 }
 
@@ -547,12 +655,20 @@ function renderCards(list) {
         const canMarkSent = (roleLc === 'vendedor' || roleLc === 'administrador' || roleLc === 'admin');
         const isMotorizado = (roleLc === 'motorizado');
 
+        // new: check if motorizado assigned
+        const hasAssignedMotor = Boolean(o.data && (o.data.assignedMotor || o.data.assignedMotorName || o.data.assignedMotorizedName || o.data.assignedDriverName || o.data.motorizadoName || o.data.assignedMotorizado));
+
+        // compute sent flag
+        const isSent = (o.data && ((String(o.data.shippingStatus || '').toLowerCase() === 'enviado') || (String(o.data.status || '').toLowerCase() === 'enviado')));
+
         // Buttons with icons
         const viewBtnHtml = `<button class="order-card-btn" data-action="view" data-id="${o.id}" title="Ver">${getIconSvg('eye', 14)} <span style="margin-left:6px">Ver</span></button>`;
         const editBtnHtml = `<button class="order-card-btn" data-action="edit" data-id="${o.id}" title="Editar">${getIconSvg('pencil', 14)} <span style="margin-left:6px">Editar</span></button>`;
         const histBtnHtml = `<button class="order-card-btn" data-action="history" data-id="${o.id}" title="Historial">${getIconSvg('clock', 14)} <span style="margin-left:6px">Historial</span></button>`;
         const cobrarBtnHtml = `<button class="order-card-btn" data-action="cobrar" data-id="${o.id}" title="Cobrar">${getIconSvg('cash-coin', 14)} <span style="margin-left:6px">Cobrar</span></button>`;
         const sendBtnHtml = `<button class="order-card-btn" data-action="enviado" data-id="${o.id}" title="Marcar como enviado">🚚 <span style="margin-left:6px">Enviar</span></button>`;
+        const myLocBtnHtml = `<button class="order-card-btn" data-action="myloc" data-id="${o.id}" title="Mi ubicación">📍 <span style="margin-left:6px">Mi ubicación</span></button>`;
+        const acceptBtnHtml = `<button class="order-card-btn" data-action="accept" data-id="${o.id}" title="Aceptar envío">✅ <span style="margin-left:6px">Aceptar envío</span></button>`;
 
         // Build actionsHtml depending on role
         let actionsHtml = '';
@@ -565,16 +681,26 @@ function renderCards(list) {
             }
         } else {
             if (isMotorizado) {
-                // Motorizado: only view and cobrar (if not paid)
+                // Motorizado: view and cobrar + location/accept when assigned & order is 'enviado'
                 actionsHtml = `${viewBtnHtml}`;
                 if (isAllowedToCharge && !isPaid) actionsHtml += `${cobrarBtnHtml}`;
+
+                const isThisMotorAssigned = Boolean(currentUser && o.data && o.data.assignedMotor && String(o.data.assignedMotor) === String(currentUser.uid));
+                const hasSavedLocation = Boolean(o.data && o.data.lastMotorLocationAt);
+                const alreadyAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
+
+                if (isThisMotorAssigned && isSent) {
+                    if (!hasSavedLocation && !alreadyAccepted) actionsHtml += `${myLocBtnHtml}`;
+                    if (hasSavedLocation && !alreadyAccepted) actionsHtml += `${acceptBtnHtml}`;
+                    if (alreadyAccepted) actionsHtml += `<span class="badge info">Aceptado</span>`;
+                }
             } else {
                 // Non-motorizado: previous behavior
                 if (isAllowedToCharge && !isPaid) actionsHtml = `${viewBtnHtml}${editBtnHtml}${cobrarBtnHtml}${histBtnHtml}`;
                 else actionsHtml = `${viewBtnHtml}${editBtnHtml}${histBtnHtml}`;
 
-                // insert send button for roles allowed (vendedor/admin) next to edit
-                if (canMarkSent) {
+                // insert send button for roles allowed (vendedor/admin) next to edit ONLY when motorizado assigned
+                if (canMarkSent && hasAssignedMotor) {
                     actionsHtml = actionsHtml.replace(editBtnHtml, editBtnHtml + sendBtnHtml);
                 }
             }
@@ -612,7 +738,6 @@ function renderCards(list) {
                     window.location.href = url;
                 }
                 if (a === 'cobrar') {
-                    // open payment modal with merged object (same behavior que orders-admin)
                     const orderObj = { id: o.id, ...(o.data || {}) };
                     try {
                         if (openPaymentModal) openPaymentModal(orderObj);
@@ -623,56 +748,23 @@ function renderCards(list) {
                     }
                 }
                 if (a === 'enviado') {
-                    markAsSent(o);
+                    (async () => {
+                        await markAsSent(o);
+                        await refreshSingleOrderLocal(o.id);
+                    })();
+                }
+                if (a === 'myloc') {
+                    markMyLocation(o);
+                }
+                if (a === 'accept') {
+                    const conf = window.confirm('¿Confirmas que aceptarás este envío?');
+                    if (!conf) return;
+                    acceptOrderAsMotor(o);
                 }
             });
         });
         ordersCards.appendChild(card);
     });
-}
-
-/* Chat column list */
-function renderChatColumn(list) {
-    // Motorizado no debe ver la columna de chat
-    if (currentUserRole === 'motorizado') {
-        if (chatColumn) chatColumn.style.display = 'none';
-        return;
-    }
-    if (isMobileViewport()) {
-        if (chatColumn) chatColumn.style.display = 'none';
-        return;
-    }
-    if (!chatList) renderChatSidebarList();
-    if (!chatList) return;
-    chatList.innerHTML = '';
-    list.forEach(o => {
-        const entry = document.createElement('div'); entry.className = 'chat-item';
-        const cname = (o.data && o.data.customerData && (o.data.customerData.Customname || o.data.customerData.name)) || 'Sin nombre';
-        const last = (o.data && o.data.lastMessage && o.data.lastMessage.text) || (o.data && o.data.items && o.data.items[0] && o.data.items[0].name) || '';
-        entry.innerHTML = `
-      <div class="chat-item-left"><div class="thumb"></div></div>
-      <div class="chat-item-body">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-weight:700">${escapeHtml(cname)}</div>
-          <div class="small-muted">${formatDateFlexible(o.data && (o.data.orderDate || o.data.timestamp))}</div>
-        </div>
-        <div class="small-muted">${escapeHtml(String(last)).slice(0, 60)}</div>
-      </div>
-    `;
-        entry.addEventListener('click', () => openChatForOrder(o));
-        chatList.appendChild(entry);
-    });
-}
-
-/* Recreate sidebar list structure and bind chatList ref */
-function renderChatSidebarList() {
-    if (!chatColumn) return;
-    if (currentUserRole === 'motorizado') { chatColumn.style.display = 'none'; return; }
-    if (isMobileViewport()) { chatColumn.style.display = 'none'; return; }
-    chatColumn.style.display = '';
-    chatColumn.innerHTML = `<h3>Mensajes de Clientes</h3><div id="chatList" class="chat-list"></div>`;
-    chatList = document.getElementById('chatList');
-    renderChatColumn(filteredOrders.length ? filteredOrders : orders);
 }
 
 /* ================= FILTERS ================= */
@@ -768,7 +860,6 @@ function applyFilters() {
 // --- Ocultar filtro de fecha en DOM ---
 if (filterDate && filterDate.parentElement) {
     try {
-        // filterDate.parentElement.remove(); // altern. remover
         filterDate.parentElement.style.display = 'none';
     } catch (e) { /* ignore */ }
 }
@@ -1055,7 +1146,6 @@ function openEditModal(order) {
 
     // Add listeners so that when user changes select/free input we update visibility/requirement dynamically
     if (editMotorizadoSelect) {
-        // Remove previous listener by replacing with a fresh one (best-effort)
         try { editMotorizadoSelect.removeEventListener('change', _applyEditMotCommentVisibility); } catch (e) { }
         editMotorizadoSelect.addEventListener('change', _applyEditMotCommentVisibility);
     }
@@ -1500,17 +1590,24 @@ async function suspendOrder(order) {
 /* ================= MARCAR COMO ENVIADO ================= */
 async function markAsSent(order) {
     if (!order || !order.id) return;
+    const hasAssignedMotor = Boolean(order.data && (order.data.assignedMotor || order.data.assignedMotorName || order.data.assignedMotorizedName || order.data.assignedDriverName || order.data.motorizadoName || order.data.assignedMotorizado));
+    if (!hasAssignedMotor) {
+        showToast('No se puede marcar como enviado: no hay motorizado asignado.');
+        return;
+    }
+
     const conf = window.confirm('¿Deseas marcar este pedido como "enviado"?');
     if (!conf) return;
     const docRef = doc(db, 'orders', order.id);
     try {
-        // Actualizamos status y shippingStatus a 'enviado' y timestamp de actualización
         await updateDoc(docRef, {
             status: 'enviado',
             shippingStatus: 'enviado',
             updatedAt: serverTimestamp()
         });
         showToast('Pedido marcado como enviado.');
+        // Force update locally so motorizado sees Mi ubicación / Aceptar envío immediately
+        await refreshSingleOrderLocal(order.id);
     } catch (err) {
         console.error('markAsSent error', err, order.id);
         showToast('No se pudo marcar como enviado. Revisa la consola.');
@@ -1839,7 +1936,6 @@ document.addEventListener('payment:confirmed', (e) => {
     const orderId = e?.detail?.orderId;
     if (orderId) {
         showToast('Cobranza registrada correctamente.');
-        // onSnapshot listener hará la actualización, pero podemos forzar re-render de filtros actuales
         applyFilters();
     }
 });

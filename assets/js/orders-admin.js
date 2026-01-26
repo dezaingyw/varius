@@ -1,4 +1,4 @@
-// assets/js/orders.js
+// assets/js/orders-admin.js
 // Versión actualizada: validaciones inline, leyendas en botones, productos agregados desaparecen de la lista disponible.
 // - Conexión a Firestore, escucha pedidos en tiempo real.
 // - Carga motorizados & productos disponibles.
@@ -7,6 +7,7 @@
 // - Chat removido por petición.
 // - Añadido: slider de imágenes dentro del modal "Ver detalle" (solo modal).
 // - Mejora: si el item no tiene imágenes intenta obtenerlas desde el documento `product/{productId}`.
+// - Nuevo: flujo para motorizado: "Mi ubicación" -> guardar ubicación del motorizado -> mostrar "Aceptar envío" -> marcar que el motorizado acepta la orden.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -227,7 +228,6 @@ function buildHistoryUrlFromOrder(order) {
 }
 
 /* ================= MODAL ROTATOR HELPERS ================= */
-/* Small fade helper used by modal rotator */
 function fadeImageToModal(imgEl, newSrc, dur = 240) {
     if (!imgEl) return;
     imgEl.style.transition = `opacity ${dur}ms ease`;
@@ -235,17 +235,8 @@ function fadeImageToModal(imgEl, newSrc, dur = 240) {
     setTimeout(() => { imgEl.src = newSrc; imgEl.style.opacity = '1'; }, dur);
 }
 
-/* Initialize simple rotators inside the view modal only.
-   Structure expected:
-   <div class="mini-slider"><div class="mini-track">
-       <img src="..."> ... multiple imgs
-   </div></div>
-   Will replace track contents with a single display img and cycle through the list.
-*/
 function initModalRotators(root = document) {
-    // clear previous (if any) before starting new ones
     clearModalRotators();
-
     if (!root) return;
     const sliders = Array.from(root.querySelectorAll('.mini-slider'));
     sliders.forEach(slider => {
@@ -253,10 +244,7 @@ function initModalRotators(root = document) {
             const track = slider.querySelector('.mini-track');
             if (!track) return;
             const imgs = Array.from(track.querySelectorAll('img')).map(i => i.src).filter(Boolean);
-            // if no imgs but there are div placeholders, ignore
             if (!imgs.length) return;
-
-            // clear track and create display
             track.innerHTML = '';
             const displayWrap = document.createElement('div');
             displayWrap.className = 'mini-display';
@@ -273,7 +261,6 @@ function initModalRotators(root = document) {
             displayImg.style.transition = 'opacity 240ms ease';
             displayWrap.appendChild(displayImg);
             track.appendChild(displayWrap);
-
             let idx = 0;
             let intervalId = null;
             if (imgs.length > 1) {
@@ -282,7 +269,6 @@ function initModalRotators(root = document) {
                     fadeImageToModal(displayImg, imgs[idx], 240);
                 }, 2000);
             }
-
             modalRotators.set(slider, { intervalId, imgs, imgEl: displayImg, idx });
         } catch (e) {
             console.error('initModalRotators error', e);
@@ -306,6 +292,73 @@ function render(list) {
 function formatTitleCase(str) {
     if (!str) return '';
     return str.toLowerCase().replace(/\b\w/g, s => s.toUpperCase());
+}
+
+/* ================= MOTORIZADO ACTIONS ================= */
+/* Guardar ubicación del motorizado (navigator.geolocation) */
+async function markMyLocation(order) {
+    if (!order || !order.id) return;
+    if (!navigator.geolocation) {
+        showToast('Geolocalización no soportada en este navegador.');
+        return;
+    }
+    showToast('Obteniendo ubicación...');
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const docRef = doc(db, 'orders', order.id);
+            await updateDoc(docRef, {
+                lastMotorLocation: { lat, lng },
+                lastMotorLocationAt: serverTimestamp(),
+                lastMotorLocationBy: currentUser ? currentUser.uid : null
+            });
+            showToast('Ubicación guardada. Ahora puedes aceptar el envío.');
+            // force UI update
+            await refreshSingleOrderLocal(order.id, { lastMotorLocationSaved: true });
+            applyFilters();
+        } catch (err) {
+            console.error('Error guardando ubicación:', err);
+            showToast('No se pudo guardar la ubicación. Revisa la consola.');
+        }
+    }, (err) => {
+        console.error('geolocation error', err);
+        showToast('No se pudo obtener la ubicación: ' + (err.message || err.code));
+    }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+/* Motorizado acepta la orden (indica que la tomará) */
+async function acceptOrderAsMotor(order) {
+    if (!order || !order.id) return;
+    const docRef = doc(db, 'orders', order.id);
+    try {
+        await updateDoc(docRef, {
+            assignedMotorAccepted: true,
+            assignedMotorAcceptedAt: serverTimestamp(),
+            assignedMotorAcceptedBy: currentUser ? currentUser.uid : null
+        });
+        showToast('Has aceptado el envío.');
+        await refreshSingleOrderLocal(order.id, { acceptedSaved: true });
+        applyFilters();
+    } catch (err) {
+        console.error('Error aceptando orden:', err);
+        showToast('No se pudo aceptar el envío. Revisa la consola.');
+    }
+}
+
+/* Helper: refresh single order in local `orders` array to reflect recent changes quickly */
+async function refreshSingleOrderLocal(orderId, hints = {}) {
+    try {
+        const docSnap = await getDoc(doc(db, 'orders', orderId));
+        if (docSnap.exists()) {
+            const data = docSnap.data() || {};
+            const idx = orders.findIndex(x => x.id === orderId);
+            if (idx >= 0) orders[idx] = { id: orderId, data };
+            else orders.unshift({ id: orderId, data });
+        }
+    } catch (e) {
+        console.warn('refreshSingleOrderLocal error', e);
+    }
 }
 
 /* Table */
@@ -368,9 +421,10 @@ function renderTable(list) {
         const canMarkSent = (roleLc === 'vendedor' || roleLc === 'administrador' || roleLc === 'admin');
         const isMotorizado = (roleLc === 'motorizado');
 
+        // NEW: comprobar si el pedido tiene motorizado asignado (uid/email/name)
+        const hasAssignedMotor = Boolean(o.data && (o.data.assignedMotor || o.data.assignedMotorName || o.data.assignedMotorizedName || o.data.assignedDriverName || o.data.motorizadoName || o.data.assignedMotorizado));
+
         // Actions behavior:
-        // - For motorizado: ONLY show View and Cobranza (if applicable). No Edit / Suspend / History / Mark as enviado.
-        // - For others: previous behavior
         if (isDelivered) {
             // Delivered: show delivered badge; for motorizado show only 'Ver', for others show delivered + historial
             const deliveredSpan = document.createElement('span');
@@ -399,7 +453,7 @@ function renderTable(list) {
         } else {
             // Non-delivered
             if (isMotorizado) {
-                // Motorizado: only View + Cobranza (if not paid)
+                // Motorizado: view + cobranza (if applicable) + (Mi ubicación / Aceptar envío UI when assigned to this motorizado)
                 const viewBtn = document.createElement('button');
                 viewBtn.className = 'btn-small btn-view';
                 viewBtn.title = 'Ver detalles';
@@ -425,9 +479,47 @@ function renderTable(list) {
                     });
                     rowActions.appendChild(cobrarBtn);
                 }
+
+                // Only show motorizado-location / accept buttons if this motorizado is the assigned one
+                const isThisMotorAssigned = Boolean(currentUser && o.data && o.data.assignedMotor && String(o.data.assignedMotor) === String(currentUser.uid));
+                if (isThisMotorAssigned) {
+                    const hasSavedLocation = Boolean(o.data && o.data.lastMotorLocationAt);
+                    const alreadyAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
+
+                    if (!hasSavedLocation && !alreadyAccepted) {
+                        const locBtn = document.createElement('button');
+                        locBtn.className = 'btn-small btn-location';
+                        locBtn.title = 'Mi ubicación';
+                        locBtn.innerText = 'Mi ubicación';
+                        locBtn.addEventListener('click', () => markMyLocation(o));
+                        rowActions.appendChild(locBtn);
+                    }
+
+                    // If location saved but not yet accepted, show Accept button
+                    if ((o.data && o.data.lastMotorLocationAt) && !alreadyAccepted) {
+                        const acceptBtn = document.createElement('button');
+                        acceptBtn.className = 'btn-small btn-accept';
+                        acceptBtn.title = 'Aceptar envío';
+                        acceptBtn.innerText = 'Aceptar envío';
+                        acceptBtn.addEventListener('click', () => {
+                            // confirm acceptance
+                            const conf = window.confirm('¿Confirmas que aceptarás este envío?');
+                            if (!conf) return;
+                            acceptOrderAsMotor(o);
+                        });
+                        rowActions.appendChild(acceptBtn);
+                    }
+
+                    // If already accepted, show a badge
+                    if (alreadyAccepted) {
+                        const acceptedSpan = document.createElement('span');
+                        acceptedSpan.className = 'badge info';
+                        acceptedSpan.textContent = 'Aceptado';
+                        rowActions.appendChild(acceptedSpan);
+                    }
+                }
             } else {
                 // Non-motorizado: previous full set of actions
-                // View button
                 const viewBtn = document.createElement('button');
                 viewBtn.className = 'btn-small btn-view';
                 viewBtn.title = 'Ver detalles';
@@ -435,7 +527,6 @@ function renderTable(list) {
                 viewBtn.addEventListener('click', () => openViewModal(o));
                 rowActions.appendChild(viewBtn);
 
-                // Edit button
                 const editBtn = document.createElement('button');
                 editBtn.className = 'btn-small btn-assign';
                 editBtn.title = 'Editar Pedido';
@@ -443,8 +534,8 @@ function renderTable(list) {
                 editBtn.addEventListener('click', () => openEditModal(o));
                 rowActions.appendChild(editBtn);
 
-                // If user can mark as enviado, show send button (vendedor/admin)
-                if (canMarkSent) {
+                // If user can mark as enviado, show send button (vendedor/admin) BUT ONLY if motorizado assigned
+                if (canMarkSent && hasAssignedMotor) {
                     const sendBtn = document.createElement('button');
                     sendBtn.className = 'btn-small btn-send';
                     sendBtn.title = 'Marcar como enviado';
@@ -453,7 +544,6 @@ function renderTable(list) {
                     rowActions.appendChild(sendBtn);
                 }
 
-                // History button
                 const histBtn = document.createElement('button');
                 histBtn.className = 'btn-small btn-history';
                 histBtn.title = 'Historial de Cliente';
@@ -464,7 +554,6 @@ function renderTable(list) {
                 });
                 rowActions.appendChild(histBtn);
 
-                // Cobranza button: solo si rol permitido y pedido NO está pagado
                 const paymentLower = String(rawPayment || '').toLowerCase();
                 const isPaid = paymentLower === 'pagado' || paymentLower === 'paid';
                 if (isAllowedToCharge && !isPaid) {
@@ -484,7 +573,6 @@ function renderTable(list) {
                     rowActions.appendChild(cobrarBtn);
                 }
 
-                // Suspend button
                 const suspBtn = document.createElement('button');
                 suspBtn.className = 'btn-small btn-suspender';
                 suspBtn.title = 'Suspender este pedido';
@@ -527,34 +615,44 @@ function renderCards(list) {
         const canMarkSent = (roleLc === 'vendedor' || roleLc === 'administrador' || roleLc === 'admin');
         const isMotorizado = (roleLc === 'motorizado');
 
+        // NEW: comprobar si el pedido tiene motorizado asignado (uid/email/name)
+        const hasAssignedMotor = Boolean(o.data && (o.data.assignedMotor || o.data.assignedMotorName || o.data.assignedMotorizedName || o.data.assignedDriverName || o.data.motorizadoName || o.data.assignedMotorizado));
+
         // Buttons with icons
         const viewBtnHtml = `<button class="order-card-btn" data-action="view" data-id="${o.id}" title="Ver">${getIconSvg('eye', 14)} <span style="margin-left:6px">Ver</span></button>`;
         const editBtnHtml = `<button class="order-card-btn" data-action="edit" data-id="${o.id}" title="Editar">${getIconSvg('pencil', 14)} <span style="margin-left:6px">Editar</span></button>`;
         const histBtnHtml = `<button class="order-card-btn" data-action="history" data-id="${o.id}" title="Historial">${getIconSvg('clock', 14)} <span style="margin-left:6px">Historial</span></button>`;
         const cobrarBtnHtml = `<button class="order-card-btn" data-action="cobrar" data-id="${o.id}" title="Cobrar">${getIconSvg('cash-coin', 14)} <span style="margin-left:6px">Cobrar</span></button>`;
         const sendBtnHtml = `<button class="order-card-btn" data-action="enviado" data-id="${o.id}" title="Marcar como enviado">🚚 <span style="margin-left:6px">Enviar</span></button>`;
+        const myLocBtnHtml = `<button class="order-card-btn" data-action="myloc" data-id="${o.id}" title="Mi ubicación">📍 <span style="margin-left:6px">Mi ubicación</span></button>`;
+        const acceptBtnHtml = `<button class="order-card-btn" data-action="accept" data-id="${o.id}" title="Aceptar envío">✅ <span style="margin-left:6px">Aceptar envío</span></button>`;
 
         // Build actionsHtml depending on role
         let actionsHtml = '';
         if (isDelivered) {
-            // delivered: motorizado -> only view; others -> history
-            if (isMotorizado) {
-                actionsHtml = `${viewBtnHtml}`;
-            } else {
-                actionsHtml = `${histBtnHtml}`;
-            }
+            if (isMotorizado) actionsHtml = `${viewBtnHtml}`;
+            else actionsHtml = `${histBtnHtml}`;
         } else {
             if (isMotorizado) {
-                // Motorizado: only view and cobrar (if not paid)
+                // Motorizado: view and cobrar + location/accept when assigned
                 actionsHtml = `${viewBtnHtml}`;
                 if (isAllowedToCharge && !isPaid) actionsHtml += `${cobrarBtnHtml}`;
+
+                const isThisMotorAssigned = Boolean(currentUser && o.data && o.data.assignedMotor && String(o.data.assignedMotor) === String(currentUser.uid));
+                const hasSavedLocation = Boolean(o.data && o.data.lastMotorLocationAt);
+                const alreadyAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
+
+                if (isThisMotorAssigned) {
+                    if (!hasSavedLocation && !alreadyAccepted) actionsHtml += `${myLocBtnHtml}`;
+                    if (hasSavedLocation && !alreadyAccepted) actionsHtml += `${acceptBtnHtml}`;
+                    if (alreadyAccepted) actionsHtml += `<span class="badge info">Aceptado</span>`;
+                }
             } else {
-                // Non-motorizado: previous behavior
                 if (isAllowedToCharge && !isPaid) actionsHtml = `${viewBtnHtml}${editBtnHtml}${cobrarBtnHtml}${histBtnHtml}`;
                 else actionsHtml = `${viewBtnHtml}${editBtnHtml}${histBtnHtml}`;
 
-                // insert send button for roles allowed (vendedor/admin) next to edit
-                if (canMarkSent) {
+                // insert send button for roles allowed (vendedor/admin) next to edit BUT ONLY when motorizado assigned
+                if (canMarkSent && hasAssignedMotor) {
                     actionsHtml = actionsHtml.replace(editBtnHtml, editBtnHtml + sendBtnHtml);
                 }
             }
@@ -592,7 +690,6 @@ function renderCards(list) {
                     window.location.href = url;
                 }
                 if (a === 'cobrar') {
-                    // open payment modal with merged object (same behavior que motorizado-orders)
                     const orderObj = { id: o.id, ...(o.data || {}) };
                     try {
                         openPaymentModal(orderObj);
@@ -603,6 +700,15 @@ function renderCards(list) {
                 }
                 if (a === 'enviado') {
                     markAsSent(o);
+                }
+                if (a === 'myloc') {
+                    // motorizado clicks "Mi ubicación" on card
+                    markMyLocation(o);
+                }
+                if (a === 'accept') {
+                    const conf = window.confirm('¿Confirmas que aceptarás este envío?');
+                    if (!conf) return;
+                    acceptOrderAsMotor(o);
                 }
             });
         });
@@ -623,10 +729,7 @@ function debounce(fn, wait = 200) {
 function updateStatusFilterOptions(ordersList = orders) {
     if (!filterStatus) return;
     try {
-        // Guardar valor seleccionado actual
         const currentVal = filterStatus.value || '';
-
-        // Construir set de estados a partir de la lógica de display usada en renderers
         const statuses = new Set();
         (ordersList || []).forEach(o => {
             const rawStatus = (o.data && o.data.status) || '';
@@ -639,16 +742,13 @@ function updateStatusFilterOptions(ordersList = orders) {
                 if (rawPayment) displayStatus = translateStatus(rawPayment) || displayStatus;
             }
 
-            // Si shipping indica entregado, mostrar como 'Entregado'
             const isDelivered = rawShipping && (String(rawShipping).toLowerCase() === 'entregado' || String(rawShipping).toLowerCase() === 'delivered');
             if (isDelivered) statuses.add('Entregado');
             else if (displayStatus) statuses.add(displayStatus);
         });
 
-        // Convertir a array y ordenar alfabéticamente (mantener acentos)
         const arr = Array.from(statuses).sort((a, b) => a.localeCompare(b, 'es'));
 
-        // Reconstruir options
         filterStatus.innerHTML = '';
         const optAll = document.createElement('option');
         optAll.value = '';
@@ -657,13 +757,11 @@ function updateStatusFilterOptions(ordersList = orders) {
 
         arr.forEach(s => {
             const opt = document.createElement('option');
-            // value en minúsculas sin acentos para coincidencias simples; pero mostramos el texto traducido
             opt.value = s.toLowerCase();
             opt.text = s;
             filterStatus.appendChild(opt);
         });
 
-        // Restaurar selección si posible (coincidencia por valor lowercase)
         if (currentVal) {
             const found = Array.from(filterStatus.options).some(o => o.value === currentVal.toLowerCase());
             filterStatus.value = found ? currentVal.toLowerCase() : '';
@@ -681,7 +779,6 @@ function applyFilters() {
     filteredOrders = orders.filter(o => {
         const od = o.data || {};
 
-        // Estado: comparamos con la representación mostrada (translateStatus)
         if (s) {
             const rawStatus = (od.status) || '';
             const rawShipping = (od.shippingStatus) || '';
@@ -698,7 +795,6 @@ function applyFilters() {
             if (finalDisplay.toLowerCase() !== s.toLowerCase()) return false;
         }
 
-        // Cliente (búsqueda en tiempo real)
         if (c) {
             const cname = ((od.customerData && (od.customerData.Customname || od.customerData.name)) || (od.customer && od.customer.name) || '').toLowerCase();
             if (!cname.includes(c)) return false;
@@ -708,16 +804,12 @@ function applyFilters() {
     });
 
     render(filteredOrders);
-    // Actualizar opciones de estado según la lista resultante (útil si quieres que el select se adapte a resultados filtrados)
     updateStatusFilterOptions(filteredOrders.length ? filteredOrders : orders);
 }
 
 // --- Ocultar/Eliminar filtro de fecha en DOM (si existe en markup) ---
 if (filterDate && filterDate.parentElement) {
     try {
-        // Si quieres remover completamente:
-        // filterDate.parentElement.remove();
-        // Si prefieres ocultar:
         filterDate.parentElement.style.display = 'none';
     } catch (e) { /* ignore */ }
 }
@@ -731,11 +823,9 @@ if (filterClient) {
 if (filterStatus) {
     filterStatus.addEventListener('change', () => applyFilters());
 }
-// btnFilter sigue disponible pero ya no es necesario para buscar
 if (btnFilter) {
     btnFilter.addEventListener('click', (e) => { e.preventDefault(); applyFilters(); });
 }
-// btnClear ahora limpia y aplica inmediatamente
 if (btnClear) {
     btnClear.addEventListener('click', (e) => {
         e && e.preventDefault();
@@ -751,7 +841,6 @@ function buildOrdersQueryForRole(uid, role) {
     try {
         if (role === 'vendedor' && uid) return query(col, where('assignedSeller', '==', uid), orderBy('orderDate', 'desc'));
         if (role === 'motorizado' && uid) return query(col, where('assignedMotor', '==', uid), orderBy('orderDate', 'desc'));
-        // admin or default: view all
         return query(col, orderBy('orderDate', 'desc'));
     } catch {
         try { return query(col, orderBy('timestamp', 'desc')); }
@@ -759,8 +848,7 @@ function buildOrdersQueryForRole(uid, role) {
     }
 }
 
-
-// Helper: determina si una fecha/timestamp corresponde al día de hoy (cliente local)
+/* Helper: determina si una fecha/timestamp corresponde al día de hoy (cliente local) */
 function isDateToday(val) {
     if (!val) return false;
     try {
@@ -783,14 +871,11 @@ function listenOrders() {
         orders = [];
         snap.forEach(docSnap => {
             const data = docSnap.data() || {};
-            // Preferimos orderDate, si no existe intentamos timestamp o assignedAt
             const dateField = data.orderDate || data.timestamp || data.assignedAt;
-            // Solo incluir si la fecha pertenece al día de hoy
             if (!isDateToday(dateField)) return;
             orders.push({ id: docSnap.id, data });
         });
 
-        // Ordenar por fecha como antes (desc)
         orders.sort((a, b) => {
             const ad = a.data && (a.data.orderDate || a.data.timestamp);
             const bd = b.data && (b.data.orderDate || b.data.timestamp);
@@ -807,7 +892,6 @@ function listenOrders() {
     });
 }
 
-
 /* ================= VIEW / EDIT / SUSPEND ================= */
 /* openViewModal made async so we can fetch images from product docs if item lacks images */
 async function openViewModal(order) {
@@ -819,8 +903,6 @@ async function openViewModal(order) {
 
     if (!viewBody) return;
 
-    // For each item, try to collect images:
-    // priority: item.imageUrls (array) -> item.imageUrl / item.image (single) -> product doc imageUrls
     const itemsWithImgs = [];
     for (let i = 0; i < items.length; i++) {
         const it = items[i] || {};
@@ -832,7 +914,6 @@ async function openViewModal(order) {
         } catch (e) {
             console.warn('item image normalization error', e);
         }
-        // If still empty and we have a productId, try to fetch product doc for imageUrls
         if (!imgs.length && (it.productId || it.product_id || it.product)) {
             const pid = it.productId || it.product_id || it.product;
             if (pid) {
@@ -848,18 +929,10 @@ async function openViewModal(order) {
                 }
             }
         }
-        // dedupe & keep valid urls
         imgs = imgs.filter(Boolean).map(s => String(s));
-        // Log for debugging if no images found
-        if (!imgs.length) {
-            console.debug('No images for item', it.name || it.productId || '(no id)');
-        } else {
-            console.debug('Images for item', it.name || it.productId || '(no name)', imgs);
-        }
         itemsWithImgs.push({ ...it, imgs });
     }
 
-    // Build products table - image column now supports a simple mini-slider per product.
     const productsHtml = `
       <div class="card products-card" style="border-radius:8px;padding:12px;">
         <h4 style="margin:0 0 10px 0;font-size:16px;">Productos (${itemsWithImgs.length})</h4>
@@ -882,11 +955,9 @@ async function openViewModal(order) {
         const imgs = Array.isArray(it.imgs) ? it.imgs : [];
         let imgCellHtml = '';
         if (imgs.length) {
-            // Build mini-slider markup expected by initModalRotators
             const imgsHtml = imgs.map(src => `<img src="${escapeHtml(src)}" alt="${escapeHtml(it.name || '')}" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-right:6px;">`).join('');
             imgCellHtml = `<div class="mini-slider" style="display:flex;align-items:center;"><div class="mini-track">${imgsHtml}</div></div>`;
         } else {
-            // placeholder with initials (like product table)
             const initials = escapeHtml(((it.name || '').slice(0, 2) || 'IMG').toUpperCase());
             imgCellHtml = `<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:#f3f4f6;color:#9aa0a6;font-weight:700">${initials}</div>`;
         }
@@ -905,7 +976,6 @@ async function openViewModal(order) {
       </div>
     `;
 
-    // Información superior
     const shippingTranslated = translateStatus(o.shippingStatus);
     const paymentTranslated = translateStatus(o.paymentStatus);
     const statusTranslated = translateStatus(o.status);
@@ -930,7 +1000,6 @@ async function openViewModal(order) {
     ${productsHtml}
     `;
 
-    // initialize rotators inside the newly injected viewBody
     initModalRotators(viewBody);
 
     viewModal && viewModal.classList.remove('hidden');
@@ -941,7 +1010,6 @@ function closeViewModal() {
     viewModal && viewModal.classList.add('hidden');
     viewModal && viewModal.setAttribute('aria-hidden', 'true');
     currentViewOrder = null;
-    // clear modal rotators to avoid intervals running in background
     clearModalRotators();
 }
 
@@ -953,7 +1021,6 @@ function _editShouldRequireMotorComment() {
     const oldAssignedMotorEmail = originalData.assignedMotorName || originalData.assignedMotorEmail || '';
     const oldAssignedMotorName = originalData.assignedMotorizedName || originalData.assignedDriverName || originalData.motorizadoName || originalData.assignedMotorizado || '';
 
-    // obtener valor seleccionado actualmente en el editor (orders-admin no tiene entrada libre)
     const selectedMotorId = editMotorizadoSelect ? (editMotorizadoSelect.value || '') : '';
 
     let newAssignedMotorUid = '';
@@ -1004,7 +1071,6 @@ function openEditModal(order) {
     const o = currentEditOrder.data || {};
     if (editCustomer) editCustomer.textContent = (o.customerData && (o.customerData.Customname || o.customerData.name)) || 'Sin nombre';
     populateMotorizadoSelect();
-    // Try to set select value to assignedMotor (uid) if present, otherwise try to match by email or name
     const assignedMotorId = o.assignedMotor || '';
     const assignedMotorEmail = o.assignedMotorName || o.assignedMotorEmail || '';
     const assignedMotorNameVal = o.assignedMotorizedName || o.assignedDriverName || o.motorizadoName || '';
@@ -1019,10 +1085,8 @@ function openEditModal(order) {
     }
     if (editMotComment) editMotComment.value = '';
 
-    // Ajustar visibilidad del campo de comentario según si ya existía motorizado
     _applyEditMotCommentVisibility();
 
-    // Add listener for select changes to update visibility dynamically
     if (editMotorizadoSelect) {
         try { editMotorizadoSelect.removeEventListener('change', _applyEditMotCommentVisibility); } catch (e) { }
         editMotorizadoSelect.addEventListener('change', _applyEditMotCommentVisibility);
@@ -1049,7 +1113,6 @@ function loadMotorizados() {
             motorizados = [];
             snap.forEach(s => {
                 const d = s.data() || {};
-                // Solo incluir motorizados con status = "activo" (insensible a mayúsculas)
                 const st = (d.status || '').toString().toLowerCase();
                 if (st === 'activo' || st === 'active') {
                     motorizados.push({ id: s.id, name: d.name || d.displayName || '', email: d.email || '', ...d });
@@ -1080,8 +1143,8 @@ function populateMotorizadoSelect() {
 
     motorizados.forEach(u => {
         const opt = document.createElement('option');
-        opt.value = u.id; // store uid to be able to save assignedMotor = uid
-        opt.text = `${u.name || u.email || u.id}`; // show readable label
+        opt.value = u.id;
+        opt.text = `${u.name || u.email || u.id}`;
         editMotorizadoSelect.appendChild(opt);
     });
 }
@@ -1339,9 +1402,8 @@ async function saveEditForm(e) {
     const original = orders.find(x => x.id === currentEditOrder.id);
     if (!original) { showToast('Pedido no encontrado'); return; }
 
-    // Determinar motorizado seleccionado: preferir select (uid)
     const selectedMotorId = editMotorizadoSelect ? (editMotorizadoSelect.value || '') : '';
-    const freeEntryName = ''; // input libre eliminado en UI, mantenemos por compatibilidad futura
+    const freeEntryName = '';
     let newAssignedMotorUid = '';
     let newAssignedMotorEmail = '';
     let newAssignedMotorName = '';
@@ -1360,19 +1422,16 @@ async function saveEditForm(e) {
         newAssignedMotorName = freeEntryName;
     }
 
-    // old motor identity to compare (prefer uid, otherwise email/name)
     const oldAssignedMotorUid = original.data && original.data.assignedMotor || '';
     const oldAssignedMotorEmail = original.data && (original.data.assignedMotorName || original.data.assignedMotorEmail) || '';
     const oldAssignedMotorName = original.data && (original.data.assignedMotorizedName || original.data.motorizadoName) || '';
 
-    // If motorizado changed
     const isMotorChanged = (
         (newAssignedMotorUid && newAssignedMotorUid !== oldAssignedMotorUid) ||
         (!newAssignedMotorUid && (newAssignedMotorEmail && newAssignedMotorEmail !== oldAssignedMotorEmail)) ||
         (!newAssignedMotorUid && !newAssignedMotorEmail && newAssignedMotorName && newAssignedMotorName !== oldAssignedMotorName)
     );
 
-    // REQUERIR comentario solo si SE CAMBIÓ Y YA HABÍA un motorizado asignado antes
     const oldHadMotor = Boolean(oldAssignedMotorUid || oldAssignedMotorEmail || oldAssignedMotorName);
     if (isMotorChanged && oldHadMotor && !(editMotComment && editMotComment.value.trim())) {
         showFieldError(editMotComment || (editMotorizadoSelect), 'Debes justificar el cambio de motorizado.');
@@ -1380,7 +1439,6 @@ async function saveEditForm(e) {
         return;
     }
 
-    // 2) Debe tener al menos un item
     const items = currentEditOrder.data.items || [];
     if (!items || items.length === 0) {
         if (itemsList) showFieldError(itemsList, 'El pedido debe contener al menos un producto.');
@@ -1388,7 +1446,6 @@ async function saveEditForm(e) {
         return;
     }
 
-    // 3) Validar cada item (precio > 0, qty >=1)
     for (let i = 0; i < items.length; i++) {
         const it = items[i];
         if (!it.name || String(it.name).trim() === '') {
@@ -1416,10 +1473,9 @@ async function saveEditForm(e) {
     };
 
     if (newAssignedMotorUid || newAssignedMotorEmail || newAssignedMotorName) {
-        // Guardar los campos solicitados:
         if (newAssignedMotorUid) updates.assignedMotor = newAssignedMotorUid;
-        if (newAssignedMotorEmail) updates.assignedMotorName = newAssignedMotorEmail; // email field as requested (assignedMotorName)
-        if (newAssignedMotorName) updates.assignedMotorizedName = newAssignedMotorName; // readable name
+        if (newAssignedMotorEmail) updates.assignedMotorName = newAssignedMotorEmail;
+        if (newAssignedMotorName) updates.assignedMotorizedName = newAssignedMotorName;
         updates.assignedMotorizedAt = serverTimestamp();
         updates.lastMotorizedChange = {
             from: oldAssignedMotorUid || oldAssignedMotorEmail || oldAssignedMotorName || null,
@@ -1455,11 +1511,17 @@ async function suspendOrder(order) {
 /* ================= MARCAR COMO ENVIADO ================= */
 async function markAsSent(order) {
     if (!order || !order.id) return;
+    // Nuevo: verificar que exista motorizado asignado antes de permitir marcar como enviado
+    const hasAssignedMotor = Boolean(order.data && (order.data.assignedMotor || order.data.assignedMotorName || order.data.assignedMotorizedName || order.data.assignedDriverName || order.data.motorizadoName || order.data.assignedMotorizado));
+    if (!hasAssignedMotor) {
+        showToast('No se puede marcar como enviado: no hay motorizado asignado.');
+        return;
+    }
+
     const conf = window.confirm('¿Deseas marcar este pedido como "enviado"?');
     if (!conf) return;
     const docRef = doc(db, 'orders', order.id);
     try {
-        // Actualizamos status y shippingStatus a 'enviado' y timestamp de actualización
         await updateDoc(docRef, {
             status: 'enviado',
             shippingStatus: 'enviado',
@@ -1505,7 +1567,6 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         viewModal && viewModal.classList.add('hidden');
         editModal && editModal.classList.add('hidden');
-        // ensure rotators cleared too
         clearModalRotators();
     }
 });
@@ -1515,7 +1576,6 @@ document.addEventListener('payment:confirmed', (e) => {
     const orderId = e?.detail?.orderId;
     if (orderId) {
         showToast('Cobranza registrada correctamente.');
-        // onSnapshot listener hará la actualización, pero podemos forzar re-render de filtros actuales
         applyFilters();
     }
 });

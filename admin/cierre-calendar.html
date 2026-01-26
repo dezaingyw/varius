@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cierre de Caja — Calendario</title>
+
+  <!-- Estilos existentes (mantener look & feel) -->
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/cierre.css">
+  <link rel="stylesheet" href="../assets/css/presence.css">
+
+  <!-- Estilos del calendario (añadir este archivo en ../assets/css/calendar.css) -->
+  <link rel="stylesheet" href="assets/css/calendar.css">
+
+  <style>
+    /* Pequeñas correcciones para que el calendario se integre bien en pantallas muy pequeñas */
+    @media (max-width: 900px) {
+      #caja-calendar-app {
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <input id="nav-toggle" type="checkbox" class="nav-toggle" aria-hidden="true">
+  <header class="topbar">
+    <div class="top-left">
+      <label for="nav-toggle" class="hamburger" aria-hidden="true">
+        <span class="hamburger-box"><span class="hamburger-inner"></span></span>
+      </label>
+      <a class="brand" href="./" aria-label="Dashboard">
+        <img src="assets/img/logo.png" alt="Varius" width="14%">
+        <span class="brand-text">VARIUS</span>
+      </a>
+    </div>
+
+    <div class="top-search">
+      <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
+        <span class="dot"></span>
+        <span class="label">Desconectado</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="app-sidebar"></div>
+
+  <main class="main cierre" id="main-calendar">
+    <section class="panel header" style="margin-bottom:12px;">
+      <div class="header-row">
+        <div class="header-left">
+          <div class="title">Cierre de Caja — <span id="display-month">Calendario</span></div>
+          <div class="subtitle">Selecciona un día, semana o mes para ver el detalle del cierre</div>
+        </div>
+
+        <div class="header-right">
+          <div class="controls" aria-hidden="false">
+            <input type="date" id="cal-jump-date" />
+            <button id="btn-jump" class="btn-apply">Ir a fecha</button>
+            <button id="btn-refresh-calendar" title="Refrescar" class="icon-btn" style="margin-left:8px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                class="bi bi-arrow-clockwise" viewBox="0 0 16 16" aria-hidden="true">
+                <path fill-rule="evenodd"
+                  d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z" />
+                <path
+                  d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Calendario + panel de detalles -->
+    <div class="calendar-app card" id="caja-calendar-app" aria-live="polite">
+      <!-- Panel calendario -->
+      <div class="calendar-panel">
+        <header class="calendar-header" aria-hidden="false">
+          <div class="cal-nav" role="toolbar" aria-label="Navegación del calendario">
+            <button id="cal-prev" class="icon-btn" title="Mes anterior" aria-label="Mes anterior">◀</button>
+            <div id="cal-title" class="cal-title" aria-live="polite">Enero 2026</div>
+            <button id="cal-next" class="icon-btn" title="Mes siguiente" aria-label="Mes siguiente">▶</button>
+          </div>
+
+          <div class="cal-actions" role="group" aria-label="Acciones del calendario">
+            <button id="cal-today" class="btn-small">Hoy</button>
+            <button id="cal-week" class="btn-small">Seleccionar semana</button>
+            <button id="cal-month" class="btn-small">Seleccionar mes</button>
+            <label class="small-muted" for="cal-range-mode" style="margin-left:12px;display:inline-flex;align-items:center;gap:6px;">
+              <input id="cal-range-mode" type="checkbox" /> Modo rango
+            </label>
+          </div>
+        </header>
+
+        <section class="calendar-grid-wrap" aria-hidden="false">
+          <div class="cal-weekdays" aria-hidden="true">
+            <div>Dom</div><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
+          </div>
+          <div id="cal-grid" class="cal-grid" role="grid" aria-label="Calendario de cierres"></div>
+        </section>
+      </div>
+
+      <!-- Panel de detalles -->
+      <aside id="cal-details" class="cal-details card hidden" aria-live="polite" aria-hidden="true">
+        <div class="details-header">
+          <div id="details-title">Seleccione un día</div>
+          <div id="details-status"></div>
+        </div>
+
+        <div id="details-content" class="details-content">
+          <p class="small-muted">Selecciona un día en el calendario para ver los movimientos y totales del cierre de caja.</p>
+        </div>
+
+        <div class="details-footer" style="margin-top:12px; display:flex; gap:8px;">
+          <button id="btn-export" class="btn-small btn-link hidden" title="Exportar detalle">Exportar</button>
+          <button id="btn-refresh-details" class="btn-small" title="Refrescar detalles">Refrescar</button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Opcional: explicación o leyenda -->
+    <section class="panel" style="margin-top:12px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="width:12px;height:12px;border-radius:3px;background:linear-gradient(180deg,#10b981,#059669);display:inline-block;"></span>
+          <span class="small-muted">Cierre realizado</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-left:12px;">
+          <span style="width:12px;height:12px;border-radius:3px;background:linear-gradient(180deg,#ef4444,#c0262e);display:inline-block;"></span>
+          <span class="small-muted">Cierre pendiente</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Script del calendario (copiar ../assets/js/calendar.js) -->
+  <script type="module">
+    import { CashClosureCalendar } from '../assets/js/calendar.js';
+
+    // Datos de ejemplo: reemplázalos con tu API real
+    const sampleClosures = [
+      {
+        date: '2026-01-05',
+        status: 'done',
+        totals: { bs: 12500.50, usd: 120.00 },
+        movements: [
+          { time: '09:12', type: 'Venta', method: 'Efectivo', amount: 5000, seller: 'Ana', rider: 'Pedro', note: 'Venta tienda' },
+          { time: '11:30', type: 'Devolución', method: 'Tarjeta', amount: -200, seller: 'Ana', rider: 'Pedro', note: 'Devolución producto' }
+        ]
+      },
+      {
+        date: '2026-01-09',
+        status: 'pending',
+        totals: { bs: 0, usd: 0 },
+        movements: []
+      },
+      {
+        date: '2026-01-12',
+        status: 'done',
+        totals: { bs: 3320, usd: 30 },
+        movements: [
+          { time: '10:02', type: 'Venta', method: 'POS', amount: 1200, seller: 'Luis', rider: 'Miguel', note: 'Pedido 1234' },
+          { time: '15:20', type: 'Venta', method: 'Efectivo', amount: 2120, seller: 'Luis', rider: 'Miguel', note: 'Delivery' }
+        ]
+      }
+    ];
+
+    // Inicializar calendario
+    const appContainer = document.getElementById('caja-calendar-app');
+    const calendar = new CashClosureCalendar(appContainer, {
+      locale: 'es-ES',
+      firstDay: 0 // Domingo como primer día de la semana
+    });
+
+    calendar.loadClosures(sampleClosures);
+
+    // Mapeo de controles externos
+    document.getElementById('cal-prev').addEventListener('click', () => calendar.prevMonth());
+    document.getElementById('cal-next').addEventListener('click', () => calendar.nextMonth());
+    document.getElementById('cal-today').addEventListener('click', () => calendar.goToToday());
+    document.getElementById('cal-week').addEventListener('click', () => calendar.selectWeekFromActive());
+    document.getElementById('cal-month').addEventListener('click', () => calendar.selectMonthFromActive());
+    document.getElementById('cal-range-mode').addEventListener('change', (e) => calendar.enableRangeMode(e.target.checked));
+    document.getElementById('btn-refresh-details').addEventListener('click', () => calendar.refreshDetails());
+
+    // Botón "Ir a fecha"
+    document.getElementById('btn-jump').addEventListener('click', () => {
+      const v = document.getElementById('cal-jump-date').value;
+      if (!v) return;
+      // navegar al mes conteniendo la fecha y seleccionar el día
+      const d = new Date(v);
+      calendar.active = new Date(d.getFullYear(), d.getMonth(), 1);
+      calendar.render();
+      calendar.selectRange(v, v);
+    });
+
+    // Refrescar calendario (re-render)
+    document.getElementById('btn-refresh-calendar').addEventListener('click', () => calendar.render());
+
+    // Mostrar mes en header secundario
+    const displayMonthEl = document.getElementById('display-month');
+    function updateDisplayMonth() {
+      displayMonthEl.textContent = calendar.active.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    }
+    // Inicializar y actualizar al navegar
+    updateDisplayMonth();
+    const origRender = calendar.render.bind(calendar);
+    calendar.render = function () {
+      origRender();
+      updateDisplayMonth();
+    }.bind(calendar);
+  </script>
+
+  <!-- Sidebar loader (mantener comportamiento compartido) -->
+  <script type="module" src="../assets/js/sidebar-loader.js"></script>
+</body>
+
+</html>
