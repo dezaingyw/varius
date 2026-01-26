@@ -1882,7 +1882,43 @@ a:focus-visible {
 }
 /* Ocultar por defecto en móviles */
 .section-divider {
-  display: none;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 18px 0 14px;
+  color: var(--muted);
+  font-size: 1rem; /* tamaño base para móvil */
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  gap: 12px;
+}
+
+/* Líneas laterales */
+.section-divider::before,
+.section-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--border);
+  height: 0;
+}
+
+/* Ajustes: separación del texto respecto a las líneas */
+.section-divider > span {
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+/* Escalas para pantallas más grandes */
+@media (min-width: 900px) {
+  .section-divider {
+    margin: 30px 0 20px;
+    font-size: 1.125rem;
+    gap: 18px;
+  }
+  .section-divider > span {
+    padding: 0 18px;
+  }
 }
 
 /* Mostrar solo en Desktop (pantallas mayores a 900px) */
