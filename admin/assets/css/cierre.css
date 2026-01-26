@@ -502,13 +502,13 @@
 
 /* closed = green (cierre realizado) */
 .calendar-closed {
-  background: rgba(16, 185, 129, 0.06);
+  background: rgba(16, 185, 129, 0.13);
   border-left: 4px solid #16a34a;
 }
 
 /* pending = red (hay pedidos, sin cierre) */
 .calendar-pending {
-  background: rgba(239, 68, 68, 0.04);
+  background: rgba(239, 68, 68, 0.13);
   border-left: 4px solid #ef4444;
 }
 
@@ -521,7 +521,7 @@
 .calendar-selected {
   outline: 3px solid rgba(126, 63, 240, 0.12);
   box-shadow: 0 6px 18px rgba(126, 63, 240, 0.06);
-  background: rgba(126, 63, 240, 0.04) !important;
+  background: rgba(126, 63, 240, 0.13) !important;
 }
 
 /* small helpers */
