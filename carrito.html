@@ -6,6 +6,72 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Tienda - Varius</title>
   <link rel="stylesheet" href="assets/css/carrito.css">
+  <style>
+    /* Asegura que el grid de productos se muestre en móviles igual que en escritorio. */
+    .products-grid {
+      display: grid !important;
+    }
+
+    /* Badge para productos disponibles (más visible) */
+    .offer-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #fff7cc, #ffd166);
+      color: #4b2e05;
+      padding: 6px 10px;
+      border-radius: 999px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+    }
+
+    /* Badge pequeño y delicado para items dentro del carrito */
+    .offer-badge-small {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #fff7cc, #ffd166);
+      color: #4b2e05;
+      padding: 4px 8px;
+      border-radius: 999px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      margin-left: 6px;
+      font-size: 0.78rem;
+    }
+
+    /* Posicionar badge pequeño junto al título del producto en carrito */
+    .cart-item .product-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .cart-item .product-title-row .left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Ajuste estético para el summary panel (opcional) */
+    .cart-summary {
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 12px;
+      margin: 12px 0;
+      box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
+    }
+
+    .cart-actions-inline {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+  </style>
 </head>
 
 <body>
@@ -20,18 +86,6 @@
   </header>
 
   <main class="container">
-    <!-- Carrusel de ofertas -->
-    <section class="carousel-section">
-      <div class="carousel-title-container">
-        <span class="carousel-title-text">Productos en Ofertas</span>
-      </div>
-      <div class="carousel" id="carousel" aria-roledescription="carousel">
-        <div class="carousel-track" id="carouselTrack" aria-live="polite"></div>
-        <div class="carousel-indicators" id="carouselIndicators" aria-hidden="true"></div>
-        <button class="carousel-btn prev" id="carouselPrev" aria-label="Anterior">‹</button>
-        <button class="carousel-btn next" id="carouselNext" aria-label="Siguiente">›</button>
-      </div>
-    </section>
 
     <!-- Página de carrito: dividida en panel izquierdo (carrito) y derecho (checkout) -->
     <section id="cartPage" class="cart-page">
@@ -52,21 +106,24 @@
 
         <hr class="divider">
 
-        <div class="available-head"><strong>Productos Disponibles</strong></div>
-        <div id="availableProducts" class="available-products" aria-live="polite">
-          <div id="productsSpinner" class="spinner">Cargando productos…</div>
-        </div>
-
+        <!-- MOVIDO: Resumen y acciones (ahora antes de "Productos Disponibles") -->
         <div class="cart-summary" id="cartSummaryInline" aria-live="polite">
           <div>Subtotal: <strong id="cartSubtotalInline">$0</strong></div>
           <div>Envío: <strong id="cartShippingInline2">GRATIS</strong></div>
-          <div class="total">Total: <strong id="cartTotalInline">$0</strong></div>
+          <div class="total" style="margin-top:8px;font-weight:800">Total: <strong id="cartTotalInline">$0</strong>
+          </div>
         </div>
 
         <div class="cart-actions-inline">
           <button id="continueWithData" class="btn-primary" disabled>Continuar con mis datos</button>
           <button id="clearCartBtn" class="btn-secondary">Vaciar Carrito</button>
         </div>
+
+        <div class="available-head"><strong>Productos Disponibles</strong></div>
+        <div id="availableProducts" class="available-products" aria-live="polite">
+          <div id="productsSpinner" class="spinner">Cargando productos…</div>
+        </div>
+
       </aside>
 
       <!-- Panel checkout (right) -->
@@ -202,17 +259,6 @@
   <script type="module" src="assets/js/pedidos-data.js"></script>
   <script type="module" src="assets/js/contact-layout.js"></script>
   <script type="module" src="assets/js/ui-animations.js"></script>
-  <script>
-    const ribbon = document.getElementById('productRibbon');
-    if (product && product.onSale) {
-      ribbon.textContent = 'Oferta';
-      ribbon.classList.add('on-sale');
-      ribbon.setAttribute('aria-hidden', 'false');
-    } else {
-      ribbon.classList.remove('on-sale');
-      ribbon.setAttribute('aria-hidden', 'true');
-    }
-  </script>
 </body>
 
 </html>
