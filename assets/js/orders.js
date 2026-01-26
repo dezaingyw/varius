@@ -374,7 +374,90 @@ function buildHistoryUrlFromOrder(order) {
         return 'history.html';
     }
 }
+// renderChatSidebarList: llena el sidebar de chats con la lista de pedidos (desktop)
+function renderChatSidebarList() {
+    try {
+        // Si no hay contenedor para la lista, intentar reutilizar chatColumn
+        if (currentUserRole === 'motorizado') {
+            if (chatColumn) chatColumn.style.display = 'none';
+            if (floatingChatBtn) floatingChatBtn.style.display = 'none';
+            return;
+        }
 
+        if (isMobileViewport()) {
+            if (chatColumn) chatColumn.style.display = 'none';
+            return;
+        }
+
+        // Asegurarnos de tener un contenedor
+        let container = chatList;
+        if (!container && chatColumn) {
+            container = document.createElement('div');
+            container.id = 'chatList';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '8px';
+            container.style.overflow = 'auto';
+            container.style.padding = '8px';
+            chatColumn.innerHTML = '';
+            chatColumn.appendChild(container);
+            chatList = container; // actualizar referencia global
+        }
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        const source = (filteredOrders && filteredOrders.length) ? filteredOrders : orders;
+        if (!source || source.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'small-muted';
+            empty.textContent = 'No hay pedidos/clientes disponibles.';
+            container.appendChild(empty);
+            return;
+        }
+
+        source.forEach(o => {
+            const itemBtn = document.createElement('button');
+            itemBtn.type = 'button';
+            itemBtn.className = 'chat-list-item';
+            itemBtn.style.display = 'flex';
+            itemBtn.style.gap = '12px';
+            itemBtn.style.alignItems = 'center';
+            itemBtn.style.padding = '8px';
+            itemBtn.style.border = '1px solid var(--border)';
+            itemBtn.style.borderRadius = '8px';
+            itemBtn.style.background = '#fff';
+            itemBtn.style.cursor = 'pointer';
+            itemBtn.style.width = '100%';
+            itemBtn.style.textAlign = 'left';
+
+            const cname = (o.data && o.data.customerData && (o.data.customerData.Customname || o.data.customerData.name)) || (o.data && o.data.customer && o.data.customer.name) || 'Sin nombre';
+            const snippet = (o.data && o.data.items && o.data.items[0] && o.data.items[0].name) || '';
+            const when = formatDateFlexible(o.data && (o.data.orderDate || o.data.timestamp));
+
+            itemBtn.innerHTML = `
+                <div class="thumb" style="width:44px;height:44px;border-radius:50%;background:#e6e9ed;display:flex;align-items:center;justify-content:center;font-weight:700;">
+                  ${escapeHtml((cname || ' ')[0].toUpperCase())}
+                </div>
+                <div style="flex:1;text-align:left;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-weight:700">${escapeHtml(cname)}</div>
+                    <div class="small-muted" style="font-size:12px">${escapeHtml(when)}</div>
+                  </div>
+                  <div class="small-muted" style="margin-top:6px;font-size:13px;">${escapeHtml(snippet)}</div>
+                </div>
+            `;
+
+            itemBtn.addEventListener('click', () => openChatForOrder(o));
+            container.appendChild(itemBtn);
+        });
+
+        // Asegurar que el panel esté visible
+        if (chatColumn) chatColumn.style.display = '';
+    } catch (err) {
+        console.error('renderChatSidebarList error', err);
+    }
+}
 /* ================= RENDERERS ================= */
 function render(list) {
     renderTable(list);
