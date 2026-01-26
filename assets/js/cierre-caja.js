@@ -133,6 +133,25 @@ function toDateFromPossible(value) {
     return null;
 }
 
+// Nuevo helper: obtener la fecha "oficial" del pedido y campo usado
+function getOrderDateInfo(order) {
+    // Orden de prioridad: preferimos payment.paidAt, paidAt, payment.createdAt, createdAt, paymentUpdatedAt, updatedAt, payment.conversionRateDate
+    const candidates = [
+        { field: 'payment.paidAt', value: order?.payment?.paidAt },
+        { field: 'paidAt', value: order?.paidAt },
+        { field: 'payment.createdAt', value: order?.payment?.createdAt },
+        { field: 'createdAt', value: order?.createdAt },
+        { field: 'paymentUpdatedAt', value: order?.paymentUpdatedAt },
+        { field: 'updatedAt', value: order?.updatedAt },
+        { field: 'payment.conversionRateDate', value: order?.payment?.conversionRateDate }
+    ];
+    for (const c of candidates) {
+        const dt = toDateFromPossible(c.value);
+        if (dt) return { date: dt, field: c.field };
+    }
+    return { date: null, field: null };
+}
+
 function determinePrimaryCurrency(m) {
     const currency = String((m.currency || '').toLowerCase() || '').trim();
     const method = String((m.method || m.type || '').toLowerCase() || '').trim();
@@ -498,10 +517,11 @@ function renderCascade(sellersMap) {
             for (const o of orders) {
                 const pd = document.createElement('div'); pd.className = 'pedido';
                 const order = o.order;
-                const dtCandidates = [order.paidAt, order.payment?.paidAt, order.createdAt, order.paymentUpdatedAt, order.updatedAt];
-                let paidAt = null;
-                for (const r of dtCandidates) { const dt = toDateFromPossible(r); if (dt) { paidAt = dt; break; } }
-                const dateStr = paidAt ? paidAt.toLocaleDateString() : '—';
+
+                // Usar getOrderDateInfo para obtener la fecha consistente
+                const info = getOrderDateInfo(order);
+                const dateStr = info.date ? info.date.toLocaleDateString() : '—';
+
                 const cust = order.customerName || order.clientName || order.buyer || order.recipientName || '';
 
                 const paymentsHtml = (o.payments && o.payments.length) ? o.payments.map(p => {
@@ -816,7 +836,7 @@ function renderClosureBanner(closuresForRange, datesArray) {
         const todayISO = isoFromDate(new Date());
         if (closedDates.has(todayISO)) {
             const closure = closedDates.get(todayISO);
-            banner.innerHTML = `<div><strong>La caja del día ${formatDateDisplay(new Date(todayISO))} ya fue cerrada</strong><div class="muted">Totales guardados: ${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
+            banner.innerHTML = `<div><strong>La caja del día ${formatDateDisplay(new Date(todayISO + 'T00:00:00'))} ya fue cerrada</strong><div class="muted">Totales guardados: ${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
             if (conciliationSection) conciliationSection.style.display = 'none';
             if (btnCloseCash) btnCloseCash.style.display = 'none';
         } else {
@@ -834,8 +854,8 @@ function renderClosureBanner(closuresForRange, datesArray) {
             if (btnCloseCash) btnCloseCash.style.display = '';
             return;
         }
-        const closedDatesStr = closedList.map(c => `${new Date(c.date).toLocaleDateString('es-ES')}`).join(', ');
-        const totalsSummary = closedList.map(c => `${new Date(c.date).toLocaleDateString('es-ES')}: ${formatCurrencyBs(c.closure.totals?.bs ?? 0)}`).join(' • ');
+        const closedDatesStr = closedList.map(c => `${new Date(c.date + 'T00:00:00').toLocaleDateString('es-ES')}`).join(', ');
+        const totalsSummary = closedList.map(c => `${new Date(c.date + 'T00:00:00').toLocaleDateString('es-ES')}: ${formatCurrencyBs(c.closure.totals?.bs ?? 0)}`).join(' • ');
         banner.innerHTML = `<div><strong>La(s) caja(s) de las siguientes fecha(s) ya fueron cerradas:</strong><div class="muted" style="margin-top:6px">${closedDatesStr}</div><div style="margin-top:6px;font-weight:700">${totalsSummary}</div></div>`;
         const allClosed = closedList.length === datesArray.length;
         if (allClosed) {
@@ -874,14 +894,10 @@ async function calculateAndRenderForSelected(datesSet = null) {
 
         // Filtrar pedidos que caen exactamente en las fechas seleccionadas
         const keep = orders.filter(order => {
-            const candidates = [order.paidAt, order.payment?.paidAt, order.createdAt, order.paymentUpdatedAt, order.updatedAt];
-            for (const c of candidates) {
-                const dt = toDateFromPossible(c);
-                if (!dt) continue;
-                const iso = isoFromDate(dt); // ahora local
-                if (datesArray.includes(iso)) return true;
-            }
-            return false;
+            const info = getOrderDateInfo(order);
+            if (!info.date) return false;
+            const iso = isoFromDate(info.date);
+            return datesArray.includes(iso);
         });
 
         lastFetchedOrders = keep.slice();
@@ -896,32 +912,27 @@ async function calculateAndRenderForSelected(datesSet = null) {
         // --- Nuevo: usar las fechas reales de los pedidos para el encabezado ---
         const orderDateSet = new Set();
         for (const o of keep) {
-            const candidates = [o.paidAt, o.payment?.paidAt, o.createdAt, o.paymentUpdatedAt, o.updatedAt];
-            for (const c of candidates) {
-                const dt = toDateFromPossible(c);
-                if (!dt) continue;
-                orderDateSet.add(isoFromDate(dt));
-                break;
-            }
+            const info = getOrderDateInfo(o);
+            if (info.date) orderDateSet.add(isoFromDate(info.date));
         }
         const orderDates = Array.from(orderDateSet).sort();
 
         if (orderDates.length === 1) {
             // si hay un único día real entre los pedidos
-            if (displayDate) displayDate.textContent = formatDateDisplay(new Date(orderDates[0]));
+            if (displayDate) displayDate.textContent = formatDateDisplay(new Date(orderDates[0] + 'T00:00:00'));
             if (displayDatePill) displayDatePill.textContent = orderDates[0].split('-').reverse().join('/');
         } else if (orderDates.length > 1) {
             // varios días: mostrar rango según pedidos reales (primero..último)
-            const first = new Date(orderDates[0]), last = new Date(orderDates[orderDates.length - 1]);
+            const first = new Date(orderDates[0] + 'T00:00:00'), last = new Date(orderDates[orderDates.length - 1] + 'T00:00:00');
             if (displayDate) displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${orderDates.length} días)`;
             if (displayDatePill) displayDatePill.textContent = `${orderDates[0].split('-').reverse().join('/')} — ${orderDates[orderDates.length - 1].split('-').reverse().join('/')}`;
         } else {
             // no hay pedidos; fallback a la selección (o a hoy)
             if (datesArray.length === 1) {
-                if (displayDate) displayDate.textContent = formatDateDisplay(new Date(datesArray[0]));
+                if (displayDate) displayDate.textContent = formatDateDisplay(new Date(datesArray[0] + 'T00:00:00'));
                 if (displayDatePill) displayDatePill.textContent = datesArray[0].split('-').reverse().join('/');
             } else {
-                const first = new Date(datesArray[0]), last = new Date(datesArray[datesArray.length - 1]);
+                const first = new Date(datesArray[0] + 'T00:00:00'), last = new Date(datesArray[datesArray.length - 1] + 'T00:00:00');
                 if (displayDate) displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${datesArray.length} días)`;
                 if (displayDatePill) displayDatePill.textContent = `${datesArray[0].split('-').reverse().join('/')} — ${datesArray[datesArray.length - 1].split('-').reverse().join('/')}`;
             }
@@ -929,6 +940,14 @@ async function calculateAndRenderForSelected(datesSet = null) {
 
         // Renderiza banner de cierres (usa closures ya obtenidos)
         renderClosureBanner(closures, datesArray);
+
+        // DEBUG: lista de pedidos retenidos y la fecha elegida por cada uno
+        try {
+            console.log('Pedidos retenidos y fecha usada por cada uno:', keep.map(o => {
+                const info = getOrderDateInfo(o);
+                return { id: o.id, dateISO: info.date ? isoFromDate(info.date) : null, field: info.field };
+            }));
+        } catch (e) { /* ignore */ }
 
         return { orders: keep, summary, closures };
     } catch (err) {
@@ -944,7 +963,7 @@ async function saveCashClosure(summary, isoDate) {
     const closuresCol = collection(db, 'cash_closures');
     const payload = {
         dateISO: isoDate,
-        dateLabel: formatDateDisplay(new Date(isoDate)),
+        dateLabel: formatDateDisplay(new Date(isoDate + 'T00:00:00')),
         totals: { bs: summary.totalBs ?? 0, usd: summary.totalUsd ?? 0, totalsByMethod: summary.totalsByMethod || {} },
         createdAt: serverTimestamp(),
         createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null,
@@ -976,7 +995,7 @@ $('#btn-close-cash')?.addEventListener('click', async () => {
         const closedSet = new Set(closures.map(c => c.dateISO));
         for (const d of toClose) {
             if (closedSet.has(d)) {
-                showToast(`La fecha ${new Date(d).toLocaleDateString('es-ES')} ya tiene cierre`, { type: 'info', duration: 4000 });
+                showToast(`La fecha ${new Date(d + 'T00:00:00').toLocaleDateString('es-ES')} ya tiene cierre`, { type: 'info', duration: 4000 });
                 return;
             }
         }
@@ -990,7 +1009,7 @@ $('#btn-close-cash')?.addEventListener('click', async () => {
         for (const d of toClose) {
             const payload = {
                 dateISO: d,
-                dateLabel: formatDateDisplay(new Date(d)),
+                dateLabel: formatDateDisplay(new Date(d + 'T00:00:00')),
                 totals: { bs: result.summary.totalBs ?? 0, usd: result.summary.totalUsd ?? 0, totalsByMethod: result.summary.totalsByMethod || {} },
                 createdAt: serverTimestamp(),
                 createdBy: currentUser ? { uid: currentUser.uid, email: currentUser.email } : null,
