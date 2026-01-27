@@ -200,28 +200,91 @@ function todayString(offsetDays = 0) {
     return d.toISOString().slice(0, 10);
 }
 
+// Reemplazar la función fetchRates por esta versión más robusta y con logging visible en UI
 async function fetchRates() {
+    const showUiError = (msg) => {
+        try {
+            if (pmConvInfo) {
+                pmConvInfo.textContent = msg;
+            }
+        } catch (e) { /* ignore */ }
+    };
+
+    const controller = new AbortController();
+    const timeoutMs = 8000; // 8s timeout
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const url = EXCHANGE_API + '?_=' + Date.now(); // cache-busting
     try {
-        console.debug('fetchRates: solicitando API de tasas a', EXCHANGE_API);
-        const resp = await fetch(EXCHANGE_API);
+        console.debug('fetchRates: solicitando API de tasas a', url);
+        const resp = await fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' },
+            signal: controller.signal
+        });
+
+        clearTimeout(timer);
+
         if (!resp.ok) {
-            console.warn('fetchRates: respuesta no OK', resp.status);
+            console.warn('fetchRates: respuesta no OK', resp.status, resp.statusText);
+            // reintentar una vez sin el parámetro por si hay algún proxy/cache con querystring raro
+            try {
+                const retryUrl = EXCHANGE_API;
+                console.debug('fetchRates: reintentando a', retryUrl);
+                const resp2 = await fetch(retryUrl, { method: 'GET', mode: 'cors', headers: { 'Accept': 'application/json' } });
+                if (resp2.ok) {
+                    const j2 = await resp2.json();
+                    console.debug('fetchRates: retry payload recibido', j2);
+                    rates.apiRaw = j2;
+                    rates.apiSource = EXCHANGE_API;
+                    // continuar con el parse habitual usando j2
+                    const current2 = j2?.current;
+                    if (!current2) {
+                        showUiError('Formato de tasa inesperado (retry).');
+                        rates.usd_bcv = null; rates.eur_bcv = null; rates.date = null; rates.isTomorrow = false;
+                        return;
+                    }
+                    const apiDate2 = String(current2.date || '').slice(0, 10);
+                    const today = todayString(0);
+                    const tomorrow = todayString(1);
+                    const usd2 = Number(current2.usd);
+                    const eur2 = Number(current2.eur);
+                    if (apiDate2 === today || apiDate2 === tomorrow) {
+                        rates.usd_bcv = (usd2 && !isNaN(usd2)) ? usd2 : null;
+                        rates.eur_bcv = (eur2 && !isNaN(eur2)) ? eur2 : null;
+                        rates.date = apiDate2;
+                        rates.isTomorrow = (apiDate2 === tomorrow);
+                    } else {
+                        showUiError('Tasa API disponible pero con fecha fuera de rango (retry).');
+                        rates.usd_bcv = null; rates.eur_bcv = null; rates.date = apiDate2; rates.isTomorrow = false;
+                    }
+                    return;
+                } else {
+                    console.warn('fetchRates retry no OK', resp2.status);
+                }
+            } catch (retryErr) {
+                console.warn('fetchRates retry failed', retryErr);
+            }
+
             rates.usd_bcv = null;
             rates.eur_bcv = null;
             rates.date = null;
             rates.apiSource = EXCHANGE_API;
             rates.apiRaw = null;
-            rates.isTomorrow = false;
+            showUiError('No se pudo obtener la tasa (respuesta no OK).');
             return;
         }
+
         const j = await resp.json();
         console.debug('fetchRates: payload recibido', j);
-        const current = j?.current;
         rates.apiRaw = j;
         rates.apiSource = EXCHANGE_API;
 
+        const current = j?.current;
         if (!current) {
             console.warn('fetchRates: formato inesperado', j);
+            showUiError('Formato inesperado de la API de tasas.');
             rates.usd_bcv = null;
             rates.eur_bcv = null;
             rates.date = null;
@@ -255,11 +318,13 @@ async function fetchRates() {
         }
 
         console.warn(`fetchRates: tasa API con fecha ${apiDate} no es hoy ni mañana (${today} / ${tomorrow}) — no se usará`);
+        showUiError('Tasa API fuera de rango de fecha.');
         rates.usd_bcv = null;
         rates.eur_bcv = null;
         rates.date = apiDate || null;
         rates.isTomorrow = false;
     } catch (e) {
+        clearTimeout(timer);
         console.warn('fetchRates error', e);
         rates.usd_bcv = null;
         rates.eur_bcv = null;
@@ -267,6 +332,13 @@ async function fetchRates() {
         rates.apiRaw = null;
         rates.apiSource = EXCHANGE_API;
         rates.isTomorrow = false;
+
+        if (e && e.name === 'AbortError') {
+            console.warn('fetchRates: petición abortada por timeout');
+            showUiError('Timeout obteniendo tasa. Reintenta.');
+        } else {
+            showUiError('Error obteniendo tasa: ' + (e && e.message ? e.message : String(e)));
+        }
     }
 }
 
