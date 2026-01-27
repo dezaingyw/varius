@@ -168,7 +168,7 @@ function getIconSvg(name, size = 16) {
         case 'eye': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></svg>`;
         case 'pencil': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>`;
         case 'clock': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/></svg>`;
-        case 'x-circle': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>`;
+        case 'x-circle': return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 1 1-3.998-.085A1.5 1.5 0 0 1 0 10.5zm1.294 7.456A2 2 0 0 1 4.732 11h5.536a2 2 0 0 1 .732-.732V3.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .294.456M12 10a2 2 0 0 1 1.732 1h.768a.5.5 0 0 0 .5-.5V8.35a.5.5 0 0 0-.11-.312l-1.48-1.85A.5.5 0 0 0 13.02 6H12zm-9 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2m9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/></svg>`;
         case 'cash-coin':
             return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-coin" viewBox="0 0 16 16">
                     <path d="M5.5 9.511c.076.954.83 1.697 2.182 1.785V12h.6v-.709c1.4-.098 2.218-.846 2.218-1.932 0-.987-.626-1.496-1.745-1.76l-.473-.112V5.57c.6.068.982.396 1.074.85h1.052c-.076-.919-.864-1.638-2.126-1.716V4h-.6v.719c-1.195.117-2.01.836-2.01 1.853 0 .9.606 1.472 1.613 1.707l.397.098v2.034c-.615-.093-1.022-.43-1.114-.9zm2.177-2.166c-.59-.137-.91-.416-.91-.836 0-.47.345-.822.915-.925v1.76h-.005zm.692 1.193c.717.166 1.048.435 1.048.91 0 .542-.412.914-1.135.982V8.518z"/>
@@ -361,6 +361,18 @@ async function refreshSingleOrderLocal(orderId, hints = {}) {
     }
 }
 
+/* Small helper to determine if order is considered "enviado" (checks status and shippingStatus) */
+function isOrderSent(order) {
+    if (!order || !order.data) return false;
+    const s1 = (order.data.status || '').toString().toLowerCase();
+    const s2 = (order.data.shippingStatus || '').toString().toLowerCase();
+    const checks = [s1, s2];
+    return checks.some(s => {
+        if (!s) return false;
+        return s === 'enviado' || s === 'sent' || s.includes('enviado') || s.includes('sent');
+    });
+}
+
 /* Table */
 function renderTable(list) {
     if (!tbody) return;
@@ -463,7 +475,11 @@ function renderTable(list) {
 
                 const paymentLower = String(rawPayment || '').toLowerCase();
                 const isPaid = paymentLower === 'pagado' || paymentLower === 'paid';
-                if (isAllowedToCharge && !isPaid) {
+
+                // For motorizado users: only show cobrar button if the motorizado already accepted the order
+                const motAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
+
+                if (isAllowedToCharge && !isPaid && motAccepted) {
                     const cobrarBtn = document.createElement('button');
                     cobrarBtn.className = 'btn-small btn-cobrar';
                     cobrarBtn.title = 'Registrar cobranza';
@@ -486,7 +502,10 @@ function renderTable(list) {
                     const hasSavedLocation = Boolean(o.data && o.data.lastMotorLocationAt);
                     const alreadyAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
 
-                    if (!hasSavedLocation && !alreadyAccepted) {
+                    // Show "Mi ubicación" ONLY when the order has status "enviado"
+                    const orderIsSent = isOrderSent(o);
+
+                    if (orderIsSent && !hasSavedLocation && !alreadyAccepted) {
                         const locBtn = document.createElement('button');
                         locBtn.className = 'btn-small btn-location';
                         locBtn.title = 'Mi ubicación';
@@ -636,14 +655,19 @@ function renderCards(list) {
             if (isMotorizado) {
                 // Motorizado: view and cobrar + location/accept when assigned
                 actionsHtml = `${viewBtnHtml}`;
-                if (isAllowedToCharge && !isPaid) actionsHtml += `${cobrarBtnHtml}`;
+
+                // For motorizado: only allow cobrar after acceptance
+                const alreadyAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
+                if (isAllowedToCharge && !isPaid && alreadyAccepted) actionsHtml += `${cobrarBtnHtml}`;
 
                 const isThisMotorAssigned = Boolean(currentUser && o.data && o.data.assignedMotor && String(o.data.assignedMotor) === String(currentUser.uid));
                 const hasSavedLocation = Boolean(o.data && o.data.lastMotorLocationAt);
-                const alreadyAccepted = Boolean(o.data && o.data.assignedMotorAccepted);
+
+                // Only show "Mi ubicación" when the order is "enviado"
+                const orderIsSent = isOrderSent(o);
 
                 if (isThisMotorAssigned) {
-                    if (!hasSavedLocation && !alreadyAccepted) actionsHtml += `${myLocBtnHtml}`;
+                    if (orderIsSent && !hasSavedLocation && !alreadyAccepted) actionsHtml += `${myLocBtnHtml}`;
                     if (hasSavedLocation && !alreadyAccepted) actionsHtml += `${acceptBtnHtml}`;
                     if (alreadyAccepted) actionsHtml += `<span class="badge info">Aceptado</span>`;
                 }
