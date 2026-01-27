@@ -201,144 +201,118 @@ function todayString(offsetDays = 0) {
 }
 
 // Reemplazar la función fetchRates por esta versión más robusta y con logging visible en UI
+
+// Reemplazar la función fetchRates por esta versión de debug + manejo 401
 async function fetchRates() {
-    const showUiError = (msg) => {
-        try {
-            if (pmConvInfo) {
-                pmConvInfo.textContent = msg;
-            }
-        } catch (e) { /* ignore */ }
+    const showUiInfo = (msg) => {
+        try { if (pmConvInfo) pmConvInfo.textContent = msg; } catch (e) { /* ignore */ }
     };
 
     const controller = new AbortController();
-    const timeoutMs = 8000; // 8s timeout
+    const timeoutMs = 8000;
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    const url = EXCHANGE_API + '?_=' + Date.now(); // cache-busting
+    // Cache-busting para evitar respuestas en cache distintas entre sesiones
+    const url = EXCHANGE_API + '?_=' + Date.now();
+
     try {
         console.debug('fetchRates: solicitando API de tasas a', url);
-        const resp = await fetch(url, {
-            method: 'GET',
-            mode: 'cors',
-            headers: { 'Accept': 'application/json' },
-            signal: controller.signal
-        });
-
+        const resp = await fetch(url, { method: 'GET', mode: 'cors', headers: { 'Accept': 'application/json' }, signal: controller.signal });
         clearTimeout(timer);
 
+        // Si no OK, intentar leer body para diagnosticar (por ejemplo 401 con mensaje)
         if (!resp.ok) {
-            console.warn('fetchRates: respuesta no OK', resp.status, resp.statusText);
-            // reintentar una vez sin el parámetro por si hay algún proxy/cache con querystring raro
-            try {
-                const retryUrl = EXCHANGE_API;
-                console.debug('fetchRates: reintentando a', retryUrl);
-                const resp2 = await fetch(retryUrl, { method: 'GET', mode: 'cors', headers: { 'Accept': 'application/json' } });
-                if (resp2.ok) {
-                    const j2 = await resp2.json();
-                    console.debug('fetchRates: retry payload recibido', j2);
-                    rates.apiRaw = j2;
-                    rates.apiSource = EXCHANGE_API;
-                    // continuar con el parse habitual usando j2
-                    const current2 = j2?.current;
-                    if (!current2) {
-                        showUiError('Formato de tasa inesperado (retry).');
-                        rates.usd_bcv = null; rates.eur_bcv = null; rates.date = null; rates.isTomorrow = false;
-                        return;
-                    }
-                    const apiDate2 = String(current2.date || '').slice(0, 10);
-                    const today = todayString(0);
-                    const tomorrow = todayString(1);
-                    const usd2 = Number(current2.usd);
-                    const eur2 = Number(current2.eur);
-                    if (apiDate2 === today || apiDate2 === tomorrow) {
-                        rates.usd_bcv = (usd2 && !isNaN(usd2)) ? usd2 : null;
-                        rates.eur_bcv = (eur2 && !isNaN(eur2)) ? eur2 : null;
-                        rates.date = apiDate2;
-                        rates.isTomorrow = (apiDate2 === tomorrow);
-                    } else {
-                        showUiError('Tasa API disponible pero con fecha fuera de rango (retry).');
-                        rates.usd_bcv = null; rates.eur_bcv = null; rates.date = apiDate2; rates.isTomorrow = false;
-                    }
-                    return;
-                } else {
-                    console.warn('fetchRates retry no OK', resp2.status);
-                }
-            } catch (retryErr) {
-                console.warn('fetchRates retry failed', retryErr);
+            const text = await resp.text().catch(() => '');
+            console.warn('fetchRates: respuesta no OK', resp.status, resp.statusText, text);
+            showUiInfo(`Error obteniendo tasa: ${resp.status} ${resp.statusText}. ${text ? 'Detalle: ' + text : ''}`);
+
+            // si es 401 -> indicar claramente que la API requiere autorización
+            if (resp.status === 401) {
+                console.warn('fetchRates: 401 Unauthorized — la API requiere autenticación o la clave no es válida.');
+                // Dejar rates en null de forma explícita
+                rates.usd_bcv = null; rates.eur_bcv = null; rates.date = null; rates.apiRaw = null; rates.apiSource = EXCHANGE_API; rates.isTomorrow = false;
+                return;
             }
 
-            rates.usd_bcv = null;
-            rates.eur_bcv = null;
-            rates.date = null;
-            rates.apiSource = EXCHANGE_API;
-            rates.apiRaw = null;
-            showUiError('No se pudo obtener la tasa (respuesta no OK).');
+            // reintento simple (sin query param) por si algún proxy falla con querystring
+            try {
+                const resp2 = await fetch(EXCHANGE_API, { method: 'GET', mode: 'cors', headers: { 'Accept': 'application/json' } });
+                if (resp2.ok) {
+                    const j2 = await resp2.json();
+                    rates.apiRaw = j2; rates.apiSource = EXCHANGE_API;
+                    const current2 = j2?.current;
+                    if (current2) {
+                        const apiDate2 = String(current2.date || '').slice(0,10);
+                        const usd2 = Number(current2.usd);
+                        const eur2 = Number(current2.eur);
+                        const today = todayString(0);
+                        const tomorrow = todayString(1);
+                        if (apiDate2 === today || apiDate2 === tomorrow) {
+                            rates.usd_bcv = (usd2 && !isNaN(usd2)) ? usd2 : null;
+                            rates.eur_bcv = (eur2 && !isNaN(eur2)) ? eur2 : null;
+                            rates.date = apiDate2;
+                            rates.isTomorrow = (apiDate2 === tomorrow);
+                            console.debug('fetchRates: retry OK, tasas asignadas', rates);
+                            return;
+                        }
+                    }
+                } else {
+                    const t2 = await resp2.text().catch(()=>'');
+                    console.warn('fetchRates retry no OK', resp2.status, t2);
+                    showUiInfo(`Retry: ${resp2.status} ${resp2.statusText}. ${t2}`);
+                }
+            } catch (retryErr) {
+                console.warn('fetchRates retry error', retryErr);
+            }
+
+            // fallback: dejar tasas null y mostrar mensaje (para que la UI no rompa)
+            rates.usd_bcv = null; rates.eur_bcv = null; rates.date = null; rates.apiRaw = null; rates.apiSource = EXCHANGE_API; rates.isTomorrow = false;
             return;
         }
 
+        // OK path
         const j = await resp.json();
         console.debug('fetchRates: payload recibido', j);
-        rates.apiRaw = j;
-        rates.apiSource = EXCHANGE_API;
-
+        rates.apiRaw = j; rates.apiSource = EXCHANGE_API;
         const current = j?.current;
         if (!current) {
-            console.warn('fetchRates: formato inesperado', j);
-            showUiError('Formato inesperado de la API de tasas.');
-            rates.usd_bcv = null;
-            rates.eur_bcv = null;
-            rates.date = null;
-            rates.isTomorrow = false;
+            showUiInfo('Formato inesperado de la API de tasas.');
+            rates.usd_bcv = null; rates.eur_bcv = null; rates.date = null; rates.isTomorrow = false;
             return;
         }
 
-        const apiDate = String(current.date || '').slice(0, 10); // "YYYY-MM-DD"
-        const today = todayString(0);
-        const tomorrow = todayString(1);
-
+        const apiDate = String(current.date || '').slice(0,10);
         const usd = Number(current.usd);
         const eur = Number(current.eur);
+        const today = todayString(0);
+        const tomorrow = todayString(1);
 
         if (apiDate === today) {
             rates.usd_bcv = (usd && !isNaN(usd)) ? usd : null;
             rates.eur_bcv = (eur && !isNaN(eur)) ? eur : null;
             rates.date = apiDate;
             rates.isTomorrow = false;
-            console.debug('fetchRates: usando tasa para hoy', { usd_bcv: rates.usd_bcv, eur_bcv: rates.eur_bcv, date: rates.date });
+            console.debug('fetchRates: usando tasa para hoy', rates);
             return;
         }
-
         if (apiDate === tomorrow) {
             rates.usd_bcv = (usd && !isNaN(usd)) ? usd : null;
             rates.eur_bcv = (eur && !isNaN(eur)) ? eur : null;
             rates.date = apiDate;
             rates.isTomorrow = true;
-            console.debug('fetchRates: usando tasa para mañana (fallback)', { usd_bcv: rates.usd_bcv, eur_bcv: rates.eur_bcv, date: rates.date });
+            console.debug('fetchRates: usando tasa para mañana', rates);
             return;
         }
 
-        console.warn(`fetchRates: tasa API con fecha ${apiDate} no es hoy ni mañana (${today} / ${tomorrow}) — no se usará`);
-        showUiError('Tasa API fuera de rango de fecha.');
-        rates.usd_bcv = null;
-        rates.eur_bcv = null;
-        rates.date = apiDate || null;
-        rates.isTomorrow = false;
+        console.warn(`fetchRates: tasa API con fecha ${apiDate} no es hoy ni mañana`);
+        showUiInfo('Tasa API fuera de rango de fecha.');
+        rates.usd_bcv = null; rates.eur_bcv = null; rates.date = apiDate || null; rates.isTomorrow = false;
     } catch (e) {
         clearTimeout(timer);
         console.warn('fetchRates error', e);
-        rates.usd_bcv = null;
-        rates.eur_bcv = null;
-        rates.date = null;
-        rates.apiRaw = null;
-        rates.apiSource = EXCHANGE_API;
-        rates.isTomorrow = false;
-
-        if (e && e.name === 'AbortError') {
-            console.warn('fetchRates: petición abortada por timeout');
-            showUiError('Timeout obteniendo tasa. Reintenta.');
-        } else {
-            showUiError('Error obteniendo tasa: ' + (e && e.message ? e.message : String(e)));
-        }
+        rates.usd_bcv = null; rates.eur_bcv = null; rates.date = null; rates.apiRaw = null; rates.apiSource = EXCHANGE_API; rates.isTomorrow = false;
+        if (e && e.name === 'AbortError') showUiInfo('Timeout obteniendo tasa. Reintenta.');
+        else showUiInfo('Error obteniendo tasa: ' + (e && e.message ? e.message : String(e)));
     }
 }
 
