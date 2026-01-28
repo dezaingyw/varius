@@ -1,10 +1,3 @@
-/* product-modal.css
-   Override / improvements scoped to #productModal to:
-   - present a clean two-column form on desktop
-   - keep all behavior responsive and accessible on mobile
-   - avoid touching global styles (specific selectors)
-*/
-
 /* Scope everything to the modal to avoid global side effects */
 #productModal .modal-content {
   width: min(880px, 96%);
@@ -294,4 +287,5 @@
 /* Prevent overflowing long labels inside mobile stacked product card layout */
 #productModal .modal-form .form-row {
   min-width: 0;
+
 }
