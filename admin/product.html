@@ -252,7 +252,13 @@
         <div id="productModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
             <div class="modal-content modal-lg" role="document">
                 <header class="modal-header">
-                    <h2 id="modalTitle">Agregar Producto</h2>
+                    <div class="header-content">
+                        <span class="header-icon">📦</span>
+                        <div>
+                            <h2 id="modalTitle">Gestión de Producto</h2>
+                            <p class="header-subtitle">Completa la información detallada del artículo</p>
+                        </div>
+                    </div>
                     <button id="closeModal" class="close-btn" aria-label="Cerrar">&times;</button>
                 </header>
 
@@ -260,30 +266,24 @@
                     <form id="productForm" class="modal-form" novalidate>
                         <input type="hidden" id="productId" />
 
-                        <!-- Nombre (full width) -->
-                        <div class="form-row full-width">
-                            <label for="name">Nombre <span class="required">*</span></label>
-                            <input id="name" type="text" required />
+                        <div class="form-section main-info">
+                            <div class="form-row full-width">
+                                <label for="name">Nombre del Producto <span class="required">*</span></label>
+                                <input id="name" type="text" placeholder="Ej: Camiseta de Algodón Premium" required />
+                            </div>
+
+                            <div class="form-row full-width">
+                                <label for="description">Descripción detallada</label>
+                                <textarea id="description" rows="3"
+                                    placeholder="Describe las características principales..."></textarea>
+                            </div>
                         </div>
 
-                        <!-- Descripción (full width) -->
-                        <div class="form-row full-width">
-                            <label for="description">Descripción</label>
-                            <textarea id="description" rows="3"></textarea>
-                        </div>
-
-                        <!-- Precio (full width) -->
-                        <div class="form-row full-width">
-                            <label for="price">Precio (USD) <span class="required">*</span></label>
-                            <input id="price" type="number" min="0" required />
-                        </div>
-
-                        <!-- Categoria + Estado (two column row) -->
-                        <div class="form-row two-col">
-                            <div>
+                        <div class="form-section attributes-grid">
+                            <div class="form-group">
                                 <label for="category">Categoría <span class="required">*</span></label>
                                 <select id="category" required>
-                                    <option value="">Seleccionar categoría</option>
+                                    <option value="">Seleccionar...</option>
                                     <option>Ropa</option>
                                     <option>Electrónica</option>
                                     <option>Hogar</option>
@@ -291,8 +291,8 @@
                                 </select>
                             </div>
 
-                            <div>
-                                <label for="status">Estado</label>
+                            <div class="form-group">
+                                <label for="status">Estado de visibilidad</label>
                                 <select id="status">
                                     <option>Activo</option>
                                     <option>Inactivo</option>
@@ -300,62 +300,69 @@
                             </div>
                         </div>
 
-                        <!-- Oferta + descuento + stock (compact row) -->
-                        <div class="form-row two-col compact-row">
-                            <div style="display:flex;align-items:center;gap:10px;">
-                                <label class="checkbox-row" style="margin:0">
-                                    <input id="onOffer" type="checkbox" />
-                                    <span>En oferta</span>
-                                </label>
-                            </div>
-
-                            <div style="display:flex;gap:12px;">
-                                <div style="flex:1">
-                                    <label for="discount">Descuento (%)</label>
-                                    <input id="discount" type="number" min="0" max="100" value="0" />
+                        <div class="form-section pricing-card">
+                            <div class="pricing-row">
+                                <div class="form-group">
+                                    <label for="price">Precio Base (USD) <span class="required">*</span></label>
+                                    <div class="input-with-icon">
+                                        <input id="price" type="number" min="0" step="0.01" required />
+                                    </div>
                                 </div>
 
-                                <div style="width:120px">
-                                    <label for="stock">Stock</label>
+                                <div class="form-group">
+                                    <label for="stock">Stock Disponible</label>
                                     <input id="stock" type="number" min="0" value="0" />
+                                </div>
+                            </div>
+
+                            <div class="offer-container">
+                                <label class="toggle-switch">
+                                    <input id="onOffer" type="checkbox" />
+                                    <span class="slider"></span>
+                                    <span class="toggle-label">Producto en Oferta</span>
+                                </label>
+
+                                <div id="discountWrapper" class="discount-input">
+                                    <label for="discount">Descuento (%)</label>
+                                    <input id="discount" type="number" min="0" max="100" value="0" />
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Imagenes (full width) -->
-                        <div class="form-row full-width">
-                            <label>Imágenes (arrastra o selecciona hasta 8) <span class="muted"
-                                    style="font-weight:400">mínimo 1, ideal 4</span></label>
-
-                            <div id="imageDropZone" class="image-dropzone" aria-label="Arrastra imágenes aquí">
+                        <div class="form-section gallery-section">
+                            <label>Galería de Imágenes <span class="muted">(Máx. 8)</span></label>
+                            <div id="imageDropZone" class="image-dropzone">
                                 <input id="imageFile" type="file" accept="image/*" multiple />
-                                <div class="dz-instructions">
-                                    Arrastra imágenes o haz click para seleccionar (máx. 8)
+                                <div class="dz-content">
+                                    <span class="dz-icon">📸</span>
+                                    <p>Suelte sus imágenes aquí o haga clic para explorar</p>
                                 </div>
                             </div>
 
-                            <!-- Slider thumbnails preview -->
-                            <div id="imagePreviewSlider" class="image-slider hidden" aria-hidden="true">
+                            <div id="imagePreviewSlider" class="image-slider hidden">
                                 <button type="button" id="prevSlide" class="slide-btn">‹</button>
                                 <div class="slide-track" id="slideTrack"></div>
                                 <button type="button" id="nextSlide" class="slide-btn">›</button>
                             </div>
                         </div>
 
-                        <!-- SKU (full width) -->
-                        <div class="form-row full-width">
-                            <label for="sku">SKU <small>(generado automáticamente según categoría)</small></label>
-                            <input id="sku" type="text" readonly placeholder="Se generará al seleccionar categoría" />
+                        <div class="form-section sku-footer">
+                            <div class="form-row full-width">
+                                <label for="sku">Código SKU</label>
+                                <input id="sku" type="text" readonly placeholder="Se generará automáticamente" />
+                            </div>
                         </div>
-
-                        <!-- keep form-actions out of body (moved to footer) -->
                     </form>
                 </div>
 
                 <footer class="modal-footer">
+                    <div class="footer-info">
+                        <span class="required-note">* Campos obligatorios</span>
+                    </div>
                     <div class="form-actions">
-                        <button type="submit" form="productForm" class="btn-primary admin-only">Guardar</button>
-                        <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
+                        <button type="button" id="cancelBtn" class="btn-secondary">Descartar</button>
+                        <button type="submit" form="productForm" class="btn-primary admin-only">Guardar
+                            Producto</button>
                     </div>
                 </footer>
             </div>
