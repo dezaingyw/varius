@@ -3,11 +3,11 @@
 // - Conexión a Firestore, escucha pedidos en tiempo real.
 // - Carga motorizados & productos disponibles.
 // - Edit: ver, editar items, asignar motorizado (con comentario obligatorio si cambia), suspender.
-// - Inline field errors y eliminación de producto de availableProducts al agregar.
 // - Chat removido por petición.
 // - Añadido: slider de imágenes dentro del modal "Ver detalle" (solo modal).
 // - Mejora: si el item no tiene imágenes intenta obtenerlas desde el documento `product/{productId}`.
 // - Nuevo: flujo para motorizado: "Mi ubicación" -> guardar ubicación del motorizado -> mostrar "Aceptar envío" -> marcar que el motorizado acepta la orden.
+// - Cambio: si el pedido está en estado "Suspendido", ocultar TODOS los botones (tabla + tarjetas).
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -416,6 +416,10 @@ function renderTable(list) {
 
         // If shippingStatus indicates delivered -> special
         const isDelivered = rawShipping && (String(rawShipping).toLowerCase() === 'entregado' || String(rawShipping).toLowerCase() === 'delivered');
+
+        // Determine suspended flag
+        const isSuspended = Boolean(displayStatus && String(displayStatus).toLowerCase() === 'suspendido');
+
         if (isDelivered) {
             statusTd.innerHTML = `<span class="badge paid">${escapeHtml('Pagado')}</span>`;
         } else {
@@ -426,6 +430,14 @@ function renderTable(list) {
 
         const actionsTd = document.createElement('td');
         const rowActions = document.createElement('div'); rowActions.className = 'row-actions';
+
+        // If suspended -> hide ALL buttons (leave actions empty)
+        if (isSuspended) {
+            actionsTd.appendChild(rowActions);
+            tr.appendChild(actionsTd);
+            tbody.appendChild(tr);
+            return;
+        }
 
         // determine roles/permissions
         const roleLc = String(currentUserRole || '').toLowerCase();
@@ -646,9 +658,15 @@ function renderCards(list) {
         const myLocBtnHtml = `<button class="order-card-btn" data-action="myloc" data-id="${o.id}" title="Mi ubicación">📍 <span style="margin-left:6px">Mi ubicación</span></button>`;
         const acceptBtnHtml = `<button class="order-card-btn" data-action="accept" data-id="${o.id}" title="Aceptar envío">✅ <span style="margin-left:6px">Aceptar envío</span></button>`;
 
+        // Determine suspended flag for card
+        const isSuspended = Boolean(displayStatus && String(displayStatus).toLowerCase() === 'suspendido');
+
         // Build actionsHtml depending on role
         let actionsHtml = '';
-        if (isDelivered) {
+        if (isSuspended) {
+            // leave actionsHtml empty -> no buttons
+            actionsHtml = '';
+        } else if (isDelivered) {
             if (isMotorizado) actionsHtml = `${viewBtnHtml}`;
             else actionsHtml = `${histBtnHtml}`;
         } else {
@@ -684,7 +702,7 @@ function renderCards(list) {
 
         card.innerHTML = `
       <div class="order-card-header">
-        <div class="order-card-avatar"><img src="assets/img/avatar-placeholder.png" alt=""></div>
+
         <div class="order-card-cust">
           <div class="order-card-cust-name">${escapeHtml(cname)}</div>
           <div class="order-card-cust-address">${escapeHtml(address)}</div>
@@ -1006,7 +1024,7 @@ async function openViewModal(order) {
 
     viewBody.innerHTML = `
     <div style="display:flex;gap:16px;align-items:flex-start;">
-      <div style="min-width:160px;"><div class="thumb" style="width:120px;height:120px;"></div></div>
+
       <div style="flex:1;">
         <h3 style="margin:0 0 6px 0">${escapeHtml(cname)} <small style="float:right">${money(o.total)}</small></h3>
         <div class="small-muted">${escapeHtml(address)}</div>
