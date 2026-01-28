@@ -518,20 +518,20 @@ function renderProducts(list) {
         const suspended = (st === 'suspendido' || st === 'suspended');
 
         // Suspended rows: gray and pinned visual attribute (take priority)
-        if (suspended) {
-            tr.style.backgroundColor = '#f3f4f6'; // light gray
+         if (suspended) {
+            tr.style.backgroundColor = '#f0f0f0'; // light gray
         
             tr.setAttribute('data-suspended', 'true');
             tr.setAttribute('aria-label', 'Producto suspendido');
         } else {
             // Visual cues for stock only when not suspended:
             if (Number.isFinite(stockNum) && stockNum === 0) {
-                tr.style.backgroundColor = '#fff5f5'; // light red
+                tr.style.backgroundColor = '#ffe7e7'; // light red
                 
                 tr.setAttribute('data-low-stock', 'true');
                 tr.setAttribute('aria-label', `Sin stock`);
             } else if (Number.isFinite(stockNum) && stockNum < 5) {
-                tr.style.backgroundColor = '#fff7ed'; // light orange
+                tr.style.backgroundColor = '#fff2e2'; // light orange
                 
                 tr.setAttribute('data-low-stock', 'true');
                 tr.setAttribute('aria-label', `Stock bajo: ${stockNum}`);
