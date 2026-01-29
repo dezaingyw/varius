@@ -1,12 +1,5 @@
-// cierre-caja.js — Archivo completo con todas las mejoras:
-// - Resumen fijo (hoy) y selección desde Calendario (día(s)/semana/mes)
-// - Calendario muestra: verde = cierre realizado, rojo = pendiente
-// - Selección multi-día y aplicar selección para mostrar en Resumen
-// - Toasts mejorados, banner de cierre en Resumen, ocultado de controles cuando aplica
-// - Guardado de conciliaciones y cierre (uno por cada fecha seleccionada)
-// - Conserva la lógica original de normalización y fetch Firestore (con fallbacks)
-//
-// NOTA: Este script depende de firebase-config.js ubicado en la misma carpeta (o ../ o ../../).
+// cierre-caja.js — Archivo completo con todas las mejoras (incluye cálculo de comisiones por fecha)
+// NOTA: este script depende de firebase-config.js ubicado en la misma carpeta (o ../ o ../../).
 // Incluye imports dinámicos a Firebase CDN (v12.x) y usa Firestore.
 
 const modBase = new URL('.', import.meta.url);
@@ -31,7 +24,9 @@ import {
     getDocs,
     Timestamp,
     addDoc,
-    serverTimestamp
+    serverTimestamp,
+    doc,
+    getDoc
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 
@@ -424,6 +419,52 @@ async function checkIfClosed(isoDate) {
     return null;
 }
 
+// Nuevo helper: obtener comisiones por fechas (devuelve Map fechaISO -> { sellerPercent, riderPercent })
+async function getCommissionsForDates(datesArray) {
+    const map = new Map();
+    if (!Array.isArray(datesArray) || datesArray.length === 0) return map;
+
+    for (const iso of datesArray) {
+        try {
+            // 1) Intento directo por ID (documento con ID = YYYY-MM-DD)
+            const dRef = doc(db, 'comisiones', iso);
+            const snap = await getDoc(dRef);
+            if (snap.exists()) {
+                const data = snap.data();
+                const sellerPercent = Number(data?.sellerPercent ?? data?.sellerpercent ?? data?.seller ?? 0);
+                const riderPercent = Number(data?.riderPercent ?? data?.riderpercent ?? data?.rider ?? 0);
+                map.set(iso, { sellerPercent: isNaN(sellerPercent) ? 0 : sellerPercent, riderPercent: isNaN(riderPercent) ? 0 : riderPercent });
+                continue;
+            }
+
+            // 2) Fallback: buscar documento cuyo campo `date` (o `dateISO`) coincida con iso
+            try {
+                const col = collection(db, 'comisiones');
+                const q = query(col, where('date', '==', iso));
+                const snaps = await getDocs(q);
+                if (snaps && !snaps.empty) {
+                    const d = snaps.docs[0].data();
+                    const sellerPercent = Number(d?.sellerPercent ?? d?.seller ?? 0);
+                    const riderPercent = Number(d?.riderPercent ?? d?.rider ?? 0);
+                    map.set(iso, { sellerPercent: isNaN(sellerPercent) ? 0 : sellerPercent, riderPercent: isNaN(riderPercent) ? 0 : riderPercent });
+                    continue;
+                }
+            } catch (qerr) {
+                console.warn('Fallback query por campo date en comisiones falló para', iso, qerr);
+            }
+
+            // 3) Si no hay doc, set 0
+            map.set(iso, { sellerPercent: 0, riderPercent: 0 });
+        } catch (err) {
+            console.warn('Error leyendo comisiones para', iso, err);
+            map.set(iso, { sellerPercent: 0, riderPercent: 0 });
+        }
+    }
+
+    console.debug('getCommissionsForDates -> commissionMap keys:', Array.from(map.entries()));
+    return map;
+}
+
 // ---------- Data aggregation & rendering ----------
 function buildCascadeData(orders) {
     const sellers = new Map();
@@ -452,7 +493,10 @@ function buildCascadeData(orders) {
         if (!sellers.has(sName)) sellers.set(sName, new Map());
         const sellerMap = sellers.get(sName);
         if (!sellerMap.has(rName)) sellerMap.set(rName, []);
-        sellerMap.get(rName).push({ id: order.id, order, payments, motorizado });
+        // guardamos también la fecha ISO usada para el pedido (útil para aplicar comisión por fecha)
+        const info = getOrderDateInfo(order);
+        const orderIso = info.date ? isoFromDate(info.date) : isoFromDate(new Date());
+        sellerMap.get(rName).push({ id: order.id, order, payments, motorizado, orderIso });
     }
 
     return { sellers, summary };
@@ -491,34 +535,141 @@ function renderSummaryCards(summary) {
     if (entries.length === 0) summaryCards.innerHTML = '<div class="muted">Sin desglose por método</div>';
 }
 
-function renderCascade(sellersMap) {
-    if (!cascadeContainer) return;
+function renderCascade(sellersMap, commissionMap = new Map()) {
+    // Asegura que existe el contenedor
+    if (typeof cascadeContainer === 'undefined' || !cascadeContainer) return;
     cascadeContainer.innerHTML = '';
+
     if (!sellersMap || sellersMap.size === 0) {
         cascadeContainer.innerHTML = '<div class="muted">No hay pedidos para la fecha seleccionada.</div>';
         return;
     }
-    for (const [sellerName, riderMap] of sellersMap.entries()) {
-        const sv = document.createElement('div'); sv.className = 'vendedor expanded';
-        const sellerTotal = Array.from(riderMap.values()).flat().reduce((acc, item) => {
-            return acc + (item.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (item.motorizado?.bs || 0);
-        }, 0);
 
-        const header = document.createElement('div'); header.className = 'vh clickable';
-        header.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span class="chev">▾</span><div><div class="v-title">👤 Vendedor: ${sellerName}</div><div class="muted">Comisiones / totales mostrados por pedido</div></div></div><div class="badge-total">${formatCurrencyBs(sellerTotal)}</div>`;
+    // Log del mapa de comisiones para depuración
+    try { console.debug('renderCascade -> commissionMap:', Array.from(commissionMap.entries())); } catch (e) { /* noop */ }
+
+    for (const [sellerName, riderMap] of sellersMap.entries()) {
+        const sv = document.createElement('div');
+        sv.className = 'vendedor expanded';
+
+        // Calcular totales y comisiones del vendedor (separado por moneda)
+        let sellerTotalBs = 0;
+        let sellerTotalUsd = 0;
+        let sellerCommissionBs = 0;
+        let sellerCommissionUsd = 0;
+
+        // Obtener lista plana de todos los items (pedidos) bajo este vendedor
+        const allItems = Array.from(riderMap.values()).flat();
+
+        for (const item of allItems) {
+            // Sumar pagos por moneda (asegurando Number)
+            const paymentsBs = (item.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? Number(p.bs || 0) : 0), 0);
+            const paymentsUsd = (item.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? Number(p.usd || 0) : 0), 0);
+            const motBs = Number(item.motorizado?.bs || 0);
+            const motUsd = Number(item.motorizado?.usd || 0);
+
+            const itemBs = paymentsBs + motBs;
+            const itemUsd = paymentsUsd + motUsd;
+
+            sellerTotalBs += itemBs;
+            sellerTotalUsd += itemUsd;
+
+            const iso = item.orderIso || isoFromDate(new Date());
+            const commissionForDate = commissionMap.get(iso) ?? { sellerPercent: 0, riderPercent: 0 };
+
+            const pctSeller = Number(commissionForDate.sellerPercent ?? 0);
+            const pctSellerNum = Number.isFinite(pctSeller) ? pctSeller : 0;
+
+            // Calculamos la comisión por moneda
+            sellerCommissionBs += itemBs * (pctSellerNum / 100);
+            sellerCommissionUsd += itemUsd * (pctSellerNum / 100);
+
+            console.debug(`seller calc: seller=${sellerName} iso=${iso} itemBs=${itemBs} itemUsd=${itemUsd} pct=${pctSellerNum} => addBs ${itemBs*(pctSellerNum/100)} addUsd ${itemUsd*(pctSellerNum/100)}`);
+        }
+
+        const sellerEffectivePctBs = sellerTotalBs ? (sellerCommissionBs / sellerTotalBs * 100) : 0;
+        const sellerEffectivePctUsd = sellerTotalUsd ? (sellerCommissionUsd / sellerTotalUsd * 100) : 0;
+
+        // Header del vendedor con totales y comisiones por moneda
+        const header = document.createElement('div');
+        header.className = 'vh clickable';
+        header.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px">
+                <span class="chev">▾</span>
+                <div>
+                    <div class="v-title">👤 Vendedor: ${sellerName}</div>
+                    <div class="muted">Comisiones / totales mostrados por pedido</div>
+                </div>
+            </div>
+            <div class="badge-total">
+                ${formatCurrencyBs(sellerTotalBs)} ${sellerTotalUsd ? ` / ${formatCurrencyUSD(sellerTotalUsd)}` : ''}
+                <div style="display:inline-block;margin-left:10px;font-size:12px;color:#6b7280">
+                    ${sellerTotalBs ? `Comisión BS ${formatNumberCustom(sellerEffectivePctBs,2)}% = ${formatCurrencyBs(Math.round(sellerCommissionBs * 100) / 100)}` : ''}
+                    ${sellerTotalUsd ? ` ${sellerTotalBs ? '•' : ''} Comisión USD ${formatNumberCustom(sellerEffectivePctUsd,2)}% = ${formatCurrencyUSD(Math.round(sellerCommissionUsd * 100) / 100)}` : ''}
+                </div>
+            </div>
+        `;
         sv.appendChild(header);
 
-        const content = document.createElement('div'); content.className = 'v-content';
-        for (const [riderName, orders] of riderMap.entries()) {
-            const mv = document.createElement('div'); mv.className = 'motorizado';
-            const riderTotal = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (it.motorizado?.bs || 0), 0);
-            mv.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div><div class="motorizado-badge">${formatCurrencyBs(riderTotal)}</div></div>`;
+        const content = document.createElement('div');
+        content.className = 'v-content';
 
+        // Render por motorizado / rider
+        for (const [riderName, orders] of riderMap.entries()) {
+            // Calcular total y comisión para este rider (separado por moneda)
+            const riderTotalBs = orders.reduce((acc, it) => {
+                const paymentsBs = (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? Number(p.bs || 0) : 0), 0);
+                return acc + paymentsBs + Number(it.motorizado?.bs || 0);
+            }, 0);
+            const riderTotalUsd = orders.reduce((acc, it) => {
+                const paymentsUsd = (it.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? Number(p.usd || 0) : 0), 0);
+                return acc + paymentsUsd + Number(it.motorizado?.usd || 0);
+            }, 0);
+
+            let riderCommissionBs = 0;
+            let riderCommissionUsd = 0;
+            for (const it of orders) {
+                const paymentsBs = (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? Number(p.bs || 0) : 0), 0);
+                const paymentsUsd = (it.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? Number(p.usd || 0) : 0), 0);
+                const itemBs = paymentsBs + Number(it.motorizado?.bs || 0);
+                const itemUsd = paymentsUsd + Number(it.motorizado?.usd || 0);
+
+                const iso = it.orderIso || isoFromDate(new Date());
+                const commissionForDate = commissionMap.get(iso) ?? { sellerPercent: 0, riderPercent: 0 };
+                const pctRider = Number(commissionForDate.riderPercent ?? 0);
+                const pctRiderNum = Number.isFinite(pctRider) ? pctRider : 0;
+
+                riderCommissionBs += itemBs * (pctRiderNum / 100);
+                riderCommissionUsd += itemUsd * (pctRiderNum / 100);
+
+                console.debug(`rider calc: rider=${riderName} iso=${iso} itemBs=${itemBs} itemUsd=${itemUsd} pct=${pctRiderNum} => addBs ${itemBs*(pctRiderNum/100)} addUsd ${itemUsd*(pctRiderNum/100)}`);
+            }
+
+            const riderEffectivePctBs = riderTotalBs ? (riderCommissionBs / riderTotalBs * 100) : 0;
+            const riderEffectivePctUsd = riderTotalUsd ? (riderCommissionUsd / riderTotalUsd * 100) : 0;
+
+            const mv = document.createElement('div');
+            mv.className = 'motorizado';
+            mv.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div>
+                    <div class="motorizado-badge">
+                        ${formatCurrencyBs(riderTotalBs)} ${riderTotalUsd ? ` / ${formatCurrencyUSD(riderTotalUsd)}` : ''}
+                        <div style="display:inline-block;margin-left:8px;font-size:12px;color:#6b7280">
+                            ${riderTotalBs ? `Comisión BS ${formatNumberCustom(riderEffectivePctBs,2)}% = ${formatCurrencyBs(Math.round(riderCommissionBs * 100) / 100)}` : ''}
+                            ${riderTotalUsd ? ` ${riderTotalBs ? '•' : ''} Comisión USD ${formatNumberCustom(riderEffectivePctUsd,2)}% = ${formatCurrencyUSD(Math.round(riderCommissionUsd * 100) / 100)}` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Render detalle de pedidos del rider
             for (const o of orders) {
-                const pd = document.createElement('div'); pd.className = 'pedido';
+                const pd = document.createElement('div');
+                pd.className = 'pedido';
                 const order = o.order;
 
-                // Usar getOrderDateInfo para obtener la fecha consistente
+                // Fecha usada para el pedido
                 const info = getOrderDateInfo(order);
                 const dateStr = info.date ? info.date.toLocaleDateString() : '—';
 
@@ -530,19 +681,26 @@ function renderCascade(sellersMap) {
                     const cls = p.cls || '';
                     let icon = '💰';
                     if (p.key === 'pago-movil') icon = '📱';
-                    if (p.key === 'paypal') icon = '💳';
-                    if (p.key === 'zelle') icon = '💳';
+                    if (p.key === 'paypal' || p.key === 'zelle') icon = '💳';
                     return `<div class="payment-row"><div class="payment-left"><span class="icon">${icon}</span><span class="payment-label ${cls}">${p.label}</span></div><div class="payment-amount ${cls}"><span class="main">${main}</span><span class="small">${alt.trim()}</span></div></div>`;
                 }).join('') : '<div class="muted">Sin detalles de pago</div>';
 
-                const subtotalBs = (o.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0);
-                const subtotalUsd = (o.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? (p.usd || 0) : 0), 0);
+                const subtotalBs = (o.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? Number(p.bs || 0) : 0), 0);
+                const subtotalUsd = (o.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? Number(p.usd || 0) : 0), 0);
+
                 const motHtml = (o.motorizado && ((o.motorizado.bs || 0) > 0 || (o.motorizado.usd || 0) > 0)) ? (() => {
                     if (o.motorizado.bs) return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyBs(o.motorizado.bs)}</div></div>`;
                     return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyUSD(o.motorizado.usd)}</div></div>`;
                 })() : `<div class="motorizado-fee"><div class="muted" style="font-size:13px"> </div></div>`;
 
-                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — ${cust} <span class="muted">• ${dateStr}</span></div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>`;
+                pd.innerHTML = `
+                    <div class="pedido-header">
+                        <div><strong>📄 ${o.id}</strong> — ${cust} <span class="muted">• ${dateStr}</span></div>
+                        ${motHtml}
+                    </div>
+                    <div class="payments">${paymentsHtml}</div>
+                    <div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>
+                `;
                 mv.appendChild(pd);
             }
 
@@ -552,6 +710,7 @@ function renderCascade(sellersMap) {
         sv.appendChild(content);
         cascadeContainer.appendChild(sv);
 
+        // Toggle expand/collapse
         header.addEventListener('click', () => {
             const isCollapsed = sv.classList.contains('collapsed');
             if (isCollapsed) {
@@ -612,7 +771,7 @@ function populateFilterOptions(orders) {
 }
 
 // ---------- Filters apply ----------
-function applyFiltersToLastFetched() {
+async function applyFiltersToLastFetched() {
     if (!lastFetchedOrders || !lastFetchedOrders.length) return;
     let filtered = lastFetchedOrders.slice();
     const selSeller = filterSeller?.value || 'all';
@@ -640,7 +799,17 @@ function applyFiltersToLastFetched() {
     });
 
     const { sellers, summary } = buildCascadeData(filtered);
-    renderKpis(summary); renderSummaryCards(summary); renderCascade(sellers);
+
+    // obtener fechas presentes en filtered para pedir comisiones
+    const orderDateSet = new Set();
+    for (const o of filtered) {
+        const info = getOrderDateInfo(o);
+        if (info.date) orderDateSet.add(isoFromDate(info.date));
+    }
+    const dates = Array.from(orderDateSet).sort();
+    const commissionMap = await getCommissionsForDates(dates.length ? dates : [isoFromDate(new Date())]);
+
+    renderKpis(summary); renderSummaryCards(summary); renderCascade(sellers, commissionMap);
     if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
     if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 }
@@ -871,7 +1040,6 @@ function renderClosureBanner(closuresForRange, datesArray) {
 }
 
 // ---------- main calculate function for selected dates (or today) ----------
-// Reemplaza la versión anterior de calculateAndRenderForSelected con esta
 async function calculateAndRenderForSelected(datesSet = null) {
     // Determina las fechas solicitadas (sorted)
     let datesArray;
@@ -903,9 +1071,14 @@ async function calculateAndRenderForSelected(datesSet = null) {
         lastFetchedOrders = keep.slice();
         populateFilterOptions(keep);
         const { sellers, summary } = buildCascadeData(keep);
+
+        // --- NUEVO: obtener comisiones para cada fecha seleccionada ---
+        const commissionMap = await getCommissionsForDates(datesArray);
+
         renderKpis(summary);
         renderSummaryCards(summary);
-        renderCascade(sellers);
+        renderCascade(sellers, commissionMap);
+
         if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
         if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 
