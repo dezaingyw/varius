@@ -6,6 +6,7 @@
 // - Guardado de conciliaciones y cierre (uno por cada fecha seleccionada)
 // - Cálculo y visualización de comisiones (percent / amount) para vendedores y motorizados
 // - Muestra montos fijos con decimales en headers y por pedido
+// - Muestra nombre del cliente junto a la fecha en cada pedido
 //
 // NOTA: Este script depende de firebase-config.js ubicado en la misma carpeta (o ../ o ../../).
 // Incluye imports dinámicos a Firebase CDN (v12.x) y usa Firestore.
@@ -148,6 +149,106 @@ function getOrderDateInfo(order) {
         if (dt) return { date: dt, field: c.field };
     }
     return { date: null, field: null };
+}
+
+// helper robusto: extrae nombre del cliente buscando keys case-insensitive y priorizando name sobre phone/email
+function getCustomerName(order) {
+    if (!order || typeof order !== 'object') return '';
+
+    // 1) Revisar claves directas en el objeto root (case-insensitive)
+    const rootCandidates = ['customername','customerName','clientName','buyer','recipientName','buyerName','name','customer'];
+    for (const k of Object.keys(order)) {
+        if (!order[k]) continue;
+        const lk = k.toLowerCase();
+        if (rootCandidates.includes(lk)) {
+            return String(order[k]);
+        }
+    }
+
+    // 2) Revisar objetos comunes que contienen info de cliente
+    const possibleContainers = [order.customerData, order.customer, order.customerInfo, order.client, order.clientData];
+    for (const cd of possibleContainers) {
+        if (!cd || typeof cd !== 'object') continue;
+
+        // map keys lowercased -> value
+        const lowerMap = {};
+        for (const key of Object.keys(cd)) {
+            try { lowerMap[key.toLowerCase()] = cd[key]; } catch (e) { /* ignore */ }
+        }
+
+        // prioridad: customername (tu caso), luego varias variantes
+        const priority = [
+            'customername',
+            'customer_name',
+            'customername', // duplicate to emphasize
+            'customername', // safe
+            'customername', // safe
+            'customername',
+            'customername',
+            'name',
+            'fullname',
+            'fullName'.toLowerCase(),
+            'displayname',
+            'readable_name',
+            'firstname',
+            'first_name'
+        ];
+
+        for (const p of priority) {
+            if (lowerMap[p]) {
+                // si es firstName/lastName necesitamos combinarlas
+                if (p === 'firstname' && (lowerMap['lastname'] || lowerMap['last_name'])) {
+                    return `${String(lowerMap[p])} ${String(lowerMap['lastname'] || lowerMap['last_name'])}`;
+                }
+                return String(lowerMap[p]);
+            }
+        }
+
+        // si no encontramos en priority, mirar si existen first+last en cualquiera de las keys
+        const first = lowerMap['firstName'.toLowerCase()] || lowerMap['first_name'] || lowerMap['firstname'];
+        const last = lowerMap['lastName'.toLowerCase()] || lowerMap['last_name'] || lowerMap['lastname'];
+        if (first && last) return `${String(first)} ${String(last)}`;
+
+        // check usual alternate keys
+        if (lowerMap['customer']) return String(lowerMap['customer']);
+        if (lowerMap['username']) return String(lowerMap['username']);
+    }
+
+    // 3) Otros campos comunes en root: intentar keys específicas (case-insensitive)
+    const fallbackRootNames = ['customername','customer','name','clientname','buyername'];
+    for (const k of Object.keys(order)) {
+        if (!order[k]) continue;
+        const lk = k.toLowerCase();
+        if (fallbackRootNames.includes(lk)) return String(order[k]);
+    }
+
+    // 4) Al final sólo como fallback mostrar phone o email (si realmente no hay nombre)
+    const phoneKeys = ['phone','clientphone','telefono','phoneNumber','phone_number'];
+    for (const k of Object.keys(order)) {
+        const lk = k.toLowerCase();
+        if (phoneKeys.includes(lk) && order[k]) return String(order[k]);
+    }
+    // dentro de customerData también
+    for (const cd of possibleContainers) {
+        if (!cd || typeof cd !== 'object') continue;
+        for (const pk of ['phone','telefono','phonenumber','phone_number']) {
+            if (cd[pk] && String(cd[pk]).trim()) return String(cd[pk]);
+        }
+    }
+
+    const emailKeys = ['email','clientemail','mail'];
+    for (const k of Object.keys(order)) {
+        const lk = k.toLowerCase();
+        if (emailKeys.includes(lk) && order[k]) return String(order[k]);
+    }
+    for (const cd of possibleContainers) {
+        if (!cd || typeof cd !== 'object') continue;
+        for (const pk of ['email','mail']) {
+            if (cd[pk] && String(cd[pk]).trim()) return String(cd[pk]);
+        }
+    }
+
+    return '';
 }
 
 function determinePrimaryCurrency(m) {
@@ -502,7 +603,7 @@ async function attachCommissionsToOrders(orders) {
             // ---- AMPLIADO: incluir más campos que puedan contener email/name/uid del motorizado ----
             const riderIdCandidates = [
                 order.assignedMotorizedId, order.assignedMotorizedUid, order.riderId, order.motorizadoId,
-                order.assignedMotorizedEmail, order.riderEmail, order.assignedMotorName, order.assignedMotorEmail, order.assignedMotorized // fallback
+                order.assignedMotorizedEmail, order.riderEmail, order.assignedMotorName, order.assignedMotorEmail, order.assignedMotorized
             ].filter(Boolean);
 
             const riderNameCandidates = [
@@ -539,7 +640,6 @@ async function attachCommissionsToOrders(orders) {
             order._riderCommissionValue = riderComm.value ?? riderConfig.commissionValue ?? 0;
             order._riderCommissionLabel = riderComm.label ?? (order._riderCommissionType === 'percent' ? `${order._riderCommissionValue}%` : `Bs ${formatNumberCustom(order._riderCommissionValue, 2)}`);
 
-            // DEBUG: si quieres ver por consola (descomenta)
             // console.debug('attachCommissionsToOrders', order.id, { sellerConfig, riderConfig, sellerComm, riderComm });
         } catch (err) {
             console.warn('attachCommissionsToOrders error para order', order?.id, err);
@@ -801,7 +901,9 @@ function renderCascade(sellersMap) {
                 const info = getOrderDateInfo(order);
                 const dateStr = info.date ? info.date.toLocaleDateString() : '—';
 
-                const cust = order.customerName || order.clientName || order.buyer || order.recipientName || '';
+                // Obtener nombre cliente usando helper robusto
+                const cust = getCustomerName(order);
+                const custHtml = cust ? `<span class="cust-name" style="font-weight:600;margin-left:8px">${cust}</span>` : '';
 
                 const paymentsHtml = (o.payments && o.payments.length) ? o.payments.map(p => {
                     const main = p.primary === 'bs' ? formatCurrencyBs(p.bs) : formatCurrencyUSD(p.usd);
@@ -831,8 +933,7 @@ function renderCascade(sellersMap) {
                 const riderCommPerOrderDisplay = riderCommPerOrderBs || riderCommPerOrderUsd ? `${formatCurrencyBs(riderCommPerOrderBs)}${riderCommPerOrderUsd ? ` / ${formatCurrencyUSD(riderCommPerOrderUsd)}` : ''}` : '';
 
                 let commissionHtml = '';
-
-                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — ${cust} <span class="muted">• ${dateStr}</span></div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>${commissionHtml}
+                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — <span class="muted">${dateStr}</span>${custHtml}</div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>${commissionHtml}
                 `;
                 mv.appendChild(pd);
             }
@@ -1162,7 +1263,9 @@ function renderClosureBanner(closuresForRange, datesArray) {
 }
 
 // ---------- main calculate function for selected dates (or today) ----------
+// Reemplaza la versión anterior de calculateAndRenderForSelected con esta
 async function calculateAndRenderForSelected(datesSet = null) {
+    // Determina las fechas solicitadas (sorted)
     let datesArray;
     if (!datesSet || datesSet.size === 0) {
         const todayISO = isoFromDate(new Date());
@@ -1171,13 +1274,17 @@ async function calculateAndRenderForSelected(datesSet = null) {
         datesArray = Array.from(datesSet).sort();
     }
 
+    // fetch closures y orders para el rango (start..end)
     const start = datesArray[0], end = datesArray[datesArray.length - 1];
     if (!start || !end) return;
 
     try {
+        // obtener cierres del rango (para banner)
         const closures = await fetchClosuresInRange(start, end);
+        // obtener pedidos en el rango
         const orders = await fetchOrdersForRange(start, end);
 
+        // Filtrar pedidos que caen exactamente en las fechas seleccionadas
         const keep = orders.filter(order => {
             const info = getOrderDateInfo(order);
             if (!info.date) return false;
@@ -1185,6 +1292,7 @@ async function calculateAndRenderForSelected(datesSet = null) {
             return datesArray.includes(iso);
         });
 
+        // --- Attach commissions to orders (async) antes de renderizar ---
         lastFetchedOrders = keep.slice();
         await attachCommissionsToOrders(lastFetchedOrders);
 
@@ -1196,6 +1304,7 @@ async function calculateAndRenderForSelected(datesSet = null) {
         if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
         if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 
+        // --- Nuevo: usar las fechas reales de los pedidos para el encabezado ---
         const orderDateSet = new Set();
         for (const o of keep) {
             const info = getOrderDateInfo(o);
@@ -1204,13 +1313,16 @@ async function calculateAndRenderForSelected(datesSet = null) {
         const orderDates = Array.from(orderDateSet).sort();
 
         if (orderDates.length === 1) {
+            // si hay un único día real entre los pedidos
             if (displayDate) displayDate.textContent = formatDateDisplay(new Date(orderDates[0] + 'T00:00:00'));
             if (displayDatePill) displayDatePill.textContent = orderDates[0].split('-').reverse().join('/');
         } else if (orderDates.length > 1) {
+            // varios días: mostrar rango según pedidos reales (primero..último)
             const first = new Date(orderDates[0] + 'T00:00:00'), last = new Date(orderDates[orderDates.length - 1] + 'T00:00:00');
             if (displayDate) displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${orderDates.length} días)`;
             if (displayDatePill) displayDatePill.textContent = `${orderDates[0].split('-').reverse().join('/')} — ${orderDates[orderDates.length - 1].split('-').reverse().join('/')}`;
         } else {
+            // no hay pedidos; fallback a la selección (o a hoy)
             if (datesArray.length === 1) {
                 if (displayDate) displayDate.textContent = formatDateDisplay(new Date(datesArray[0] + 'T00:00:00'));
                 if (displayDatePill) displayDatePill.textContent = datesArray[0].split('-').reverse().join('/');
@@ -1221,8 +1333,10 @@ async function calculateAndRenderForSelected(datesSet = null) {
             }
         }
 
+        // Renderiza banner de cierres (usa closures ya obtenidos)
         renderClosureBanner(closures, datesArray);
 
+        // DEBUG: lista de pedidos retenidos y la fecha elegida por cada uno
         try {
             console.log('Pedidos retenidos y fecha usada por cada uno:', keep.map(o => {
                 const info = getOrderDateInfo(o);
