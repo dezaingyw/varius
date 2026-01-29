@@ -657,6 +657,119 @@ async function attachCommissionsToOrders(orders) {
     }
 }
 
+// --- Nuevos helpers para mostrar nombre (sin phone) y productos ---
+/**
+ * escape sencillo para contenido HTML
+ */
+function escapeHtml(str) {
+  if (!str && str !== 0) return '';
+  return String(str).replace(/[&<>"'`]/g, (s) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;'
+  }[s]));
+}
+
+/**
+ * Detecta si un string es muy probablemente un teléfono (muchos dígitos)
+ */
+function looksLikePhone(s) {
+  if (!s) return false;
+  const cleaned = String(s).replace(/[^\d]/g, '');
+  return cleaned.length >= 6; // ajustar si necesitas otro umbral
+}
+
+/**
+ * Intenta obtener el nombre del cliente preferentemente (NO devolver phone como fallback).
+ */
+function getCustomerNamePreferName(order) {
+  // 1) revisar campos claros que suelen contener nombre
+  const tryFields = [
+    'customerName', 'customer_name', 'clientName', 'client_name', 'buyerName', 'buyer',
+    'recipientName', 'name', 'fullname', 'fullName', 'displayName', 'customer'
+  ];
+
+  // normalizar keys del root
+  for (const k of Object.keys(order || {})) {
+    const lk = k.toLowerCase();
+    if (tryFields.map(f => f.toLowerCase()).includes(lk) && order[k]) {
+      const val = String(order[k]).trim();
+      if (!looksLikePhone(val)) return val;
+    }
+  }
+
+  // revisar containers comunes
+  const containers = [order.customerData, order.customer, order.customerInfo, order.client, order.clientData, order.billing, order.shipping];
+  for (const cd of containers) {
+    if (!cd || typeof cd !== 'object') continue;
+    // keys lowercased
+    const map = {};
+    for (const key of Object.keys(cd)) map[key.toLowerCase()] = cd[key];
+    const priority = ['name','fullname','full_name','displayname','first_name','firstname','last_name','lastname'];
+    for (const p of priority) {
+      if (map[p] && String(map[p]).trim()) {
+        const val = String(map[p]).trim();
+        if (!looksLikePhone(val)) {
+          // si sólo tenemos first_name y existe last_name los combinamos
+          if (p === 'first_name' || p === 'firstname') {
+            const last = map['last_name'] || map['lastname'];
+            if (last) return `${val} ${String(last).trim()}`;
+          }
+          return val;
+        }
+      }
+    }
+  }
+
+  // si no hay nombre válido, NO devolvemos phone: retornamos cadena vacía
+  return '';
+}
+
+/**
+ * Extrae productos de la orden (intenta varios nombres de campos comunes).
+ * Devuelve array [{ name, quantity, price, priceCurrency, priceLabel }]
+ */
+function getOrderProducts(order) {
+  if (!order || typeof order !== 'object') return [];
+
+  const possibleArrays = [
+    order.items, order.line_items, order.products, order.orderItems, order.cart, order.itemsOrdered, order.order_lines
+  ];
+
+  let arr = null;
+  for (const a of possibleArrays) {
+    if (Array.isArray(a) && a.length) { arr = a; break; }
+  }
+
+  if (!arr) {
+    // a veces viene como objeto con claves
+    for (const k of Object.keys(order)) {
+      const val = order[k];
+      if (Array.isArray(val) && val.length && (k.toLowerCase().includes('item') || k.toLowerCase().includes('product') || k.toLowerCase().includes('line'))) {
+        arr = val; break;
+      }
+    }
+  }
+
+  if (!arr) return [];
+
+  const out = arr.map(it => {
+    if (!it) return null;
+    // posibles campos
+    const name = it.name || it.title || it.productName || it.product || it.label || it.description || it.descriptionText || it.itemName || it.sku || '';
+    const qty = Number(it.quantity ?? it.qty ?? it.count ?? it.amount ?? 1) || 1;
+    // precio unitario o total
+    const price = Number(it.price ?? it.unitPrice ?? it.unit_price ?? it.total ?? it.totalPrice ?? it.lineTotal ?? 0) || 0;
+    let priceCurrency = 'bs';
+    if (it.currency) {
+      const c = String(it.currency).toLowerCase();
+      if (c.includes('usd') || c.includes('$')) priceCurrency = 'usd';
+    } else if (String(name).includes('$')) priceCurrency = 'usd';
+    const priceLabel = price ? (priceCurrency === 'usd' ? formatCurrencyUSD(price) : formatCurrencyBs(price)) : '';
+    return { name: String(name || '').trim(), quantity: qty, price, priceCurrency, priceLabel };
+  }).filter(Boolean);
+
+  return out;
+}
+
 // ---------- Firestore helpers ----------
 function dayRangeFromISO(isoDate) {
     const start = new Date(isoDate + 'T00:00:00');
@@ -901,9 +1014,9 @@ function renderCascade(sellersMap) {
                 const info = getOrderDateInfo(order);
                 const dateStr = info.date ? info.date.toLocaleDateString() : '—';
 
-                // Obtener nombre cliente usando helper robusto
-                const cust = getCustomerName(order);
-                const custHtml = cust ? `<span class="cust-name" style="font-weight:600;margin-left:8px">${cust}</span>` : '';
+                // Obtener nombre cliente usando helper robusto preferente (NO mostrar teléfono)
+                const custName = getCustomerNamePreferName(order);
+                const custHtml = custName ? `<span class="cust-name" style="font-weight:600;margin-left:8px">${escapeHtml(custName)}</span>` : '';
 
                 const paymentsHtml = (o.payments && o.payments.length) ? o.payments.map(p => {
                     const main = p.primary === 'bs' ? formatCurrencyBs(p.bs) : formatCurrencyUSD(p.usd);
@@ -933,7 +1046,16 @@ function renderCascade(sellersMap) {
                 const riderCommPerOrderDisplay = riderCommPerOrderBs || riderCommPerOrderUsd ? `${formatCurrencyBs(riderCommPerOrderBs)}${riderCommPerOrderUsd ? ` / ${formatCurrencyUSD(riderCommPerOrderUsd)}` : ''}` : '';
 
                 let commissionHtml = '';
-                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — <span class="muted">${dateStr}</span>${custHtml}</div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>${commissionHtml}
+                // Productos de la orden (lista)
+                const productList = getOrderProducts(order);
+                let productsHtml = '';
+                if (productList && productList.length) {
+                    productsHtml = `<div class="order-products" style="margin-top:8px"><div style="font-weight:700;margin-bottom:6px">Productos:</div><ul style="margin:0;padding-left:18px">` +
+                        productList.map(p => `<li style="margin-bottom:4px"><strong>${p.quantity && p.quantity > 1 ? escapeHtml(String(p.quantity)) + '× ' : ''}</strong>${escapeHtml(p.name || '—')}${p.priceLabel ? ` <span class="muted" style="margin-left:8px">${escapeHtml(p.priceLabel)}</span>` : ''}</li>`).join('') +
+                        `</ul></div>`;
+                }
+
+                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — <span class="muted">${dateStr}</span>${custHtml}</div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>${productsHtml}${commissionHtml}
                 `;
                 mv.appendChild(pd);
             }
