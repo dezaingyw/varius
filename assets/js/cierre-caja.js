@@ -1,13 +1,5 @@
-// cierre-caja.js — Archivo completo con todas las mejoras:
-// - Resumen fijo (hoy) y selección desde Calendario (día(s)/semana/mes)
-// - Calendario muestra: verde = cierre realizado, rojo = pendiente
-// - Selección multi-día y aplicar selección para mostrar en Resumen
-// - Toasts mejorados, banner de cierre en Resumen, ocultado de controles cuando aplica
-// - Guardado de conciliaciones y cierre (uno por cada fecha seleccionada)
-// - Cálculo y visualización de comisiones (percent / amount) para vendedores y motorizados
-// - Muestra montos fijos con decimales en headers y por pedido
-// - Muestra nombre del cliente junto a la fecha en cada pedido
-//
+// cierre-caja.js — Archivo completo con todas las mejoras y badges en subtotales/totales
+// Añadido: dentro del cuadro "Productos" también mostramos datos del cliente: nombre, ubicación y contactos.
 // NOTA: Este script depende de firebase-config.js ubicado en la misma carpeta (o ../ o ../../).
 // Incluye imports dinámicos a Firebase CDN (v12.x) y usa Firestore.
 
@@ -44,6 +36,40 @@ const auth = getAuth(app);
 // ---------- DOM helpers ----------
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+// ---------- Inject badge styles ----------
+let _badgeStylesInjected = false;
+function injectBadgeStyles() {
+    if (_badgeStylesInjected) return;
+    _badgeStylesInjected = true;
+    const css = `
+    .badge-amount {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #0f172a;
+      font-weight: 700;
+      border: 1px solid #c7d2fe;
+      font-size: 0.95em;
+      line-height: 1;
+    }
+    .badge-amount.small { padding: 2px 8px; font-size:0.85em; }
+    .main-badge { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
+    .subtotal-row { display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px dashed #e6eef8; margin-top:8px; }
+    .pedido { padding:10px 0; border-bottom:1px solid #f1f5f9; }
+    .pedido-header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .order-products ul { margin:0; padding-left:18px; }
+    .client-info { margin-top:8px; background: #f8fafc; padding:8px; border-radius:8px; border:1px solid #eef2ff; }
+    .client-info .ci-row { margin-bottom:6px; font-size:0.95em; }
+    .client-info .ci-label { color:#374151; font-weight:700; margin-right:6px; }
+    .muted { color:#6b7280; }
+    `;
+    const st = document.createElement('style');
+    st.type = 'text/css';
+    st.appendChild(document.createTextNode(css));
+    document.head.appendChild(st);
+}
 
 // ---------- Enhanced Toasts ----------
 function showToast(message, opts = {}) {
@@ -87,7 +113,6 @@ function formatDateDisplay(d) {
         return String(d);
     }
 }
-// Reemplaza isoFromDate con esta versión que devuelve la fecha en zona local (YYYY-MM-DD)
 function isoFromDate(d) {
     if (!(d instanceof Date)) d = new Date(d);
     const y = d.getFullYear();
@@ -134,7 +159,6 @@ function toDateFromPossible(value) {
 
 // Nuevo helper: obtener la fecha "oficial" del pedido y campo usado
 function getOrderDateInfo(order) {
-    // Orden de prioridad: preferimos payment.paidAt, paidAt, payment.createdAt, createdAt, paymentUpdatedAt, updatedAt, payment.conversionRateDate
     const candidates = [
         { field: 'payment.paidAt', value: order?.payment?.paidAt },
         { field: 'paidAt', value: order?.paidAt },
@@ -155,7 +179,6 @@ function getOrderDateInfo(order) {
 function getCustomerName(order) {
     if (!order || typeof order !== 'object') return '';
 
-    // 1) Revisar claves directas en el objeto root (case-insensitive)
     const rootCandidates = ['customername','customerName','clientName','buyer','recipientName','buyerName','name','customer'];
     for (const k of Object.keys(order)) {
         if (!order[k]) continue;
@@ -165,29 +188,20 @@ function getCustomerName(order) {
         }
     }
 
-    // 2) Revisar objetos comunes que contienen info de cliente
     const possibleContainers = [order.customerData, order.customer, order.customerInfo, order.client, order.clientData];
     for (const cd of possibleContainers) {
         if (!cd || typeof cd !== 'object') continue;
 
-        // map keys lowercased -> value
         const lowerMap = {};
         for (const key of Object.keys(cd)) {
             try { lowerMap[key.toLowerCase()] = cd[key]; } catch (e) { /* ignore */ }
         }
 
-        // prioridad: customername (tu caso), luego varias variantes
         const priority = [
             'customername',
             'customer_name',
-            'customername', // duplicate to emphasize
-            'customername', // safe
-            'customername', // safe
-            'customername',
-            'customername',
             'name',
             'fullname',
-            'fullName'.toLowerCase(),
             'displayname',
             'readable_name',
             'firstname',
@@ -196,7 +210,6 @@ function getCustomerName(order) {
 
         for (const p of priority) {
             if (lowerMap[p]) {
-                // si es firstName/lastName necesitamos combinarlas
                 if (p === 'firstname' && (lowerMap['lastname'] || lowerMap['last_name'])) {
                     return `${String(lowerMap[p])} ${String(lowerMap['lastname'] || lowerMap['last_name'])}`;
                 }
@@ -204,17 +217,14 @@ function getCustomerName(order) {
             }
         }
 
-        // si no encontramos en priority, mirar si existen first+last en cualquiera de las keys
-        const first = lowerMap['firstName'.toLowerCase()] || lowerMap['first_name'] || lowerMap['firstname'];
-        const last = lowerMap['lastName'.toLowerCase()] || lowerMap['last_name'] || lowerMap['lastname'];
+        const first = lowerMap['firstname'] || lowerMap['first_name'];
+        const last = lowerMap['lastname'] || lowerMap['last_name'];
         if (first && last) return `${String(first)} ${String(last)}`;
 
-        // check usual alternate keys
         if (lowerMap['customer']) return String(lowerMap['customer']);
         if (lowerMap['username']) return String(lowerMap['username']);
     }
 
-    // 3) Otros campos comunes en root: intentar keys específicas (case-insensitive)
     const fallbackRootNames = ['customername','customer','name','clientname','buyername'];
     for (const k of Object.keys(order)) {
         if (!order[k]) continue;
@@ -222,13 +232,11 @@ function getCustomerName(order) {
         if (fallbackRootNames.includes(lk)) return String(order[k]);
     }
 
-    // 4) Al final sólo como fallback mostrar phone o email (si realmente no hay nombre)
     const phoneKeys = ['phone','clientphone','telefono','phoneNumber','phone_number'];
     for (const k of Object.keys(order)) {
         const lk = k.toLowerCase();
         if (phoneKeys.includes(lk) && order[k]) return String(order[k]);
     }
-    // dentro de customerData también
     for (const cd of possibleContainers) {
         if (!cd || typeof cd !== 'object') continue;
         for (const pk of ['phone','telefono','phonenumber','phone_number']) {
@@ -428,13 +436,8 @@ const calState = { currentCalendarMonth: new Date() };
 // ---------- Commission helpers (improved) ----------
 const userCommissionCache = new Map();
 
-/**
- * Busca la configuración de comisión por uid/email/nameLower.
- * Devuelve { commissionType, commissionValue, commissionCurrency?, rawUserDoc? }
- */
 async function getUserCommissionByAny(candidate) {
     if (!candidate) return { commissionType: 'percent', commissionValue: 0 };
-    // normalize input
     let uid = null, email = null, name = null;
     if (typeof candidate === 'string') {
         if (candidate.includes('@')) email = candidate.toLowerCase();
@@ -455,7 +458,6 @@ async function getUserCommissionByAny(candidate) {
         const usersCol = collection(db, 'users');
         let snap = null;
 
-        // Try several queries to increase chances (emailLower, email, uid, nameLower, name)
         if (emailLower) {
             try {
                 let q = query(usersCol, where('emailLower', '==', emailLower));
@@ -498,7 +500,6 @@ async function getUserCommissionByAny(candidate) {
         if (snap && !snap.empty) {
             const data = snap.docs[0].data();
 
-            // --- Mejor detección de tipo/valor de comisión (cubriendo variantes comunes de nombres) ---
             let commissionType = data?.commissionType ?? data?.commission?.type ?? null;
             if (!commissionType) {
                 if (data?.commissionPercent || data?.commission_percent || data?.commissionRate || data?.commission_rate || data?.commissionPercentValue) commissionType = 'percent';
@@ -521,7 +522,7 @@ async function getUserCommissionByAny(candidate) {
                 0
             ) || 0;
 
-            const commissionCurrency = data?.commissionCurrency ?? data?.commission?.currency ?? data?.commission_currency ?? null; // opcional
+            const commissionCurrency = data?.commissionCurrency ?? data?.commission?.currency ?? data?.commission_currency ?? null;
             const res = { commissionType, commissionValue, commissionCurrency, rawUserDoc: data };
             if (cacheKey) userCommissionCache.set(cacheKey, res);
             return res;
@@ -535,13 +536,6 @@ async function getUserCommissionByAny(candidate) {
     return fallback;
 }
 
-/**
- * Calcula la comisión (BS/USD) para un pedido según la configuración provista.
- * role: 'seller' | 'rider'
- * - seller: base = total pedido (pagos BS / USD + motorizado BS/USD)
- * - rider: base = únicamente la parte motorizado (si hay); si no hay monto de motorizado, fallback al total
- * Devuelve { bs, usd, label, type, value, currency }
- */
 function computeCommissionAmounts(order, commissionConfig = {}, role = 'seller') {
     const { payments, motorizado } = extractPaymentsFromOrder(order);
 
@@ -570,7 +564,6 @@ function computeCommissionAmounts(order, commissionConfig = {}, role = 'seller')
         const label = `${value}%`;
         return { bs, usd, label, type, value, currency: currency || 'bs' };
     } else if (type === 'amount') {
-        // si la amount tiene currency especificada la respetamos, sino asumimos Bs
         const bs = (currency && String(currency).toLowerCase().includes('usd')) ? 0 : Number(value);
         const usd = (currency && String(currency).toLowerCase().includes('usd')) ? Number(value) : 0;
         const label = (currency && String(currency).toLowerCase().includes('usd')) ? `USD ${formatNumberCustom(value, 2)}` : `Bs ${formatNumberCustom(value, 2)}`;
@@ -579,18 +572,10 @@ function computeCommissionAmounts(order, commissionConfig = {}, role = 'seller')
     return { bs: 0, usd: 0, label: '0', type: 'percent', value: 0, currency: null };
 }
 
-/**
- * Recorre un array de pedidos (los objetos order) y les agrega:
- *  - _sellerCommissionBs, _sellerCommissionUsd, _sellerCommissionType, _sellerCommissionValue, _sellerCommissionLabel
- *  - _riderCommissionBs, _riderCommissionUsd, _riderCommissionType, _riderCommissionValue, _riderCommissionLabel
- *
- * El identificador del vendedor/motorizado se busca en propiedades comunes del pedido
- */
 async function attachCommissionsToOrders(orders) {
     if (!Array.isArray(orders)) return;
     for (const order of orders) {
         try {
-            // Determinar identificadores probables del vendedor/motorizado (uid/email/name)
             const sellerIdCandidates = [
                 order.assignedSellerId, order.assignedSellerUid, order.sellerId, order.sellerUid,
                 order.assignedSellerEmail, order.sellerEmail, order.createdBy?.uid, order.createdBy?.email
@@ -600,7 +585,6 @@ async function attachCommissionsToOrders(orders) {
                 order.assignedSellerName, order.assignedSeller, order.sellerName, order.vendedor, order.createdBy?.name
             ].filter(Boolean);
 
-            // ---- AMPLIADO: incluir más campos que puedan contener email/name/uid del motorizado ----
             const riderIdCandidates = [
                 order.assignedMotorizedId, order.assignedMotorizedUid, order.riderId, order.motorizadoId,
                 order.assignedMotorizedEmail, order.riderEmail, order.assignedMotorName, order.assignedMotorEmail, order.assignedMotorized
@@ -627,7 +611,6 @@ async function attachCommissionsToOrders(orders) {
             const sellerComm = computeCommissionAmounts(order, sellerConfig, 'seller');
             const riderComm = computeCommissionAmounts(order, riderConfig, 'rider');
 
-            // Añadir campos al propio objeto order (renderCascade / buildCascadeData usan este objeto)
             order._sellerCommissionBs = sellerComm.bs ?? 0;
             order._sellerCommissionUsd = sellerComm.usd ?? 0;
             order._sellerCommissionType = sellerComm.type ?? sellerConfig.commissionType ?? 'percent';
@@ -639,8 +622,6 @@ async function attachCommissionsToOrders(orders) {
             order._riderCommissionType = riderComm.type ?? riderConfig.commissionType ?? 'percent';
             order._riderCommissionValue = riderComm.value ?? riderConfig.commissionValue ?? 0;
             order._riderCommissionLabel = riderComm.label ?? (order._riderCommissionType === 'percent' ? `${order._riderCommissionValue}%` : `Bs ${formatNumberCustom(order._riderCommissionValue, 2)}`);
-
-            // console.debug('attachCommissionsToOrders', order.id, { sellerConfig, riderConfig, sellerComm, riderComm });
         } catch (err) {
             console.warn('attachCommissionsToOrders error para order', order?.id, err);
             order._sellerCommissionBs = 0;
@@ -657,37 +638,23 @@ async function attachCommissionsToOrders(orders) {
     }
 }
 
-// --- Nuevos helpers para mostrar nombre (sin phone) y productos ---
-/**
- * escape sencillo para contenido HTML
- */
+// --- Helpers para nombre, productos y cliente (ubicación y contactos) ---
 function escapeHtml(str) {
   if (!str && str !== 0) return '';
   return String(str).replace(/[&<>"'`]/g, (s) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;'
   }[s]));
 }
-
-/**
- * Detecta si un string es muy probablemente un teléfono (muchos dígitos)
- */
 function looksLikePhone(s) {
   if (!s) return false;
   const cleaned = String(s).replace(/[^\d]/g, '');
-  return cleaned.length >= 6; // ajustar si necesitas otro umbral
+  return cleaned.length >= 6;
 }
-
-/**
- * Intenta obtener el nombre del cliente preferentemente (NO devolver phone como fallback).
- */
 function getCustomerNamePreferName(order) {
-  // 1) revisar campos claros que suelen contener nombre
   const tryFields = [
     'customerName', 'customer_name', 'clientName', 'client_name', 'buyerName', 'buyer',
     'recipientName', 'name', 'fullname', 'fullName', 'displayName', 'customer'
   ];
-
-  // normalizar keys del root
   for (const k of Object.keys(order || {})) {
     const lk = k.toLowerCase();
     if (tryFields.map(f => f.toLowerCase()).includes(lk) && order[k]) {
@@ -695,12 +662,9 @@ function getCustomerNamePreferName(order) {
       if (!looksLikePhone(val)) return val;
     }
   }
-
-  // revisar containers comunes
   const containers = [order.customerData, order.customer, order.customerInfo, order.client, order.clientData, order.billing, order.shipping];
   for (const cd of containers) {
     if (!cd || typeof cd !== 'object') continue;
-    // keys lowercased
     const map = {};
     for (const key of Object.keys(cd)) map[key.toLowerCase()] = cd[key];
     const priority = ['name','fullname','full_name','displayname','first_name','firstname','last_name','lastname'];
@@ -708,7 +672,6 @@ function getCustomerNamePreferName(order) {
       if (map[p] && String(map[p]).trim()) {
         const val = String(map[p]).trim();
         if (!looksLikePhone(val)) {
-          // si sólo tenemos first_name y existe last_name los combinamos
           if (p === 'first_name' || p === 'firstname') {
             const last = map['last_name'] || map['lastname'];
             if (last) return `${val} ${String(last).trim()}`;
@@ -718,8 +681,6 @@ function getCustomerNamePreferName(order) {
       }
     }
   }
-
-  // si no hay nombre válido, NO devolvemos phone: retornamos cadena vacía
   return '';
 }
 
@@ -740,7 +701,6 @@ function getOrderProducts(order) {
   }
 
   if (!arr) {
-    // a veces viene como objeto con claves
     for (const k of Object.keys(order)) {
       const val = order[k];
       if (Array.isArray(val) && val.length && (k.toLowerCase().includes('item') || k.toLowerCase().includes('product') || k.toLowerCase().includes('line'))) {
@@ -753,10 +713,8 @@ function getOrderProducts(order) {
 
   const out = arr.map(it => {
     if (!it) return null;
-    // posibles campos
     const name = it.name || it.title || it.productName || it.product || it.label || it.description || it.descriptionText || it.itemName || it.sku || '';
     const qty = Number(it.quantity ?? it.qty ?? it.count ?? it.amount ?? 1) || 1;
-    // precio unitario o total
     const price = Number(it.price ?? it.unitPrice ?? it.unit_price ?? it.total ?? it.totalPrice ?? it.lineTotal ?? 0) || 0;
     let priceCurrency = 'bs';
     if (it.currency) {
@@ -768,6 +726,90 @@ function getOrderProducts(order) {
   }).filter(Boolean);
 
   return out;
+}
+
+/**
+ * Extrae información relevante del cliente: nombre (si está), ubicación (address) y contactos (phones, emails).
+ * Devuelve { name, address, phones: [], emails: [] }
+ */
+function getCustomerInfo(order) {
+  const info = { name: '', address: '', phones: [], emails: [] };
+
+  if (!order || typeof order !== 'object') return info;
+
+  // Name (preferente, sin phone)
+  info.name = getCustomerNamePreferName(order) || getCustomerName(order) || '';
+
+  // Possible containers where location/contact are commonly stored
+  const containers = [order.customerData, order.customer, order.customerInfo, order.client, order.clientData, order.billing, order.shipping];
+
+  // 1) Address: look for common fields
+  const addrFields = ['address', 'addressLine1', 'address1', 'direccion', 'street', 'streetAddress', 'address_line1', 'address_1'];
+  for (const c of [order, ...containers]) {
+    if (!c || typeof c !== 'object') continue;
+    for (const k of Object.keys(c)) {
+      const lk = k.toLowerCase();
+      if (addrFields.some(a => lk.includes(a)) && c[k]) {
+        // build a compact address string
+        const raw = c[k];
+        if (typeof raw === 'object') {
+          const parts = [];
+          if (raw.street) parts.push(raw.street);
+          if (raw.number) parts.push(raw.number);
+          if (raw.city) parts.push(raw.city);
+          if (raw.state) parts.push(raw.state);
+          if (raw.postalCode || raw.postal_code) parts.push(raw.postalCode || raw.postal_code);
+          if (parts.length) { info.address = parts.join(', '); break; }
+        } else {
+          info.address = String(raw);
+          break;
+        }
+      }
+    }
+    if (info.address) break;
+  }
+
+  // 2) Phones and emails
+  const phoneKeys = ['phone','phoneNumber','phonenumber','telefono','mobile','mobilePhone','cell','cellphone','clientphone','phone_number'];
+  const emailKeys = ['email','clientemail','mail','emailAddress','email_address'];
+  function collectFrom(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    for (const k of Object.keys(obj)) {
+      const lk = k.toLowerCase();
+      try {
+        const v = obj[k];
+        if (!v) continue;
+        if (phoneKeys.some(pk => lk.includes(pk))) {
+          const val = String(v).trim();
+          if (val && !info.phones.includes(val)) info.phones.push(val);
+        }
+        if (emailKeys.some(ek => lk.includes(ek))) {
+          const val = String(v).trim();
+          if (val && !info.emails.includes(val)) info.emails.push(val);
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  collectFrom(order);
+  for (const c of containers) collectFrom(c);
+
+  // Also check nested contact arrays (e.g., order.contacts or order.contactInfo)
+  if (Array.isArray(order.contacts)) {
+    for (const c of order.contacts) {
+      if (!c) continue;
+      collectFrom(c);
+    }
+  }
+  if (Array.isArray(order.contactInfo)) {
+    for (const c of order.contactInfo) collectFrom(c);
+  }
+
+  // dedupe simple normalization
+  info.phones = Array.from(new Set(info.phones.map(p => String(p).trim())));
+  info.emails = Array.from(new Set(info.emails.map(e => String(e).trim().toLowerCase())));
+
+  return info;
 }
 
 // ---------- Firestore helpers ----------
@@ -912,7 +954,7 @@ function renderKpis(summary) {
     ];
     for (const k of kpis) {
         const el = document.createElement('div'); el.className = 'kpi';
-        el.innerHTML = `<div class="label">${k.label}</div><div class="value">${k.value}</div>`;
+        el.innerHTML = `<div class="label">${k.label}</div><div class="value"><span class="badge-amount">${k.value}</span></div>`;
         kpiCards.appendChild(el);
     }
 }
@@ -929,7 +971,7 @@ function renderSummaryCards(summary) {
         const label = `${method} (${currency})`;
         const value = currency === 'BS' ? formatCurrencyBs(v.bs) : formatCurrencyUSD(v.usd);
         const alt = currency === 'BS' ? formatCurrencyUSD(v.usd) : formatCurrencyBs(v.bs);
-        div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div><div class="alt">${alt}</div>`;
+        div.innerHTML = `<div class="label">${label}</div><div class="value"><span class="badge-amount">${value}</span></div><div class="alt"><span class="badge-amount small">${alt}</span></div>`;
         summaryCards.appendChild(div);
     }
     if (entries.length === 0) summaryCards.innerHTML = '<div class="muted">Sin desglose por método</div>';
@@ -945,10 +987,8 @@ function renderCascade(sellersMap) {
     for (const [sellerName, riderMap] of sellersMap.entries()) {
         const sv = document.createElement('div'); sv.className = 'vendedor expanded';
 
-        // sellerOrders: array de items { id, order, payments, motorizado }
         const sellerOrders = Array.from(riderMap.values()).flat();
 
-        // Total vendedor (en Bs y USD) sumando pagos BS/USD y motorizado
         const sellerTotalBs = sellerOrders.reduce((acc, item) => {
             return acc + (item.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (item.motorizado?.bs || 0);
         }, 0);
@@ -956,11 +996,9 @@ function renderCascade(sellersMap) {
             return acc + (item.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? (p.usd || 0) : 0), 0) + (item.motorizado?.usd || 0);
         }, 0);
 
-        // calcular comision total del vendedor (sumando order._sellerCommissionBs/_sellerCommissionUsd)
         const sellerCommissionTotalBs = sellerOrders.reduce((acc, item) => acc + (item.order?._sellerCommissionBs || 0), 0);
         const sellerCommissionTotalUsd = sellerOrders.reduce((acc, item) => acc + (item.order?._sellerCommissionUsd || 0), 0);
 
-        // Obtener tipo/valor más representativo del vendedor (si todos iguales se muestra, si varían se muestra "Varias")
         const sellerTypes = new Set(sellerOrders.map(it => it.order?._sellerCommissionType || 'percent'));
         const sellerValues = new Set(sellerOrders.map(it => it.order?._sellerCommissionValue ?? 0));
         let sellerTypeLabel = '';
@@ -976,7 +1014,7 @@ function renderCascade(sellersMap) {
         const sellerTotalDisplay = `${formatCurrencyBs(sellerTotalBs)}${sellerTotalUsd ? ` / ${formatCurrencyUSD(sellerTotalUsd)}` : ''}`;
 
         const header = document.createElement('div'); header.className = 'vh clickable';
-        header.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span class="chev">▾</span><div><div class="v-title">👤 Vendedor: ${sellerName}</div><div class="muted">Comisiones / totales mostrados por pedido</div></div></div><div class="badge-total">${sellerTotalDisplay} <span class="small-muted" style="font-weight:500;margin-left:8px">• Tipo: ${sellerTypeLabel} • Comisión: ${sellerCommissionDisplay}</span></div>`;
+        header.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span class="chev">▾</span><div><div class="v-title">👤 Vendedor: ${sellerName}</div><div class="muted">Comisiones / totales mostrados por pedido</div></div></div><div class="badge-total"><span class="badge-amount">${sellerTotalDisplay}</span> <span class="small-muted" style="font-weight:500;margin-left:8px">• Tipo: ${sellerTypeLabel} • Comisión: <span class="badge-amount small">${sellerCommissionDisplay}</span></span></div>`;
         sv.appendChild(header);
 
         const content = document.createElement('div'); content.className = 'v-content';
@@ -985,11 +1023,9 @@ function renderCascade(sellersMap) {
             const riderTotalBs = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (it.motorizado?.bs || 0), 0);
             const riderTotalUsd = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? (p.usd || 0) : 0), 0) + (it.motorizado?.usd || 0), 0);
 
-            // comision del motorizado (sumando it.order._riderCommissionBs/_riderCommissionUsd)
             const riderCommissionTotalBs = orders.reduce((acc, it) => acc + (it.order?._riderCommissionBs || 0), 0);
             const riderCommissionTotalUsd = orders.reduce((acc, it) => acc + (it.order?._riderCommissionUsd || 0), 0);
 
-            // Obtener tipo/valor representativo motorizado
             const riderTypes = new Set(orders.map(it => it.order?._riderCommissionType || 'percent'));
             const riderValues = new Set(orders.map(it => it.order?._riderCommissionValue ?? 0));
             let riderTypeLabel = '';
@@ -1004,17 +1040,15 @@ function renderCascade(sellersMap) {
             const riderCommissionDisplay = `${formatCurrencyBs(riderCommissionTotalBs)}${riderCommissionTotalUsd ? ` / ${formatCurrencyUSD(riderCommissionTotalUsd)}` : ''}`;
             const riderTotalDisplay = `${formatCurrencyBs(riderTotalBs)}${riderTotalUsd ? ` / ${formatCurrencyUSD(riderTotalUsd)}` : ''}`;
 
-            mv.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div><div class="motorizado-badge">${riderTotalDisplay} <span class="small-muted" style="font-weight:500;margin-left:8px">• Tipo: ${riderTypeLabel} • Comisión: ${riderCommissionDisplay}</span></div></div>`;
+            mv.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div><div class="motorizado-badge"><span class="badge-amount">${riderTotalDisplay}</span> <span class="small-muted" style="font-weight:500;margin-left:8px">• Tipo: ${riderTypeLabel} • Comisión: <span class="badge-amount small">${riderCommissionDisplay}</span></span></div></div>`;
 
             for (const o of orders) {
                 const pd = document.createElement('div'); pd.className = 'pedido';
                 const order = o.order;
 
-                // Usar getOrderDateInfo para obtener la fecha consistente
                 const info = getOrderDateInfo(order);
                 const dateStr = info.date ? info.date.toLocaleDateString() : '—';
 
-                // Obtener nombre cliente usando helper robusto preferente (NO mostrar teléfono)
                 const custName = getCustomerNamePreferName(order);
                 const custHtml = custName ? `<span class="cust-name" style="font-weight:600;margin-left:8px">${escapeHtml(custName)}</span>` : '';
 
@@ -1026,7 +1060,7 @@ function renderCascade(sellersMap) {
                     if (p.key === 'pago-movil') icon = '📱';
                     if (p.key === 'paypal') icon = '💳';
                     if (p.key === 'zelle') icon = '💳';
-                    return `<div class="payment-row"><div class="payment-left"><span class="icon">${icon}</span><span class="payment-label ${cls}">${p.label}</span></div><div class="payment-amount ${cls}"><span class="main">${main}</span><span class="small">${alt.trim()}</span></div></div>`;
+                    return `<div class="payment-row"><div class="payment-left"><span class="icon">${icon}</span><span class="payment-label ${cls}">${p.label}</span></div><div class="payment-amount ${cls}"><span class="badge-amount main-badge">${main}</span><span class="small" style="margin-left:6px">${alt.trim()}</span></div></div>`;
                 }).join('') : '<div class="muted">Sin detalles de pago</div>';
 
                 const subtotalBs = (o.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0);
@@ -1036,7 +1070,6 @@ function renderCascade(sellersMap) {
                     return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyUSD(o.motorizado.usd)}</div></div>`;
                 })() : `<div class="motorizado-fee"><div class="muted" style="font-size:13px"> </div></div>`;
 
-                // Mostrar comisiones por pedido (si existen) y su tipo/valor
                 const sellerCommPerOrderBs = order._sellerCommissionBs || 0;
                 const sellerCommPerOrderUsd = order._sellerCommissionUsd || 0;
                 const sellerCommPerOrderDisplay = sellerCommPerOrderBs || sellerCommPerOrderUsd ? `${formatCurrencyBs(sellerCommPerOrderBs)}${sellerCommPerOrderUsd ? ` / ${formatCurrencyUSD(sellerCommPerOrderUsd)}` : ''}` : '';
@@ -1046,6 +1079,7 @@ function renderCascade(sellersMap) {
                 const riderCommPerOrderDisplay = riderCommPerOrderBs || riderCommPerOrderUsd ? `${formatCurrencyBs(riderCommPerOrderBs)}${riderCommPerOrderUsd ? ` / ${formatCurrencyUSD(riderCommPerOrderUsd)}` : ''}` : '';
 
                 let commissionHtml = '';
+
                 // Productos de la orden (lista)
                 const productList = getOrderProducts(order);
                 let productsHtml = '';
@@ -1055,7 +1089,19 @@ function renderCascade(sellersMap) {
                         `</ul></div>`;
                 }
 
-                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — <span class="muted">${dateStr}</span>${custHtml}</div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>${productsHtml}${commissionHtml}
+                // Información adicional del cliente (nombre, ubicación, contactos)
+                const clientInfo = getCustomerInfo(order);
+                let clientInfoHtml = '';
+                if ((clientInfo.name && String(clientInfo.name).trim()) || clientInfo.address || (clientInfo.phones && clientInfo.phones.length) || (clientInfo.emails && clientInfo.emails.length)) {
+                    clientInfoHtml = `<div class="client-info"><div style="font-weight:700;margin-bottom:6px">Datos del cliente</div>`;
+                    if (clientInfo.name) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Nombre:</span><span>${escapeHtml(clientInfo.name)}</span></div>`;
+                    if (clientInfo.address) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Ubicación:</span><span class="muted">${escapeHtml(clientInfo.address)}</span></div>`;
+                    if (clientInfo.phones && clientInfo.phones.length) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Tel:</span><span>${clientInfo.phones.map(p => escapeHtml(p)).join(' • ')}</span></div>`;
+                    if (clientInfo.emails && clientInfo.emails.length) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Email:</span><span>${clientInfo.emails.map(e => escapeHtml(e)).join(' • ')}</span></div>`;
+                    clientInfoHtml += `</div>`;
+                }
+
+                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — <span class="muted">${dateStr}</span>${custHtml}</div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div><strong>Subtotal</strong></div><div><span class="badge-amount">${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</span></div></div>${clientInfoHtml}${productsHtml}${commissionHtml}
                 `;
                 mv.appendChild(pd);
             }
@@ -1253,7 +1299,7 @@ async function renderCalendar() {
 
         if (closure) {
             const content = document.createElement('div');
-            content.innerHTML = `<div style="margin-top:8px"><div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase">Cierre</div><div style="margin-top:6px;font-weight:800;color:#0f172a">${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
+            content.innerHTML = `<div style="margin-top:8px"><div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase">Cierre</div><div style="margin-top:6px;font-weight:800;color:#0f172a"><span class="badge-amount">${formatCurrencyBs(closure.totals?.bs ?? 0)}</span> ${closure.totals?.usd ? ` <span class="badge-amount">${formatCurrencyUSD(closure.totals.usd)}</span>` : ''}</div></div>`;
             cell.appendChild(content);
         } else if (ordersForDay.length > 0) {
             const content = document.createElement('div');
@@ -1350,7 +1396,7 @@ function renderClosureBanner(closuresForRange, datesArray) {
         const todayISO = isoFromDate(new Date());
         if (closedDates.has(todayISO)) {
             const closure = closedDates.get(todayISO);
-            banner.innerHTML = `<div><strong>La caja del día ${formatDateDisplay(new Date(todayISO + 'T00:00:00'))} ya fue cerrada</strong><div class="muted">Totales guardados: ${formatCurrencyBs(closure.totals?.bs ?? 0)} ${closure.totals?.usd ? ` / ${formatCurrencyUSD(closure.totals.usd)}` : ''}</div></div>`;
+            banner.innerHTML = `<div><strong>La caja del día ${formatDateDisplay(new Date(todayISO + 'T00:00:00'))} ya fue cerrada</strong><div class="muted">Totales guardados: <span class="badge-amount">${formatCurrencyBs(closure.totals?.bs ?? 0)}</span> ${closure.totals?.usd ? ` / <span class="badge-amount">${formatCurrencyUSD(closure.totals.usd)}</span>` : ''}</div></div>`;
             if (conciliationSection) conciliationSection.style.display = 'none';
             if (btnCloseCash) btnCloseCash.style.display = 'none';
         } else {
@@ -1369,7 +1415,7 @@ function renderClosureBanner(closuresForRange, datesArray) {
             return;
         }
         const closedDatesStr = closedList.map(c => `${new Date(c.date + 'T00:00:00').toLocaleDateString('es-ES')}`).join(', ');
-        const totalsSummary = closedList.map(c => `${new Date(c.date + 'T00:00:00').toLocaleDateString('es-ES')}: ${formatCurrencyBs(c.closure.totals?.bs ?? 0)}`).join(' • ');
+        const totalsSummary = closedList.map(c => `${new Date(c.date + 'T00:00:00').toLocaleDateString('es-ES')}: <span class="badge-amount">${formatCurrencyBs(c.closure.totals?.bs ?? 0)}</span>`).join(' • ');
         banner.innerHTML = `<div><strong>La(s) caja(s) de las siguientes fecha(s) ya fueron cerradas:</strong><div class="muted" style="margin-top:6px">${closedDatesStr}</div><div style="margin-top:6px;font-weight:700">${totalsSummary}</div></div>`;
         const allClosed = closedList.length === datesArray.length;
         if (allClosed) {
@@ -1385,9 +1431,7 @@ function renderClosureBanner(closuresForRange, datesArray) {
 }
 
 // ---------- main calculate function for selected dates (or today) ----------
-// Reemplaza la versión anterior de calculateAndRenderForSelected con esta
 async function calculateAndRenderForSelected(datesSet = null) {
-    // Determina las fechas solicitadas (sorted)
     let datesArray;
     if (!datesSet || datesSet.size === 0) {
         const todayISO = isoFromDate(new Date());
@@ -1396,17 +1440,13 @@ async function calculateAndRenderForSelected(datesSet = null) {
         datesArray = Array.from(datesSet).sort();
     }
 
-    // fetch closures y orders para el rango (start..end)
     const start = datesArray[0], end = datesArray[datesArray.length - 1];
     if (!start || !end) return;
 
     try {
-        // obtener cierres del rango (para banner)
         const closures = await fetchClosuresInRange(start, end);
-        // obtener pedidos en el rango
         const orders = await fetchOrdersForRange(start, end);
 
-        // Filtrar pedidos que caen exactamente en las fechas seleccionadas
         const keep = orders.filter(order => {
             const info = getOrderDateInfo(order);
             if (!info.date) return false;
@@ -1414,7 +1454,6 @@ async function calculateAndRenderForSelected(datesSet = null) {
             return datesArray.includes(iso);
         });
 
-        // --- Attach commissions to orders (async) antes de renderizar ---
         lastFetchedOrders = keep.slice();
         await attachCommissionsToOrders(lastFetchedOrders);
 
@@ -1426,7 +1465,6 @@ async function calculateAndRenderForSelected(datesSet = null) {
         if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
         if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 
-        // --- Nuevo: usar las fechas reales de los pedidos para el encabezado ---
         const orderDateSet = new Set();
         for (const o of keep) {
             const info = getOrderDateInfo(o);
@@ -1435,16 +1473,13 @@ async function calculateAndRenderForSelected(datesSet = null) {
         const orderDates = Array.from(orderDateSet).sort();
 
         if (orderDates.length === 1) {
-            // si hay un único día real entre los pedidos
             if (displayDate) displayDate.textContent = formatDateDisplay(new Date(orderDates[0] + 'T00:00:00'));
             if (displayDatePill) displayDatePill.textContent = orderDates[0].split('-').reverse().join('/');
         } else if (orderDates.length > 1) {
-            // varios días: mostrar rango según pedidos reales (primero..último)
             const first = new Date(orderDates[0] + 'T00:00:00'), last = new Date(orderDates[orderDates.length - 1] + 'T00:00:00');
             if (displayDate) displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${orderDates.length} días)`;
             if (displayDatePill) displayDatePill.textContent = `${orderDates[0].split('-').reverse().join('/')} — ${orderDates[orderDates.length - 1].split('-').reverse().join('/')}`;
         } else {
-            // no hay pedidos; fallback a la selección (o a hoy)
             if (datesArray.length === 1) {
                 if (displayDate) displayDate.textContent = formatDateDisplay(new Date(datesArray[0] + 'T00:00:00'));
                 if (displayDatePill) displayDatePill.textContent = datesArray[0].split('-').reverse().join('/');
@@ -1455,10 +1490,8 @@ async function calculateAndRenderForSelected(datesSet = null) {
             }
         }
 
-        // Renderiza banner de cierres (usa closures ya obtenidos)
         renderClosureBanner(closures, datesArray);
 
-        // DEBUG: lista de pedidos retenidos y la fecha elegida por cada uno
         try {
             console.log('Pedidos retenidos y fecha usada por cada uno:', keep.map(o => {
                 const info = getOrderDateInfo(o);
@@ -1490,7 +1523,7 @@ async function saveCashClosure(summary, isoDate) {
     return docRef.id;
 }
 
-// ---------- Save conciliacion (improved toast) ----------
+// ---------- Save conciliacion ----------
 $('#btn-save-conciliation')?.addEventListener('click', async () => {
     const iso = selectedDates.size ? Array.from(selectedDates).sort()[0] : isoFromDate(new Date());
     try {
@@ -1613,7 +1646,7 @@ if (concUsdInput) { concUsdInput.addEventListener('keydown', sanitizeInputKey); 
 onAuthStateChanged(auth, (u) => currentUser = u);
 
 (async function init() {
-    // Show today's data by default
+    injectBadgeStyles();
     const t = new Date();
     if (displayDate) displayDate.textContent = formatDateDisplay(t);
     if (displayDatePill) displayDatePill.textContent = isoFromDate(t).split('-').reverse().join('/');
