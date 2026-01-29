@@ -4,7 +4,8 @@
 // - Selección multi-día y aplicar selección para mostrar en Resumen
 // - Toasts mejorados, banner de cierre en Resumen, ocultado de controles cuando aplica
 // - Guardado de conciliaciones y cierre (uno por cada fecha seleccionada)
-// - Conserva la lógica original de normalización y fetch Firestore (con fallbacks)
+// - Cálculo y visualización de comisiones (percent / amount) para vendedores y motorizados
+// - Muestra montos fijos con decimales en headers y por pedido
 //
 // NOTA: Este script depende de firebase-config.js ubicado en la misma carpeta (o ../ o ../../).
 // Incluye imports dinámicos a Firebase CDN (v12.x) y usa Firestore.
@@ -72,8 +73,7 @@ function formatNumberCustom(value, decimals = 2) {
 }
 function formatCurrencyBs(v) {
     if (v == null) v = 0;
-    const hasDecimals = Math.abs(Number(v) - Math.trunc(Number(v))) > 0;
-    const decimals = hasDecimals ? 2 : 0;
+    const decimals = 2;
     return `Bs ${formatNumberCustom(Number(v), decimals)}`;
 }
 function formatCurrencyUSD(v) {
@@ -102,10 +102,8 @@ function parseFormattedNumber(str) {
     const commas = (s.match(/,/g) || []).length;
     let normalized = s;
     if (commas > 0 && dots === 0) {
-        // e.g., "1,234" -> "1234"
         normalized = s.replace(/,/g, '');
     } else if (commas > 0 && dots > 0) {
-        // e.g., "1.234,56" or "1,234.56" -> remove commas
         normalized = s.replace(/,/g, '');
     } else {
         normalized = s;
@@ -326,33 +324,105 @@ let closuresCache = []; // cache closures for visible month
 const selectedDates = new Set();
 const calState = { currentCalendarMonth: new Date() };
 
-// ---------- Commission helpers (new) ----------
+// ---------- Commission helpers (improved) ----------
 const userCommissionCache = new Map();
 
 /**
- * Busca la configuración de comisión de un usuario por uid o email.
- * Devuelve { commissionType: 'percent'|'amount', commissionValue: Number }
+ * Busca la configuración de comisión por uid/email/nameLower.
+ * Devuelve { commissionType, commissionValue, commissionCurrency?, rawUserDoc? }
  */
-async function getUserCommissionByIdOrEmail(idOrEmail) {
-    if (!idOrEmail) return { commissionType: 'percent', commissionValue: 0 };
-    if (userCommissionCache.has(idOrEmail)) return userCommissionCache.get(idOrEmail);
+async function getUserCommissionByAny(candidate) {
+    if (!candidate) return { commissionType: 'percent', commissionValue: 0 };
+    // normalize input
+    let uid = null, email = null, name = null;
+    if (typeof candidate === 'string') {
+        if (candidate.includes('@')) email = candidate.toLowerCase();
+        else uid = candidate;
+    } else if (typeof candidate === 'object') {
+        uid = candidate.uid || null;
+        email = (candidate.email || candidate.emailLower) ? String(candidate.email || candidate.emailLower).toLowerCase() : null;
+        name = candidate.name || candidate.nameLower || null;
+    }
+
+    const emailLower = email ? String(email).toLowerCase() : null;
+    const nameLower = name ? String(name).toLowerCase() : null;
+
+    const cacheKey = emailLower || uid || (nameLower ? `name:${nameLower}` : null);
+    if (cacheKey && userCommissionCache.has(cacheKey)) return userCommissionCache.get(cacheKey);
 
     try {
         const usersCol = collection(db, 'users');
-        let q;
-        if (String(idOrEmail).includes('@')) {
-            q = query(usersCol, where('emailLower', '==', String(idOrEmail).toLowerCase()));
-        } else {
-            // intentar por uid
-            q = query(usersCol, where('uid', '==', String(idOrEmail)));
+        let snap = null;
+
+        // Try several queries to increase chances (emailLower, email, uid, nameLower, name)
+        if (emailLower) {
+            try {
+                let q = query(usersCol, where('emailLower', '==', emailLower));
+                snap = await getDocs(q);
+            } catch (e) { /* ignore */ }
+            if ((!snap || snap.empty)) {
+                try {
+                    let q2 = query(usersCol, where('email', '==', emailLower));
+                    snap = await getDocs(q2);
+                } catch (e) { /* ignore */ }
+            }
+            if ((!snap || snap.empty)) {
+                try {
+                    let q3 = query(usersCol, where('email', '==', email));
+                    snap = await getDocs(q3);
+                } catch (e) { /* ignore */ }
+            }
         }
-        const snap = await getDocs(q);
-        if (!snap.empty) {
+
+        if ((!snap || snap.empty) && uid) {
+            try {
+                const q2 = query(usersCol, where('uid', '==', String(uid)));
+                snap = await getDocs(q2);
+            } catch (e) { /* ignore */ }
+        }
+
+        if ((!snap || snap.empty) && nameLower) {
+            try {
+                const q3 = query(usersCol, where('nameLower', '==', String(nameLower)));
+                snap = await getDocs(q3);
+            } catch (e) { /* ignore */ }
+            if ((!snap || snap.empty)) {
+                try {
+                    const q4 = query(usersCol, where('name', '==', String(name)));
+                    snap = await getDocs(q4);
+                } catch (e) { /* ignore */ }
+            }
+        }
+
+        if (snap && !snap.empty) {
             const data = snap.docs[0].data();
-            const commissionType = data?.commissionType ?? (data?.commission?.type) ?? data?.commissionType?.toString?.() ?? 'percent';
-            const commissionValue = Number(data?.commissionValue ?? data?.commission?.value ?? 0) || 0;
-            const res = { commissionType, commissionValue };
-            userCommissionCache.set(idOrEmail, res);
+
+            // --- Mejor detección de tipo/valor de comisión (cubriendo variantes comunes de nombres) ---
+            let commissionType = data?.commissionType ?? data?.commission?.type ?? null;
+            if (!commissionType) {
+                if (data?.commissionPercent || data?.commission_percent || data?.commissionRate || data?.commission_rate || data?.commissionPercentValue) commissionType = 'percent';
+                if (data?.commissionAmount || data?.commission_amount || data?.commission_value || data?.commissionFixed || data?.commission_fixed) commissionType = 'amount';
+            }
+            if (!commissionType) commissionType = 'percent';
+
+            const commissionValue = Number(
+                data?.commissionValue ??
+                data?.commission?.value ??
+                data?.commissionPercent ??
+                data?.commission_percent ??
+                data?.commissionRate ??
+                data?.commission_rate ??
+                data?.commissionAmount ??
+                data?.commission_amount ??
+                data?.commission_value ??
+                data?.commissionFixed ??
+                data?.commission_fixed ??
+                0
+            ) || 0;
+
+            const commissionCurrency = data?.commissionCurrency ?? data?.commission?.currency ?? data?.commission_currency ?? null; // opcional
+            const res = { commissionType, commissionValue, commissionCurrency, rawUserDoc: data };
+            if (cacheKey) userCommissionCache.set(cacheKey, res);
             return res;
         }
     } catch (err) {
@@ -360,79 +430,129 @@ async function getUserCommissionByIdOrEmail(idOrEmail) {
     }
 
     const fallback = { commissionType: 'percent', commissionValue: 0 };
-    userCommissionCache.set(idOrEmail, fallback);
+    if (cacheKey) userCommissionCache.set(cacheKey, fallback);
     return fallback;
 }
 
 /**
  * Calcula la comisión (BS/USD) para un pedido según la configuración provista.
- * Devuelve { bs: Number, usd: Number }
+ * role: 'seller' | 'rider'
+ * - seller: base = total pedido (pagos BS / USD + motorizado BS/USD)
+ * - rider: base = únicamente la parte motorizado (si hay); si no hay monto de motorizado, fallback al total
+ * Devuelve { bs, usd, label, type, value, currency }
  */
-function computeCommissionAmounts(order, commissionConfig) {
+function computeCommissionAmounts(order, commissionConfig = {}, role = 'seller') {
     const { payments, motorizado } = extractPaymentsFromOrder(order);
 
-    const bsAmount = (payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? Number(p.bs || 0) : 0), 0) + (motorizado?.bs || 0);
-    const usdAmount = (payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? Number(p.usd || 0) : 0), 0) + (motorizado?.usd || 0);
+    const totalBs = (payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? Number(p.bs || 0) : 0), 0) + (motorizado?.bs || 0);
+    const totalUsd = (payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? Number(p.usd || 0) : 0), 0) + (motorizado?.usd || 0);
+
+    let baseBs = totalBs;
+    let baseUsd = totalUsd;
+    if (role === 'rider') {
+        if ((motorizado?.bs || 0) > 0 || (motorizado?.usd || 0) > 0) {
+            baseBs = motorizado.bs || 0;
+            baseUsd = motorizado.usd || 0;
+        } else {
+            baseBs = totalBs;
+            baseUsd = totalUsd;
+        }
+    }
 
     const type = commissionConfig?.commissionType ?? 'percent';
     const value = Number(commissionConfig?.commissionValue ?? 0) || 0;
+    const currency = commissionConfig?.commissionCurrency || null;
 
     if (type === 'percent') {
-        const bs = Math.round((bsAmount * (value / 100)) * 100) / 100;
-        const usd = Math.round((usdAmount * (value / 100)) * 100) / 100;
-        return { bs, usd };
+        const bs = Math.round((baseBs * (value / 100)) * 100) / 100;
+        const usd = Math.round((baseUsd * (value / 100)) * 100) / 100;
+        const label = `${value}%`;
+        return { bs, usd, label, type, value, currency: currency || 'bs' };
     } else if (type === 'amount') {
-        // asumimos amount en Bs; si necesitas manejar amount en USD añade campo commissionCurrency en users
-        const bs = value;
-        return { bs, usd: 0 };
+        // si la amount tiene currency especificada la respetamos, sino asumimos Bs
+        const bs = (currency && String(currency).toLowerCase().includes('usd')) ? 0 : Number(value);
+        const usd = (currency && String(currency).toLowerCase().includes('usd')) ? Number(value) : 0;
+        const label = (currency && String(currency).toLowerCase().includes('usd')) ? `USD ${formatNumberCustom(value, 2)}` : `Bs ${formatNumberCustom(value, 2)}`;
+        return { bs, usd, label, type, value, currency };
     }
-    return { bs: 0, usd: 0 };
+    return { bs: 0, usd: 0, label: '0', type: 'percent', value: 0, currency: null };
 }
 
 /**
  * Recorre un array de pedidos (los objetos order) y les agrega:
- *  - _sellerCommissionBs, _sellerCommissionUsd
- *  - _riderCommissionBs, _riderCommissionUsd
+ *  - _sellerCommissionBs, _sellerCommissionUsd, _sellerCommissionType, _sellerCommissionValue, _sellerCommissionLabel
+ *  - _riderCommissionBs, _riderCommissionUsd, _riderCommissionType, _riderCommissionValue, _riderCommissionLabel
  *
  * El identificador del vendedor/motorizado se busca en propiedades comunes del pedido
- * (ajusta si tu esquema usa nombres distintos).
  */
 async function attachCommissionsToOrders(orders) {
     if (!Array.isArray(orders)) return;
     for (const order of orders) {
         try {
-            // Determinar identificadores probables del vendedor/motorizado
+            // Determinar identificadores probables del vendedor/motorizado (uid/email/name)
             const sellerIdCandidates = [
                 order.assignedSellerId, order.assignedSellerUid, order.sellerId, order.sellerUid,
                 order.assignedSellerEmail, order.sellerEmail, order.createdBy?.uid, order.createdBy?.email
             ].filter(Boolean);
 
-            const riderIdCandidates = [
-                order.assignedMotorizedId, order.assignedMotorizedUid, order.riderId, order.motorizadoId,
-                order.assignedMotorizedEmail, order.riderEmail
+            const sellerNameCandidates = [
+                order.assignedSellerName, order.assignedSeller, order.sellerName, order.vendedor, order.createdBy?.name
             ].filter(Boolean);
 
-            // Tomar el primero válido
-            const sellerIdentifier = sellerIdCandidates.length ? sellerIdCandidates[0] : null;
-            const riderIdentifier = riderIdCandidates.length ? riderIdCandidates[0] : null;
+            // ---- AMPLIADO: incluir más campos que puedan contener email/name/uid del motorizado ----
+            const riderIdCandidates = [
+                order.assignedMotorizedId, order.assignedMotorizedUid, order.riderId, order.motorizadoId,
+                order.assignedMotorizedEmail, order.riderEmail, order.assignedMotorName, order.assignedMotorEmail, order.assignedMotorized // fallback
+            ].filter(Boolean);
 
-            const sellerConfig = sellerIdentifier ? await getUserCommissionByIdOrEmail(sellerIdentifier) : { commissionType: 'percent', commissionValue: 0 };
-            const riderConfig = riderIdentifier ? await getUserCommissionByIdOrEmail(riderIdentifier) : { commissionType: 'percent', commissionValue: 0 };
+            const riderNameCandidates = [
+                order.assignedMotorizedName, order.assignedMotorName, order.assignedMotorizedName, order.assignedMotorName, order.motorizado, order.riderName
+            ].filter(Boolean);
 
-            const sellerComm = computeCommissionAmounts(order, sellerConfig);
-            const riderComm = computeCommissionAmounts(order, riderConfig);
+            let sellerConfig = null;
+            if (sellerIdCandidates.length) sellerConfig = await getUserCommissionByAny(sellerIdCandidates[0]);
+            if ((!sellerConfig || sellerConfig.commissionValue === undefined || sellerConfig.commissionValue === null) && sellerNameCandidates.length) {
+                sellerConfig = await getUserCommissionByAny({ name: sellerNameCandidates[0] });
+            }
+            if (!sellerConfig) sellerConfig = { commissionType: 'percent', commissionValue: 0 };
+
+            let riderConfig = null;
+            if (riderIdCandidates.length) riderConfig = await getUserCommissionByAny(riderIdCandidates[0]);
+            if ((!riderConfig || riderConfig.commissionValue === undefined || riderConfig.commissionValue === null) && riderNameCandidates.length) {
+                riderConfig = await getUserCommissionByAny({ name: riderNameCandidates[0] });
+            }
+            if (!riderConfig) riderConfig = { commissionType: 'percent', commissionValue: 0 };
+
+            const sellerComm = computeCommissionAmounts(order, sellerConfig, 'seller');
+            const riderComm = computeCommissionAmounts(order, riderConfig, 'rider');
 
             // Añadir campos al propio objeto order (renderCascade / buildCascadeData usan este objeto)
-            order._sellerCommissionBs = sellerComm.bs || 0;
-            order._sellerCommissionUsd = sellerComm.usd || 0;
-            order._riderCommissionBs = riderComm.bs || 0;
-            order._riderCommissionUsd = riderComm.usd || 0;
+            order._sellerCommissionBs = sellerComm.bs ?? 0;
+            order._sellerCommissionUsd = sellerComm.usd ?? 0;
+            order._sellerCommissionType = sellerComm.type ?? sellerConfig.commissionType ?? 'percent';
+            order._sellerCommissionValue = sellerComm.value ?? sellerConfig.commissionValue ?? 0;
+            order._sellerCommissionLabel = sellerComm.label ?? (order._sellerCommissionType === 'percent' ? `${order._sellerCommissionValue}%` : `Bs ${formatNumberCustom(order._sellerCommissionValue, 2)}`);
+
+            order._riderCommissionBs = riderComm.bs ?? 0;
+            order._riderCommissionUsd = riderComm.usd ?? 0;
+            order._riderCommissionType = riderComm.type ?? riderConfig.commissionType ?? 'percent';
+            order._riderCommissionValue = riderComm.value ?? riderConfig.commissionValue ?? 0;
+            order._riderCommissionLabel = riderComm.label ?? (order._riderCommissionType === 'percent' ? `${order._riderCommissionValue}%` : `Bs ${formatNumberCustom(order._riderCommissionValue, 2)}`);
+
+            // DEBUG: si quieres ver por consola (descomenta)
+            // console.debug('attachCommissionsToOrders', order.id, { sellerConfig, riderConfig, sellerComm, riderComm });
         } catch (err) {
             console.warn('attachCommissionsToOrders error para order', order?.id, err);
             order._sellerCommissionBs = 0;
             order._sellerCommissionUsd = 0;
+            order._sellerCommissionType = 'percent';
+            order._sellerCommissionValue = 0;
+            order._sellerCommissionLabel = '0';
             order._riderCommissionBs = 0;
             order._riderCommissionUsd = 0;
+            order._riderCommissionType = 'percent';
+            order._riderCommissionValue = 0;
+            order._riderCommissionLabel = '0';
         }
     }
 }
@@ -615,27 +735,63 @@ function renderCascade(sellersMap) {
         // sellerOrders: array de items { id, order, payments, motorizado }
         const sellerOrders = Array.from(riderMap.values()).flat();
 
-        // Total vendedor (en Bs) sumando pagos BS y motorizado.bs
-        const sellerTotal = sellerOrders.reduce((acc, item) => {
+        // Total vendedor (en Bs y USD) sumando pagos BS/USD y motorizado
+        const sellerTotalBs = sellerOrders.reduce((acc, item) => {
             return acc + (item.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (item.motorizado?.bs || 0);
         }, 0);
+        const sellerTotalUsd = sellerOrders.reduce((acc, item) => {
+            return acc + (item.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? (p.usd || 0) : 0), 0) + (item.motorizado?.usd || 0);
+        }, 0);
 
-        // calcular comision total del vendedor (sumando order._sellerCommissionBs)
-        const sellerCommissionTotal = sellerOrders.reduce((acc, item) => acc + (item.order?._sellerCommissionBs || 0), 0);
+        // calcular comision total del vendedor (sumando order._sellerCommissionBs/_sellerCommissionUsd)
+        const sellerCommissionTotalBs = sellerOrders.reduce((acc, item) => acc + (item.order?._sellerCommissionBs || 0), 0);
+        const sellerCommissionTotalUsd = sellerOrders.reduce((acc, item) => acc + (item.order?._sellerCommissionUsd || 0), 0);
+
+        // Obtener tipo/valor más representativo del vendedor (si todos iguales se muestra, si varían se muestra "Varias")
+        const sellerTypes = new Set(sellerOrders.map(it => it.order?._sellerCommissionType || 'percent'));
+        const sellerValues = new Set(sellerOrders.map(it => it.order?._sellerCommissionValue ?? 0));
+        let sellerTypeLabel = '';
+        if (sellerTypes.size === 1) {
+            const t = Array.from(sellerTypes)[0];
+            const v = Array.from(sellerValues)[0];
+            sellerTypeLabel = t === 'percent' ? `${v}%` : `Bs ${formatNumberCustom(v, 2)}`;
+        } else {
+            sellerTypeLabel = 'Varias';
+        }
+
+        const sellerCommissionDisplay = `${formatCurrencyBs(sellerCommissionTotalBs)}${sellerCommissionTotalUsd ? ` / ${formatCurrencyUSD(sellerCommissionTotalUsd)}` : ''}`;
+        const sellerTotalDisplay = `${formatCurrencyBs(sellerTotalBs)}${sellerTotalUsd ? ` / ${formatCurrencyUSD(sellerTotalUsd)}` : ''}`;
 
         const header = document.createElement('div'); header.className = 'vh clickable';
-        header.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span class="chev">▾</span><div><div class="v-title">👤 Vendedor: ${sellerName}</div><div class="muted">Comisiones / totales mostrados por pedido</div></div></div><div class="badge-total">${formatCurrencyBs(sellerTotal)} <span class="small-muted" style="font-weight:500;margin-left:8px">• Comisión: ${formatCurrencyBs(sellerCommissionTotal)}</span></div>`;
+        header.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span class="chev">▾</span><div><div class="v-title">👤 Vendedor: ${sellerName}</div><div class="muted">Comisiones / totales mostrados por pedido</div></div></div><div class="badge-total">${sellerTotalDisplay} <span class="small-muted" style="font-weight:500;margin-left:8px">• Tipo: ${sellerTypeLabel} • Comisión: ${sellerCommissionDisplay}</span></div>`;
         sv.appendChild(header);
 
         const content = document.createElement('div'); content.className = 'v-content';
         for (const [riderName, orders] of riderMap.entries()) {
             const mv = document.createElement('div'); mv.className = 'motorizado';
-            const riderTotal = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (it.motorizado?.bs || 0), 0);
+            const riderTotalBs = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'bs') ? (p.bs || 0) : 0), 0) + (it.motorizado?.bs || 0), 0);
+            const riderTotalUsd = orders.reduce((acc, it) => acc + (it.payments || []).reduce((s, p) => s + ((p.primary === 'usd') ? (p.usd || 0) : 0), 0) + (it.motorizado?.usd || 0), 0);
 
-            // comision del motorizado (sumando it.order._riderCommissionBs)
-            const riderCommissionTotal = orders.reduce((acc, it) => acc + (it.order?._riderCommissionBs || 0), 0);
+            // comision del motorizado (sumando it.order._riderCommissionBs/_riderCommissionUsd)
+            const riderCommissionTotalBs = orders.reduce((acc, it) => acc + (it.order?._riderCommissionBs || 0), 0);
+            const riderCommissionTotalUsd = orders.reduce((acc, it) => acc + (it.order?._riderCommissionUsd || 0), 0);
 
-            mv.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div><div class="motorizado-badge">${formatCurrencyBs(riderTotal)} <span class="small-muted" style="font-weight:500;margin-left:8px">• Comisión: ${formatCurrencyBs(riderCommissionTotal)}</span></div></div>`;
+            // Obtener tipo/valor representativo motorizado
+            const riderTypes = new Set(orders.map(it => it.order?._riderCommissionType || 'percent'));
+            const riderValues = new Set(orders.map(it => it.order?._riderCommissionValue ?? 0));
+            let riderTypeLabel = '';
+            if (riderTypes.size === 1) {
+                const t = Array.from(riderTypes)[0];
+                const v = Array.from(riderValues)[0];
+                riderTypeLabel = t === 'percent' ? `${v}%` : `Bs ${formatNumberCustom(v, 2)}`;
+            } else {
+                riderTypeLabel = 'Varias';
+            }
+
+            const riderCommissionDisplay = `${formatCurrencyBs(riderCommissionTotalBs)}${riderCommissionTotalUsd ? ` / ${formatCurrencyUSD(riderCommissionTotalUsd)}` : ''}`;
+            const riderTotalDisplay = `${formatCurrencyBs(riderTotalBs)}${riderTotalUsd ? ` / ${formatCurrencyUSD(riderTotalUsd)}` : ''}`;
+
+            mv.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">🧑‍💼 Motorizado: ${riderName} • <span class="muted">${orders.length} pedidos</span></div><div class="motorizado-badge">${riderTotalDisplay} <span class="small-muted" style="font-weight:500;margin-left:8px">• Tipo: ${riderTypeLabel} • Comisión: ${riderCommissionDisplay}</span></div></div>`;
 
             for (const o of orders) {
                 const pd = document.createElement('div'); pd.className = 'pedido';
@@ -665,15 +821,18 @@ function renderCascade(sellersMap) {
                     return `<div class="motorizado-fee"><div class="motorizado-badge">${formatCurrencyUSD(o.motorizado.usd)}</div></div>`;
                 })() : `<div class="motorizado-fee"><div class="muted" style="font-size:13px"> </div></div>`;
 
-                // Mostrar comisiones por pedido (si existen)
+                // Mostrar comisiones por pedido (si existen) y su tipo/valor
                 const sellerCommPerOrderBs = order._sellerCommissionBs || 0;
                 const sellerCommPerOrderUsd = order._sellerCommissionUsd || 0;
+                const sellerCommPerOrderDisplay = sellerCommPerOrderBs || sellerCommPerOrderUsd ? `${formatCurrencyBs(sellerCommPerOrderBs)}${sellerCommPerOrderUsd ? ` / ${formatCurrencyUSD(sellerCommPerOrderUsd)}` : ''}` : '';
+
                 const riderCommPerOrderBs = order._riderCommissionBs || 0;
                 const riderCommPerOrderUsd = order._riderCommissionUsd || 0;
+                const riderCommPerOrderDisplay = riderCommPerOrderBs || riderCommPerOrderUsd ? `${formatCurrencyBs(riderCommPerOrderBs)}${riderCommPerOrderUsd ? ` / ${formatCurrencyUSD(riderCommPerOrderUsd)}` : ''}` : '';
 
-                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — ${cust} <span class="muted">• ${dateStr}</span></div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>
-                <div class="commission-row" style="margin-top:8px"><div style="font-size:13px;color:#374151">Comisión vendedor</div><div style="font-weight:700">${formatCurrencyBs(sellerCommPerOrderBs)} ${sellerCommPerOrderUsd ? ` / ${formatCurrencyUSD(sellerCommPerOrderUsd)}` : ''}</div></div>
-                <div class="commission-row" style="margin-top:6px"><div style="font-size:13px;color:#374151">Comisión motorizado</div><div style="font-weight:700">${formatCurrencyBs(riderCommPerOrderBs)} ${riderCommPerOrderUsd ? ` / ${formatCurrencyUSD(riderCommPerOrderUsd)}` : ''}</div></div>
+                let commissionHtml = '';
+
+                pd.innerHTML = `<div class="pedido-header"><div><strong>📄 ${o.id}</strong> — ${cust} <span class="muted">• ${dateStr}</span></div>${motHtml}</div><div class="payments">${paymentsHtml}</div><div class="subtotal-row"><div>Subtotal</div><div>${formatCurrencyBs(subtotalBs)} ${subtotalUsd ? ` / ${formatCurrencyUSD(subtotalUsd)}` : ''}</div></div>${commissionHtml}
                 `;
                 mv.appendChild(pd);
             }
@@ -1003,9 +1162,7 @@ function renderClosureBanner(closuresForRange, datesArray) {
 }
 
 // ---------- main calculate function for selected dates (or today) ----------
-// Reemplaza la versión anterior de calculateAndRenderForSelected con esta
 async function calculateAndRenderForSelected(datesSet = null) {
-    // Determina las fechas solicitadas (sorted)
     let datesArray;
     if (!datesSet || datesSet.size === 0) {
         const todayISO = isoFromDate(new Date());
@@ -1014,17 +1171,13 @@ async function calculateAndRenderForSelected(datesSet = null) {
         datesArray = Array.from(datesSet).sort();
     }
 
-    // fetch closures y orders para el rango (start..end)
     const start = datesArray[0], end = datesArray[datesArray.length - 1];
     if (!start || !end) return;
 
     try {
-        // obtener cierres del rango (para banner)
         const closures = await fetchClosuresInRange(start, end);
-        // obtener pedidos en el rango
         const orders = await fetchOrdersForRange(start, end);
 
-        // Filtrar pedidos que caen exactamente en las fechas seleccionadas
         const keep = orders.filter(order => {
             const info = getOrderDateInfo(order);
             if (!info.date) return false;
@@ -1032,7 +1185,6 @@ async function calculateAndRenderForSelected(datesSet = null) {
             return datesArray.includes(iso);
         });
 
-        // --- Attach commissions to orders (async) antes de renderizar ---
         lastFetchedOrders = keep.slice();
         await attachCommissionsToOrders(lastFetchedOrders);
 
@@ -1044,7 +1196,6 @@ async function calculateAndRenderForSelected(datesSet = null) {
         if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
         if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 
-        // --- Nuevo: usar las fechas reales de los pedidos para el encabezado ---
         const orderDateSet = new Set();
         for (const o of keep) {
             const info = getOrderDateInfo(o);
@@ -1053,16 +1204,13 @@ async function calculateAndRenderForSelected(datesSet = null) {
         const orderDates = Array.from(orderDateSet).sort();
 
         if (orderDates.length === 1) {
-            // si hay un único día real entre los pedidos
             if (displayDate) displayDate.textContent = formatDateDisplay(new Date(orderDates[0] + 'T00:00:00'));
             if (displayDatePill) displayDatePill.textContent = orderDates[0].split('-').reverse().join('/');
         } else if (orderDates.length > 1) {
-            // varios días: mostrar rango según pedidos reales (primero..último)
             const first = new Date(orderDates[0] + 'T00:00:00'), last = new Date(orderDates[orderDates.length - 1] + 'T00:00:00');
             if (displayDate) displayDate.textContent = `${formatDateDisplay(first)} — ${formatDateDisplay(last)} (${orderDates.length} días)`;
             if (displayDatePill) displayDatePill.textContent = `${orderDates[0].split('-').reverse().join('/')} — ${orderDates[orderDates.length - 1].split('-').reverse().join('/')}`;
         } else {
-            // no hay pedidos; fallback a la selección (o a hoy)
             if (datesArray.length === 1) {
                 if (displayDate) displayDate.textContent = formatDateDisplay(new Date(datesArray[0] + 'T00:00:00'));
                 if (displayDatePill) displayDatePill.textContent = datesArray[0].split('-').reverse().join('/');
@@ -1073,14 +1221,12 @@ async function calculateAndRenderForSelected(datesSet = null) {
             }
         }
 
-        // Renderiza banner de cierres (usa closures ya obtenidos)
         renderClosureBanner(closures, datesArray);
 
-        // DEBUG: lista de pedidos retenidos y la fecha elegida por cada uno
         try {
             console.log('Pedidos retenidos y fecha usada por cada uno:', keep.map(o => {
                 const info = getOrderDateInfo(o);
-                return { id: o.id, dateISO: info.date ? isoFromDate(info.date) : null, field: info.field, sellerComm: o._sellerCommissionBs, riderComm: o._riderCommissionBs };
+                return { id: o.id, dateISO: info.date ? isoFromDate(info.date) : null, field: info.field, sellerComm: o._sellerCommissionBs, riderComm: o._riderCommissionBs, sellerType: o._sellerCommissionType, riderType: o._riderCommissionType, sellerCommUsd: o._sellerCommissionUsd, riderCommUsd: o._riderCommissionUsd };
             }));
         } catch (e) { /* ignore */ }
 
