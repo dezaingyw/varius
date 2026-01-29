@@ -27,104 +27,6 @@
             .vendedor .vh { flex-direction: column; align-items: flex-start; gap: 6px; }
             .badge-total { margin-top: 6px; }
         }
-
-        /* Modal styles (adaptadas de tu prueba.html) */
-        :root {
-            --primary-color: #7c4dff;
-            --primary-hover: #6a3de8;
-            --text-main: #334155;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
-            --bg-light: #f8fafc;
-            --white: #ffffff;
-        }
-
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            display: none; /* Oculto por defecto */
-            justify-content: center;
-            align-items: center;
-            z-index: 1200;
-            padding: 20px;
-        }
-
-        .modal-container {
-            background: var(--white);
-            width: 100%;
-            max-width: 520px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.12);
-            overflow: hidden;
-            animation: fadeIn 0.18s ease-out;
-        }
-
-        .modal-header {
-            padding: 18px 20px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-header h2 { margin: 0; font-size: 1.1rem; color: var(--text-main); }
-        .modal-header p { margin: 4px 0 0; font-size: 0.85rem; color: var(--text-muted); }
-
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.4rem;
-            color: var(--text-muted);
-            cursor: pointer;
-        }
-
-        .modal-body { padding: 18px 20px; }
-        .form-group { margin-bottom: 14px; border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; }
-        .form-group label { display:block; font-weight:600; margin-bottom:8px; color:var(--text-main); }
-        .form-group input { width:100%; padding:8px 10px; border:1px solid var(--border-color); border-radius:6px; font-size:0.95rem; box-sizing:border-box; }
-
-        .modal-footer {
-            padding: 12px 18px;
-            border-top: 1px solid var(--border-color);
-            display:flex;
-            justify-content:flex-end;
-            gap:10px;
-            background:var(--white);
-        }
-
-        .btn-secondary {
-            background: white;
-            border: 1px solid var(--border-color);
-            padding: 8px 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            color: var(--text-main);
-            font-weight: 500;
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            border: none;
-            padding: 8px 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            color: white;
-            font-weight: 600;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Simple toast */
-        #toast { position: fixed; right: 16px; bottom: 18px; z-index:1300; min-width: 180px; max-width: 320px; display:none; padding:10px 14px; border-radius:8px; color:#fff; background:#111827cc; box-shadow:0 6px 18px rgba(2,6,23,0.2); }
-        #toast.success { background: #16a34a; }
-        #toast.error { background: #ef4444; }
     </style>
 </head>
 
@@ -165,14 +67,6 @@
                              Mantenemos un pill legible que mostrará la fecha o el rango seleccionado desde calend. -->
                         <input type="date" id="cierre-date" style="display:none;" />
 
-                        <!-- Nuevo botón para abrir modal de comisiones -->
-                        <button id="btn-assign-commissions" title="Asignar comisiones" class="icon-btn" style="margin-left:8px;padding:8px 12px;">
-                            <!-- Pequeño icono + texto para claridad -->
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:middle;margin-right:6px;">
-                                <path d="M8 4a.5.5 0 0 1 .5.5V7.5H11.5a.5.5 0 0 1 0 1H8.5V11.5a.5.5 0 0 1-1 0V8.5H4.5a.5.5 0 0 1 0-1H7.5V4.5A.5.5 0 0 1 8 4z"/>
-                            </svg>
-                            <span style="vertical-align:middle;">Asignar comisiones</span>
-                        </button>
                         <button id="btn-calc" title="Refrescar" class="icon-btn" style="margin-left:8px;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                                 class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
@@ -283,44 +177,10 @@
         </div>
     </main>
 
-    <!-- Modal Comisiones -->
-    <div class="modal-overlay" id="modalComisiones" aria-hidden="true" role="dialog" aria-modal="true">
-        <div class="modal-container" role="document" aria-labelledby="modalComisionesTitle">
-            <div class="modal-header">
-                <div>
-                    <h2 id="modalComisionesTitle">Asignar Comisiones</h2>
-                    <p>Define los porcentajes para el equipo</p>
-                </div>
-                <button class="close-btn" id="closeModalBtn" aria-label="Cerrar">&times;</button>
-            </div>
-
-            <form id="formComisiones">
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="commission-seller">Comisión Vendedores (%) *</label>
-                        <input id="commission-seller" type="number" step="0.01" min="0" max="100" placeholder="Ej: 5" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="commission-rider">Comisión Motorizados (%) *</label>
-                        <input id="commission-rider" type="number" step="0.01" min="0" max="100" placeholder="Ej: 2" required>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn-secondary" id="discardModalBtn">Descartar</button>
-                    <button type="submit" class="btn-primary" id="saveCommissionsBtn">Guardar Cambios</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div id="toast" role="status" aria-live="polite"></div>
 
     <script type="module" src="../assets/js/cierre-caja.js"></script>
     <script type="module" src="../assets/js/sidebar-loader.js"></script>
-    <!-- Nuevo módulo que controla el modal y guarda en Firebase Realtime DB -->
-    <script type="module" src="../assets/js/cierre-comisiones.js"></script>
 </body>
 
 </html>
