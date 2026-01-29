@@ -1,8 +1,6 @@
 // assets/js/users-admin.js
-// Modificado para: email (local + extensión con prevención de '@' en local),
-// phone local EXACTAMENTE 7 dígitos (y aviso si intentan pegar más),
-// mejoras responsive handling en modal.
-// Cambio: removido select visible de estado y agregado botón para alternar Activo/Inactivo en la fila.
+// Versión completa actualizada: la sección de comisiones solo aparece si el rol es vendedor o motorizado,
+// y en esos casos elegir un tipo de comisión + valor es obligatorio.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -59,6 +57,15 @@ const clearFiltersBtn = document.getElementById('clearFilters');
 const loadingModal = document.getElementById('loadingModal');
 const loadingText = document.getElementById('loadingText');
 
+// Commission DOM
+const commissionSection = document.getElementById('commissionSection');
+const commissionPercentRadio = document.getElementById('commission_percent_radio');
+const commissionAmountRadio = document.getElementById('commission_amount_radio');
+const commissionPercentBox = document.getElementById('commission_percent_box');
+const commissionAmountBox = document.getElementById('commission_amount_box');
+const commissionPercentInput = document.getElementById('commission_percent');
+const commissionAmountInput = document.getElementById('commission_amount');
+
 let allUsers = [];
 let filteredUsers = [];
 let currentPage = 1;
@@ -70,7 +77,6 @@ function showToast(msg, time = 2500) {
     if (!toastEl) { console.log(msg); return; }
     toastEl.textContent = msg;
     toastEl.classList.remove('hidden');
-    // Add show class for transition (app.css has .toast.show but we use .hidden toggle)
     setTimeout(() => toastEl.classList.add('hidden'), time);
 }
 
@@ -122,7 +128,7 @@ function isPhoneFormatValid(phone) {
     return len >= PHONE_MIN_DIGITS && len <= PHONE_MAX_DIGITS;
 }
 
-// Firestore duplicate checks (como antes)
+// Firestore duplicate checks
 async function isEmailTaken(email, excludeId = null) {
     if (!email) return false;
     const emailLower = email.toLowerCase();
@@ -173,7 +179,7 @@ async function loadUsers() {
     }
 }
 
-// Filters & render (sin cambios funcionales)
+// Filters & render
 function applyFiltersAndRender() {
     const q = (searchInput?.value || '').toLowerCase();
     const r = roleFilter?.value || '';
@@ -209,8 +215,6 @@ function renderTable() {
         const dotClass = state === 'online' ? 'online-dot' : 'offline-dot';
         const tr = document.createElement('tr');
 
-        // Si está suspendido, marcar la fila con clase para estilo rojo
-        // Ahora también marcar Inactivo con clase naranja
         const statusLower = (u.status || '').toLowerCase();
         if (statusLower === 'suspendido') {
             tr.classList.add('row-suspendido');
@@ -239,11 +243,9 @@ function renderTable() {
         const tdPhone = document.createElement('td');
         tdPhone.textContent = u.phone || '';
 
-        // Nueva columna: Fecha -> muestra FC: (createdAt) y si existe FS: (updatedAt) cuando está suspendido
         const tdDate = document.createElement('td');
         const createdStr = u.createdAt ? formatTimestamp(u.createdAt) : '';
         const updatedStr = u.updatedAt ? formatTimestamp(u.updatedAt) : '';
-        // Construimos HTML con etiquetas FC: y FS:
         let dateHtml = `<div class="date-cell"><div><strong>FC:</strong> ${escapeHtml(createdStr)}</div>`;
         if ((u.status || '').toLowerCase() === 'suspendido' && updatedStr) {
             dateHtml += `<div><strong>FS:</strong> ${escapeHtml(updatedStr)}</div>`;
@@ -255,15 +257,10 @@ function renderTable() {
         tdStatus.innerHTML = `<span class="status-badge ${statusClass(u.status)}">${escapeHtml(u.status || 'Activo')}</span>`;
 
         const tdActions = document.createElement('td');
-        // Agregamos botón para alternar estado junto a Suspender
-        // Si está Activo -> mostrar botón naranja para Inactivar
-        // Si está Inactivo -> mostrar botón azul para Activar
         const isActive = ((u.status || '').toLowerCase() === 'activo');
         const toggleClass = isActive ? 'btn-inactivate' : 'btn-activate';
         const toggleAction = isActive ? 'inactivate' : 'activate';
         const toggleTitle = isActive ? 'Inactivar' : 'Activar';
-
-        // Definimos el SVG dependiendo del estado
         const toggleIcon = isActive
             ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-slash-circle" viewBox="0 0 16 16">
           <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
@@ -318,7 +315,6 @@ function renderTable() {
             const id = e.currentTarget.getAttribute('data-id');
             if (!confirm('¿Suspender usuario? Esto marcará su estado como "Suspendido".')) return;
             try {
-                // Ahora guardamos updatedAt para poder mostrar la fecha de suspensión (FS)
                 showLoading('Suspendiendo usuario...');
                 await updateDoc(doc(db, 'users', id), { status: 'Suspendido', updatedAt: serverTimestamp() });
                 showToast('Usuario suspendido.');
@@ -332,11 +328,10 @@ function renderTable() {
         });
     });
 
-    // Toggle status (Activar / Inactivar)
     usersBody.querySelectorAll('.btn-toggle-status').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.currentTarget.getAttribute('data-id');
-            const action = e.currentTarget.getAttribute('data-action'); // 'inactivate' | 'activate'
+            const action = e.currentTarget.getAttribute('data-action');
             const newStatus = action === 'inactivate' ? 'Inactivo' : 'Activo';
             const confirmMsg = action === 'inactivate' ? '¿Inactivar usuario?' : '¿Activar usuario?';
             if (!confirm(confirmMsg)) return;
@@ -358,70 +353,105 @@ function renderTable() {
 // -----------------------------
 // Modal helpers y validación UI
 // -----------------------------
+function shouldShowCommissionForRole(role) {
+    return role === 'vendedor' || role === 'motorizado';
+}
+
+function clearCommissionFields() {
+    if (commissionPercentRadio) commissionPercentRadio.checked = false;
+    if (commissionAmountRadio) commissionAmountRadio.checked = false;
+    if (commissionPercentInput) commissionPercentInput.value = '';
+    if (commissionAmountInput) commissionAmountInput.value = '';
+    if (commissionPercentBox) commissionPercentBox.style.display = 'none';
+    if (commissionAmountBox) commissionAmountBox.style.display = 'none';
+}
+
+function updateCommissionVisibilityByRole(role) {
+    if (!commissionSection) return;
+    if (shouldShowCommissionForRole(role)) {
+        commissionSection.style.display = 'block';
+        // require commission selection
+        if (commissionPercentRadio) commissionPercentRadio.setAttribute('required', 'true');
+        if (commissionAmountRadio) commissionAmountRadio.setAttribute('required', 'true');
+    } else {
+        // hide and clear
+        commissionSection.style.display = 'none';
+        if (commissionPercentRadio) commissionPercentRadio.removeAttribute('required');
+        if (commissionAmountRadio) commissionAmountRadio.removeAttribute('required');
+        clearCommissionFields();
+    }
+    // update boxes according to current radio
+    showCommissionBoxes();
+}
+
 function openModal(mode = 'add', data = null) {
     modalMode = mode;
     const titleEl = document.getElementById('modalTitle');
     const userIdEl = document.getElementById('userId');
-    titleEl.textContent = mode === 'add' ? 'Agregar Usuario' : 'Editar Usuario';
-    userIdEl.value = data?.id || '';
-    document.getElementById('u_name').value = data?.name || '';
+    if (titleEl) titleEl.textContent = mode === 'add' ? 'Agregar Usuario' : 'Editar Usuario';
+    if (userIdEl) userIdEl.value = data?.id || '';
+    if (document.getElementById('u_name')) document.getElementById('u_name').value = data?.name || '';
 
     // email split: si trae email, separo local + dominio
     const emailLocalEl = document.getElementById('u_email_local');
     const emailExtSelect = document.getElementById('u_email_ext');
     const emailExtCustom = document.getElementById('u_email_ext_custom');
     const emailFull = data?.email || '';
-    if (emailFull && emailFull.includes('@')) {
-        const [local, domain] = emailFull.split('@');
-        emailLocalEl.value = local || '';
-        const found = Array.from(emailExtSelect.options).some(opt => opt.value === domain);
-        if (found) {
-            emailExtSelect.value = domain;
+    if (emailLocalEl && emailExtSelect && emailExtCustom) {
+        if (emailFull && emailFull.includes('@')) {
+            const [local, domain] = emailFull.split('@');
+            emailLocalEl.value = local || '';
+            const found = Array.from(emailExtSelect.options).some(opt => opt.value === domain);
+            if (found) {
+                emailExtSelect.value = domain;
+                emailExtCustom.style.display = 'none';
+                emailExtCustom.value = '';
+            } else {
+                emailExtSelect.value = 'otro';
+                emailExtCustom.style.display = 'block';
+                emailExtCustom.value = domain || '';
+            }
+        } else {
+            emailLocalEl.value = '';
+            emailExtSelect.value = 'gmail.com';
             emailExtCustom.style.display = 'none';
             emailExtCustom.value = '';
-        } else {
-            emailExtSelect.value = 'otro';
-            emailExtCustom.style.display = 'block';
-            emailExtCustom.value = domain || '';
         }
-    } else {
-        emailLocalEl.value = '';
-        emailExtSelect.value = 'gmail.com';
-        emailExtCustom.style.display = 'none';
-        emailExtCustom.value = '';
     }
 
     // phone split
     const operatorEl = document.getElementById('u_operator');
     const phoneLocalEl = document.getElementById('u_phone_local');
     const phoneStored = data?.phone || '';
-    if (phoneStored && phoneStored.length >= 7) {
-        const norm = normalizePhone(phoneStored);
-        if (norm.length >= 10) {
-            const op = norm.slice(0, 3);
-            const local = norm.slice(3);
-            operatorEl.value = op;
-            phoneLocalEl.value = local;
+    if (operatorEl && phoneLocalEl) {
+        if (phoneStored && phoneStored.length >= 7) {
+            const norm = normalizePhone(phoneStored);
+            if (norm.length >= 10) {
+                const op = norm.slice(0, 3);
+                const local = norm.slice(3);
+                operatorEl.value = op;
+                phoneLocalEl.value = local;
+            } else {
+                operatorEl.value = '';
+                phoneLocalEl.value = norm;
+            }
         } else {
             operatorEl.value = '';
-            phoneLocalEl.value = norm;
+            phoneLocalEl.value = '';
         }
-    } else {
-        operatorEl.value = '';
-        phoneLocalEl.value = '';
     }
 
-    document.getElementById('u_role').value = data?.role || '';
+    if (document.getElementById('u_role')) document.getElementById('u_role').value = data?.role || '';
     // Guardamos el estado en campo oculto (ya que removimos el select visible)
-    document.getElementById('u_status').value = data?.status || 'Activo';
+    if (document.getElementById('u_status')) document.getElementById('u_status').value = data?.status || 'Activo';
 
-    document.getElementById('u_password').value = '';
-    document.getElementById('u_password_confirm').value = '';
+    if (document.getElementById('u_password')) document.getElementById('u_password').value = '';
+    if (document.getElementById('u_password_confirm')) document.getElementById('u_password_confirm').value = '';
     ['u_name_alert', 'u_email_alert', 'u_phone_alert', 'u_password_alert', 'u_password_confirm_alert', 'u_role_alert'].forEach(id => {
         const el = document.getElementById(id); if (el) el.textContent = '';
     });
 
-    // En modo 'add' marcar campos como required; en 'edit' remover required para no bloquear la edición
+    // Required flags
     const setRequired = (id, req) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -434,91 +464,131 @@ function openModal(mode = 'add', data = null) {
     setRequired('u_operator', addRequired);
     setRequired('u_phone_local', addRequired);
     setRequired('u_role', addRequired);
-    // no hacemos setRequired en u_status porque es hidden
     setRequired('u_password', addRequired);
     setRequired('u_password_confirm', addRequired);
 
-    // si está en 'otro' y es modo add, requerir el custom
-    if (emailExtSelect.value === 'otro' && addRequired) emailExtCustom.setAttribute('required', 'true');
-    else emailExtCustom.removeAttribute('required');
+    if (emailExtSelect && emailExtSelect.value === 'otro' && addRequired) emailExtCustom.setAttribute('required', 'true');
+    else if (emailExtCustom) emailExtCustom.removeAttribute('required');
 
-    userModal.classList.remove('hidden');
-    userModal.setAttribute('aria-hidden', 'false');
+    // --- rellenar comisiones si vienen en data ---
+    const cType = data?.commissionType || '';
+    const cValue = data?.commissionValue != null ? data.commissionValue : '';
+    if (commissionPercentRadio) commissionPercentRadio.checked = cType === 'percent';
+    if (commissionAmountRadio) commissionAmountRadio.checked = cType === 'amount';
+    if (commissionPercentInput) commissionPercentInput.value = (cType === 'percent' && cValue !== '') ? cValue : '';
+    if (commissionAmountInput) commissionAmountInput.value = (cType === 'amount' && cValue !== '') ? cValue : '';
+
+    // Mostrar/ocultar sección de comisiones según rol
+    const currentRole = document.getElementById('u_role')?.value || '';
+    updateCommissionVisibilityByRole(currentRole);
+
+    if (userModal) {
+        userModal.classList.remove('hidden');
+        userModal.setAttribute('aria-hidden', 'false');
+    }
 }
 
 function closeModal() {
+    if (!userModal) return;
     userModal.classList.add('hidden');
     userModal.setAttribute('aria-hidden', 'true');
 }
 
 function getFullEmailFromForm() {
-    const local = (document.getElementById('u_email_local').value || '').trim();
-    const extSelect = document.getElementById('u_email_ext').value;
+    const localEl = document.getElementById('u_email_local');
+    const extSelectEl = document.getElementById('u_email_ext');
     const extCustomEl = document.getElementById('u_email_ext_custom');
-    const ext = extSelect === 'otro' ? (extCustomEl.value || '').trim() : extSelect;
+    const local = (localEl?.value || '').trim();
+    const extSelect = extSelectEl?.value;
+    const ext = extSelect === 'otro' ? (extCustomEl?.value || '').trim() : extSelect;
     if (!local || !ext) return '';
     return `${local}@${ext}`;
 }
 
 function getFullPhoneFromForm() {
-    const operator = (document.getElementById('u_operator').value || '').trim(); // ej '414'
-    const local = (document.getElementById('u_phone_local').value || '').trim();
+    const operator = (document.getElementById('u_operator')?.value || '').trim(); // ej '414'
+    const local = (document.getElementById('u_phone_local')?.value || '').trim();
     return normalizePhone((operator || '') + (local || ''));
 }
 
+// Commission UI helpers
+function showCommissionBoxes() {
+    if (!commissionPercentBox || !commissionAmountBox) return;
+    if (commissionPercentRadio && commissionPercentRadio.checked) {
+        commissionPercentBox.style.display = 'block';
+        commissionAmountBox.style.display = 'none';
+        commissionPercentInput?.setAttribute('required', 'true');
+        commissionAmountInput?.removeAttribute('required');
+    } else if (commissionAmountRadio && commissionAmountRadio.checked) {
+        commissionAmountBox.style.display = 'block';
+        commissionPercentBox.style.display = 'none';
+        commissionAmountInput?.setAttribute('required', 'true');
+        commissionPercentInput?.removeAttribute('required');
+    } else {
+        commissionPercentBox.style.display = 'none';
+        commissionAmountBox.style.display = 'none';
+        commissionPercentInput?.removeAttribute('required');
+        commissionAmountInput?.removeAttribute('required');
+    }
+}
+function getCommissionFromForm() {
+    if (commissionPercentRadio && commissionPercentRadio.checked) {
+        const v = parseFloat(commissionPercentInput?.value || '0');
+        return { commissionType: 'percent', commissionValue: isNaN(v) ? 0 : v };
+    }
+    if (commissionAmountRadio && commissionAmountRadio.checked) {
+        const v = parseFloat(commissionAmountInput?.value || '0');
+        return { commissionType: 'amount', commissionValue: isNaN(v) ? 0 : v };
+    }
+    return { commissionType: null, commissionValue: null };
+}
+
+// Validation
 function validateForm(values, isEdit = false) {
     let ok = true;
-    if (!values.name || !values.name.trim()) { document.getElementById('u_name_alert').textContent = 'El nombre es requerido.'; ok = false; }
-    else document.getElementById('u_name_alert').textContent = '';
+    if (!values.name || !values.name.trim()) { const el = document.getElementById('u_name_alert'); if (el) el.textContent = 'El nombre es requerido.'; ok = false; }
+    else { const el = document.getElementById('u_name_alert'); if (el) el.textContent = ''; }
 
-    // email: verificar existencia y formato. Además validar extensión custom si aplica.
     const emailAlertEl = document.getElementById('u_email_alert');
     const emailExtSelectEl = document.getElementById('u_email_ext');
     const emailExtCustomEl = document.getElementById('u_email_ext_custom');
     if (!values.email) {
-        emailAlertEl.textContent = 'Correo requerido.';
+        if (emailAlertEl) emailAlertEl.textContent = 'Correo requerido.';
         ok = false;
     } else if (!EMAIL_REGEX.test(values.email)) {
-        emailAlertEl.textContent = 'Correo inválido.';
+        if (emailAlertEl) emailAlertEl.textContent = 'Correo inválido.';
         ok = false;
     } else {
-        // si seleccionaron 'otro' validar dominio custom
         if (emailExtSelectEl && emailExtSelectEl.value === 'otro') {
-            const custom = (emailExtCustomEl.value || '').trim();
+            const custom = (emailExtCustomEl?.value || '').trim();
             if (!custom) {
-                emailAlertEl.textContent = 'Ingresa la extensión de correo.';
+                if (emailAlertEl) emailAlertEl.textContent = 'Ingresa la extensión de correo.';
                 ok = false;
             } else if (!DOMAIN_REGEX.test(custom)) {
-                emailAlertEl.textContent = 'Dominio inválido.';
+                if (emailAlertEl) emailAlertEl.textContent = 'Dominio inválido.';
                 ok = false;
             } else {
-                emailAlertEl.textContent = '';
+                if (emailAlertEl) emailAlertEl.textContent = '';
             }
         } else {
-            emailAlertEl.textContent = '';
+            if (emailAlertEl) emailAlertEl.textContent = '';
         }
     }
 
-    // phone: require operator + local 7 dígitos -> total 10
-    const operator = (document.getElementById('u_operator').value || '').trim();
-    const phoneLocal = (document.getElementById('u_phone_local').value || '').trim();
+    const operator = (document.getElementById('u_operator')?.value || '').trim();
+    const phoneLocal = (document.getElementById('u_phone_local')?.value || '').trim();
     const fullPhone = values.phone || '';
 
     if (!operator) {
-        document.getElementById('u_phone_alert').textContent = 'Selecciona la operadora.';
-        ok = false;
+        const el = document.getElementById('u_phone_alert'); if (el) el.textContent = 'Selecciona la operadora.'; ok = false;
     } else if (phoneLocal.length !== 7) {
-        document.getElementById('u_phone_alert').textContent = 'El número local debe tener 7 dígitos.';
-        ok = false;
+        const el = document.getElementById('u_phone_alert'); if (el) el.textContent = 'El número local debe tener 7 dígitos.'; ok = false;
     } else if (!isPhoneFormatValid(fullPhone)) {
-        document.getElementById('u_phone_alert').textContent = `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos.`;
-        ok = false;
+        const el = document.getElementById('u_phone_alert'); if (el) el.textContent = `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos.`; ok = false;
     } else {
-        document.getElementById('u_phone_alert').textContent = '';
+        const el = document.getElementById('u_phone_alert'); if (el) el.textContent = '';
     }
 
-    // rol: ahora mostramos alerta inline (en lugar de solo toast)
-    const roleEl = document.getElementById('u_role');
     const roleAlertEl = document.getElementById('u_role_alert');
     if (!values.role || !values.role.trim()) {
         if (roleAlertEl) roleAlertEl.textContent = 'Selecciona un rol.';
@@ -527,8 +597,6 @@ function validateForm(values, isEdit = false) {
     } else {
         if (roleAlertEl) roleAlertEl.textContent = '';
     }
-
-    // Nota: el estado ya no es requerido en UI (campo hidden), por lo que no validamos aquí.
 
     // Contraseña: si estamos agregando (no isEdit) o el usuario intentó cambiar password -> validar
     if (!isEdit || (values.password || values.confirm)) {
@@ -540,18 +608,42 @@ function validateForm(values, isEdit = false) {
         const okNumber = /[0-9]/.test(pw);
         const okSpecial = /[\W_]/.test(pw);
         if (!okLen || !okUpper || !okLower || !okNumber || !okSpecial) {
-            document.getElementById('u_password_alert').textContent = 'La contraseña debe tener 6-8 caracteres e incluir mayúscula, minúscula, número y carácter especial.'; ok = false;
-        } else document.getElementById('u_password_alert').textContent = '';
-        if (pw !== confirm) { document.getElementById('u_password_confirm_alert').textContent = 'Las contraseñas no coinciden.'; ok = false; } else document.getElementById('u_password_confirm_alert').textContent = '';
+            const el = document.getElementById('u_password_alert'); if (el) el.textContent = 'La contraseña debe tener 6-8 caracteres e incluir mayúscula, minúscula, número y carácter especial.'; ok = false;
+        } else {
+            const el = document.getElementById('u_password_alert'); if (el) el.textContent = '';
+        }
+        if (pw !== confirm) { const el = document.getElementById('u_password_confirm_alert'); if (el) el.textContent = 'Las contraseñas no coinciden.'; ok = false; } else { const el = document.getElementById('u_password_confirm_alert'); if (el) el.textContent = ''; }
     } else {
-        document.getElementById('u_password_alert').textContent = '';
-        document.getElementById('u_password_confirm_alert').textContent = '';
+        const el1 = document.getElementById('u_password_alert'); if (el1) el1.textContent = '';
+        const el2 = document.getElementById('u_password_confirm_alert'); if (el2) el2.textContent = '';
     }
+
+    // Si el rol exige comisiones (vendedor o motorizado), exigir selección y valor válido
+    if (shouldShowCommissionForRole(values.role)) {
+        if (!values.commissionType) {
+            showToast('Selecciona el tipo de comisión (porcentaje o monto).');
+            ok = false;
+        } else {
+            if (values.commissionType === 'percent') {
+                if (values.commissionValue == null || isNaN(values.commissionValue) || values.commissionValue < 0 || values.commissionValue > 100) {
+                    showToast('Ingresa un porcentaje de comisión válido (0-100).');
+                    ok = false;
+                }
+            } else if (values.commissionType === 'amount') {
+                if (values.commissionValue == null || isNaN(values.commissionValue) || values.commissionValue < 0) {
+                    showToast('Ingresa un monto de comisión válido.');
+                    ok = false;
+                }
+            }
+        }
+    }
+
     return ok;
 }
 
 // -----------------------------
-// Password toggles (igual que antes) -----------------------------
+// Password toggles
+// -----------------------------
 const pwdInput = document.getElementById('u_password');
 const pwdConfirmInput = document.getElementById('u_password_confirm');
 let pwdToggle = null;
@@ -594,8 +686,8 @@ function showPasswordTogglesIfNeeded() {
     } else {
         if (pwdToggle) { pwdToggle.remove(); pwdToggle = null; }
         if (pwdConfirmToggle) { pwdConfirmToggle.remove(); pwdConfirmToggle = null; }
-        pwdInput.type = 'password';
-        pwdConfirmInput.type = 'password';
+        if (pwdInput) pwdInput.type = 'password';
+        if (pwdConfirmInput) pwdConfirmInput.type = 'password';
     }
 }
 if (pwdInput && pwdConfirmInput) {
@@ -604,32 +696,35 @@ if (pwdInput && pwdConfirmInput) {
 }
 
 // -----------------------------
-// Form submit (Cloud Function) -----------------------------
-// Reemplaza únicamente el listener existente de submit por este bloque.
-// Busca "userForm?.addEventListener('submit'," y sustituye todo hasta el cierre de la función.
-
+// Form submit (Cloud Function)
+// -----------------------------
 userForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const userId = document.getElementById('userId').value;
-    const name = document.getElementById('u_name').value.trim();
+    const userId = document.getElementById('userId')?.value;
+    const name = (document.getElementById('u_name')?.value || '').trim();
     const email = getFullEmailFromForm();
     const phone = getFullPhoneFromForm();
-    const role = document.getElementById('u_role').value;
+    const role = document.getElementById('u_role')?.value;
     const status = (document.getElementById('u_status')?.value) || 'Activo';
-    const password = document.getElementById('u_password').value;
-    const confirm = document.getElementById('u_password_confirm').value;
+    const password = document.getElementById('u_password')?.value;
+    const confirm = document.getElementById('u_password_confirm')?.value;
 
-    const values = { name, email, phone, role, status, password, confirm };
+    // comisión
+    const commission = getCommissionFromForm();
+    const commissionType = commission.commissionType;
+    const commissionValue = commission.commissionValue;
+
+    const values = { name, email, phone, role, status, password, confirm, commissionType, commissionValue };
     const isEdit = !!userId;
     if (!validateForm(values, isEdit)) return;
 
     // duplicados
     try {
         const emailTaken = await isEmailTaken(email, isEdit ? userId : null);
-        if (emailTaken) { document.getElementById('u_email_alert').textContent = 'El correo ya está registrado.'; return; }
+        if (emailTaken) { const el = document.getElementById('u_email_alert'); if (el) el.textContent = 'El correo ya está registrado.'; return; }
         if (phone) {
             const phoneTaken = await isPhoneTaken(phone, isEdit ? userId : null);
-            if (phoneTaken) { document.getElementById('u_phone_alert').textContent = 'El teléfono ya está registrado.'; return; }
+            if (phoneTaken) { const el = document.getElementById('u_phone_alert'); if (el) el.textContent = 'El teléfono ya está registrado.'; return; }
         }
     } catch (err) {
         console.error('Error checking duplicates', err);
@@ -644,6 +739,11 @@ userForm?.addEventListener('submit', async (e) => {
         if (!isEdit) {
             // build payload
             const payload = { name, email, phone, role, status, password };
+            // añadir comisiones si aplican
+            if (commissionType) {
+                payload.commissionType = commissionType;
+                payload.commissionValue = commissionValue;
+            }
             console.log('[users-admin] Crear usuario -> payload:', payload);
 
             // token (puede fallar si auth.currentUser es null)
@@ -671,11 +771,11 @@ userForm?.addEventListener('submit', async (e) => {
 
             let textBody = '';
             try {
-                // tratamos de parsear JSON si viene como JSON
                 textBody = await res.text();
                 try {
                     const jsonBody = JSON.parse(textBody);
                     console.log('[users-admin] respuesta JSON:', jsonBody);
+                    // Si la función devuelve uid y no guarda el documento, podrías usarlo para guardar comisiones aquí.
                 } catch (parseErr) {
                     console.log('[users-admin] respuesta texto:', textBody);
                 }
@@ -685,7 +785,6 @@ userForm?.addEventListener('submit', async (e) => {
 
             if (!res.ok) {
                 console.error('[users-admin] createUser NO ok', res.status, textBody);
-                // mostrar mensaje más útil al usuario
                 let userMsg = 'Error creando usuario.';
                 try {
                     const parsed = JSON.parse(textBody || '{}');
@@ -696,10 +795,18 @@ userForm?.addEventListener('submit', async (e) => {
                 return;
             }
 
-            // si todo va bien
             showToast('Usuario creado correctamente.');
         } else {
-            await updateDoc(doc(db, 'users', userId), { name, phone, role, status, updatedAt: serverTimestamp() });
+            // build update object
+            const updateObj = { name, phone, role, status, updatedAt: serverTimestamp() };
+            if (commissionType) {
+                updateObj.commissionType = commissionType;
+                updateObj.commissionValue = commissionValue;
+            } else {
+                // Si el rol dejó de requerir comisiones, puedes opcionalmente borrar campos:
+                // await updateDoc(doc(db, 'users', userId), { commissionType: deleteField(), commissionValue: deleteField() });
+            }
+            await updateDoc(doc(db, 'users', userId), updateObj);
             if (password) showToast('Datos actualizados. Email para restablecer contraseña enviado.');
             else showToast('Usuario actualizado.');
         }
@@ -709,19 +816,28 @@ userForm?.addEventListener('submit', async (e) => {
         await loadUsers();
     } catch (err) {
         console.error('Error saving user', err);
-        // detectar si es error de red / CORS
         showToast('Error guardando usuario. Revisa consola (Network).');
     } finally {
-        // asegurar que el loading modal se oculte siempre
         hideLoading();
     }
 });
 
 // UI wiring
-openAddBtn?.addEventListener('click', () => openModal('add'));
+openAddBtn?.addEventListener('click', () => {
+    openModal('add');
+});
 closeModalBtn?.addEventListener('click', closeModal);
 cancelBtn?.addEventListener('click', (e) => { e.preventDefault(); closeModal(); });
 userModal?.addEventListener('click', (e) => { if (e.target === userModal) closeModal(); });
+
+// role select: mostrar/ocultar comisiones según selección
+const roleSelectEl = document.getElementById('u_role');
+if (roleSelectEl) {
+    roleSelectEl.addEventListener('change', (e) => {
+        const role = e.target.value;
+        updateCommissionVisibilityByRole(role);
+    });
+}
 
 // Phone local input: only digits, max 7, show alert if attempted paste more
 const phoneLocalInput = document.getElementById('u_phone_local');
@@ -730,11 +846,11 @@ if (phoneLocalInput) {
         const cleaned = normalizePhone(e.target.value);
         if (cleaned.length > 7) {
             e.target.value = cleaned.slice(0, 7);
-            document.getElementById('u_phone_alert').textContent = 'Máximo 7 dígitos (parte local).';
-            setTimeout(() => { const el = document.getElementById('u_phone_alert'); if (el) el.textContent = ''; }, 2200);
+            const el = document.getElementById('u_phone_alert'); if (el) el.textContent = 'Máximo 7 dígitos (parte local).';
+            setTimeout(() => { const el2 = document.getElementById('u_phone_alert'); if (el2) el2.textContent = ''; }, 2200);
         } else {
             e.target.value = cleaned;
-            document.getElementById('u_phone_alert').textContent = '';
+            const el = document.getElementById('u_phone_alert'); if (el) el.textContent = '';
         }
     });
 }
@@ -748,11 +864,9 @@ if (emailLocalInput) {
     emailLocalInput.addEventListener('input', (e) => {
         const v = e.target.value;
         if (v.includes('@')) {
-            // separar local y dominio
             const [local, rest] = v.split('@');
             e.target.value = local || '';
-            if (rest && rest.length) {
-                // check if matches known options
+            if (rest && rest.length && emailExtSelectEl && emailExtCustomEl) {
                 const domainCandidate = rest.split('/')[0].split('?')[0];
                 const found = Array.from(emailExtSelectEl.options).some(opt => opt.value === domainCandidate);
                 if (found) {
@@ -767,11 +881,10 @@ if (emailLocalInput) {
                     if (modalMode === 'add') emailExtCustomEl.setAttribute('required', 'true');
                 }
             }
-            document.getElementById('u_email_alert').textContent = '';
+            const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
         } else {
-            // remove stray spaces at ends
             e.target.value = v.replace(/\s+/g, ' ').trimStart();
-            document.getElementById('u_email_alert').textContent = '';
+            const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
         }
     });
 }
@@ -779,6 +892,7 @@ if (emailLocalInput) {
 // Email extension select handling: mostrar input custom si "otro"
 if (emailExtSelectEl) {
     emailExtSelectEl.addEventListener('change', () => {
+        if (!emailExtCustomEl) return;
         if (emailExtSelectEl.value === 'otro') {
             emailExtCustomEl.style.display = 'block';
             emailExtCustomEl.focus();
@@ -788,22 +902,28 @@ if (emailExtSelectEl) {
             emailExtCustomEl.value = '';
             emailExtCustomEl.removeAttribute('required');
         }
-        document.getElementById('u_email_alert').textContent = '';
+        const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
     });
 }
 if (emailExtCustomEl) {
     emailExtCustomEl.addEventListener('input', (e) => {
-        // evitar '@' dentro del dominio custom
         const v = e.target.value;
         if (v.includes('@')) e.target.value = v.replace(/@/g, '');
-        document.getElementById('u_email_alert').textContent = '';
+        const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
     });
 }
 
+// Commission radios wiring (delegated)
+document.addEventListener('click', (e) => {
+    if (e.target && (e.target.id === 'commission_percent_radio' || e.target.id === 'commission_amount_radio')) {
+        setTimeout(showCommissionBoxes, 0);
+    }
+});
+
 // Filters & pagination events
 applyFiltersBtn?.addEventListener('click', () => applyFiltersAndRender());
-clearFiltersBtn?.addEventListener('click', () => { searchInput.value = ''; roleFilter.value = ''; statusFilter.value = ''; perPageSelect.value = '10'; applyFiltersAndRender(); });
-searchInput?.addEventListener('input', () => { currentPage = 1; applyFiltersAndRender(); });
+clearFiltersBtn?.addEventListener('click', () => { if (searchInput) searchInput.value = ''; if (roleFilter) roleFilter.value = ''; if (statusFilter) statusFilter.value = ''; if (perPageSelect) perPageSelect.value = '10'; applyFiltersAndRender(); });
+if (searchInput) searchInput.addEventListener('input', () => { currentPage = 1; applyFiltersAndRender(); });
 roleFilter?.addEventListener('change', () => { currentPage = 1; applyFiltersAndRender(); });
 statusFilter?.addEventListener('change', () => { currentPage = 1; applyFiltersAndRender(); });
 perPageSelect?.addEventListener('change', () => { currentPage = 1; renderTable(); });
