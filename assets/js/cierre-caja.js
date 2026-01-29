@@ -179,12 +179,14 @@ function getOrderDateInfo(order) {
 function getCustomerName(order) {
     if (!order || typeof order !== 'object') return '';
 
-    const rootCandidates = ['customername','customerName','clientName','buyer','recipientName','buyerName','name','customer'];
+    const rootCandidates = ['customername','customername','clientname','buyer','recipientname','buyername','name','customer'];
     for (const k of Object.keys(order)) {
         if (!order[k]) continue;
         const lk = k.toLowerCase();
         if (rootCandidates.includes(lk)) {
-            return String(order[k]);
+            const v = String(order[k]).trim();
+            // don't return phone or email as name
+            if (!looksLikePhone(v) && !looksLikeEmail(v)) return v;
         }
     }
 
@@ -210,52 +212,34 @@ function getCustomerName(order) {
 
         for (const p of priority) {
             if (lowerMap[p]) {
-                if (p === 'firstname' && (lowerMap['lastname'] || lowerMap['last_name'])) {
-                    return `${String(lowerMap[p])} ${String(lowerMap['lastname'] || lowerMap['last_name'])}`;
+                const candidate = String(lowerMap[p]).trim();
+                if (!looksLikePhone(candidate) && !looksLikeEmail(candidate)) {
+                    if (p === 'firstname' && (lowerMap['lastname'] || lowerMap['last_name'])) {
+                        return `${String(lowerMap[p])} ${String(lowerMap['lastname'] || lowerMap['last_name'])}`;
+                    }
+                    return candidate;
                 }
-                return String(lowerMap[p]);
             }
         }
 
         const first = lowerMap['firstname'] || lowerMap['first_name'];
         const last = lowerMap['lastname'] || lowerMap['last_name'];
-        if (first && last) return `${String(first)} ${String(last)}`;
+        if (first && last) {
+            const candidate = `${String(first)} ${String(last)}`;
+            if (!looksLikePhone(candidate) && !looksLikeEmail(candidate)) return candidate;
+        }
 
-        if (lowerMap['customer']) return String(lowerMap['customer']);
-        if (lowerMap['username']) return String(lowerMap['username']);
-    }
-
-    const fallbackRootNames = ['customername','customer','name','clientname','buyername'];
-    for (const k of Object.keys(order)) {
-        if (!order[k]) continue;
-        const lk = k.toLowerCase();
-        if (fallbackRootNames.includes(lk)) return String(order[k]);
-    }
-
-    const phoneKeys = ['phone','clientphone','telefono','phoneNumber','phone_number'];
-    for (const k of Object.keys(order)) {
-        const lk = k.toLowerCase();
-        if (phoneKeys.includes(lk) && order[k]) return String(order[k]);
-    }
-    for (const cd of possibleContainers) {
-        if (!cd || typeof cd !== 'object') continue;
-        for (const pk of ['phone','telefono','phonenumber','phone_number']) {
-            if (cd[pk] && String(cd[pk]).trim()) return String(cd[pk]);
+        if (lowerMap['customer']) {
+            const cand = String(lowerMap['customer']).trim();
+            if (!looksLikePhone(cand) && !looksLikeEmail(cand)) return cand;
+        }
+        if (lowerMap['username']) {
+            const cand = String(lowerMap['username']).trim();
+            if (!looksLikePhone(cand) && !looksLikeEmail(cand)) return cand;
         }
     }
 
-    const emailKeys = ['email','clientemail','mail'];
-    for (const k of Object.keys(order)) {
-        const lk = k.toLowerCase();
-        if (emailKeys.includes(lk) && order[k]) return String(order[k]);
-    }
-    for (const cd of possibleContainers) {
-        if (!cd || typeof cd !== 'object') continue;
-        for (const pk of ['email','mail']) {
-            if (cd[pk] && String(cd[pk]).trim()) return String(cd[pk]);
-        }
-    }
-
+    // previously we returned phones/emails as fallback; now avoid that — return empty if no valid name
     return '';
 }
 
@@ -650,37 +634,96 @@ function looksLikePhone(s) {
   const cleaned = String(s).replace(/[^\d]/g, '');
   return cleaned.length >= 6;
 }
+function looksLikeEmail(s) {
+  if (!s) return false;
+  try {
+    const str = String(s).trim();
+    // simple heuristic: contains @ and a dot after it
+    return /\S+@\S+\.\S+/.test(str);
+  } catch { return false; }
+}
+
+/**
+ * Mejora: preferimos nombre (no teléfono ni email). Fallback amplio que detecta keys como "Customname" y variantes.
+ */
 function getCustomerNamePreferName(order) {
   const tryFields = [
     'customerName', 'customer_name', 'clientName', 'client_name', 'buyerName', 'buyer',
     'recipientName', 'name', 'fullname', 'fullName', 'displayName', 'customer'
   ];
+  const tryLower = tryFields.map(f => f.toLowerCase());
+
+  // 1) Revisión directa en root del objeto
   for (const k of Object.keys(order || {})) {
     const lk = k.toLowerCase();
-    if (tryFields.map(f => f.toLowerCase()).includes(lk) && order[k]) {
+    if (tryLower.includes(lk) && order[k]) {
       const val = String(order[k]).trim();
-      if (!looksLikePhone(val)) return val;
+      if (!looksLikePhone(val) && !looksLikeEmail(val)) return val;
     }
   }
+
+  // 2) Revisión en contenedores comunes (customerData, billing, shipping, etc.)
   const containers = [order.customerData, order.customer, order.customerInfo, order.client, order.clientData, order.billing, order.shipping];
   for (const cd of containers) {
     if (!cd || typeof cd !== 'object') continue;
     const map = {};
     for (const key of Object.keys(cd)) map[key.toLowerCase()] = cd[key];
+
     const priority = ['name','fullname','full_name','displayname','first_name','firstname','last_name','lastname'];
     for (const p of priority) {
       if (map[p] && String(map[p]).trim()) {
         const val = String(map[p]).trim();
-        if (!looksLikePhone(val)) {
+        if (!looksLikePhone(val) && !looksLikeEmail(val)) {
           if (p === 'first_name' || p === 'firstname') {
             const last = map['last_name'] || map['lastname'];
-            if (last) return `${val} ${String(last).trim()}`;
+            if (last) {
+              const full = `${val} ${String(last).trim()}`;
+              if (!looksLikePhone(full) && !looksLikeEmail(full)) return full;
+            }
           }
           return val;
         }
       }
     }
+
+    const first = map['firstname'] || map['first_name'];
+    const last = map['lastname'] || map['last_name'];
+    if (first && last) {
+      const full = `${String(first).trim()} ${String(last).trim()}`;
+      if (!looksLikePhone(full) && !looksLikeEmail(full)) return full;
+    }
   }
+
+  // 3) Fallback amplio: buscamos en contenedores primero (priorizando 'customer'/'custom'), luego en root.
+  //    Esto evita tomar claves genéricas del root como assignedMotorizedName antes que customerData.Customname
+  const candidates = [];
+  // Recorremos contenedores primero para priorizar customerData.customer/customname etc.
+  const searchObjects = [...containers, order];
+  for (const obj of searchObjects) {
+    if (!obj || typeof obj !== 'object') continue;
+    // Primero intenta claves que contengan 'customer' o 'custom' (mayor prioridad)
+    for (const k of Object.keys(obj)) {
+      const lk = k.toLowerCase();
+      if ((lk.includes('customer') || lk.includes('custom')) && obj[k]) {
+        const v = obj[k];
+        const s = String(v).trim();
+        if (s && !looksLikePhone(s) && !looksLikeEmail(s)) {
+          candidates.push(s);
+        }
+      }
+    }
+    // Luego acepta otras claves que contengan 'name' o 'nombre' (pero sin incluir ya procesadas)
+    for (const k of Object.keys(obj)) {
+      const lk = k.toLowerCase();
+      if ((lk.includes('name') || lk.includes('nombre')) && !lk.includes('customer') && !lk.includes('custom') && obj[k]) {
+        const v = obj[k];
+        const s = String(v).trim();
+        if (s && !looksLikePhone(s) && !looksLikeEmail(s)) candidates.push(s);
+      }
+    }
+  }
+  if (candidates.length) return candidates[0];
+
   return '';
 }
 
@@ -737,7 +780,7 @@ function getCustomerInfo(order) {
 
   if (!order || typeof order !== 'object') return info;
 
-  // Name (preferente, sin phone)
+  // Name (preferente, sin phone ni email)
   info.name = getCustomerNamePreferName(order) || getCustomerName(order) || '';
 
   // Possible containers where location/contact are commonly stored
@@ -785,7 +828,7 @@ function getCustomerInfo(order) {
         }
         if (emailKeys.some(ek => lk.includes(ek))) {
           const val = String(v).trim();
-          if (val && !info.emails.includes(val)) info.emails.push(val);
+          if (val && !info.emails.includes(val.toLowerCase())) info.emails.push(val.toLowerCase());
         }
       } catch (e) { /* ignore */ }
     }
@@ -808,6 +851,26 @@ function getCustomerInfo(order) {
   // dedupe simple normalization
   info.phones = Array.from(new Set(info.phones.map(p => String(p).trim())));
   info.emails = Array.from(new Set(info.emails.map(e => String(e).trim().toLowerCase())));
+
+  // 3) Si aún no conseguimos nombre, busca en containers cualquier key que parezca nombre (y no sea email/phone)
+  if (!info.name) {
+    for (const c of containers) {
+      if (!c || typeof c !== 'object') continue;
+      for (const k of Object.keys(c)) {
+        const lk = k.toLowerCase();
+        if (lk.includes('name') || lk.includes('nombre') || lk.includes('customname') || lk === 'customname') {
+          const v = c[k];
+          if (!v) continue;
+          const s = String(v).trim();
+          if (s && !looksLikePhone(s) && !looksLikeEmail(s)) {
+            info.name = s;
+            break;
+          }
+        }
+      }
+      if (info.name) break;
+    }
+  }
 
   return info;
 }
@@ -954,7 +1017,7 @@ function renderKpis(summary) {
     ];
     for (const k of kpis) {
         const el = document.createElement('div'); el.className = 'kpi';
-        el.innerHTML = `<div class="label">${k.label}</div><div class="value"><span class="badge-amount">${k.value}</span></div>`;
+        el.innerHTML = `<div class="label">${k.label}</div><div class="value">${k.value}</div>`;
         kpiCards.appendChild(el);
     }
 }
@@ -971,7 +1034,7 @@ function renderSummaryCards(summary) {
         const label = `${method} (${currency})`;
         const value = currency === 'BS' ? formatCurrencyBs(v.bs) : formatCurrencyUSD(v.usd);
         const alt = currency === 'BS' ? formatCurrencyUSD(v.usd) : formatCurrencyBs(v.bs);
-        div.innerHTML = `<div class="label">${label}</div><div class="value"><span class="badge-amount">${value}</span></div><div class="alt"><span class="badge-amount small">${alt}</span></div>`;
+        div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div><div class="alt">${alt}</div>`;
         summaryCards.appendChild(div);
     }
     if (entries.length === 0) summaryCards.innerHTML = '<div class="muted">Sin desglose por método</div>';
@@ -1077,7 +1140,6 @@ function renderCascade(sellersMap) {
                 const riderCommPerOrderBs = order._riderCommissionBs || 0;
                 const riderCommPerOrderUsd = order._riderCommissionUsd || 0;
                 const riderCommPerOrderDisplay = riderCommPerOrderBs || riderCommPerOrderUsd ? `${formatCurrencyBs(riderCommPerOrderBs)}${riderCommPerOrderUsd ? ` / ${formatCurrencyUSD(riderCommPerOrderUsd)}` : ''}` : '';
-
                 let commissionHtml = '';
 
                 // Productos de la orden (lista)
@@ -1097,7 +1159,6 @@ function renderCascade(sellersMap) {
                     if (clientInfo.name) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Nombre:</span><span>${escapeHtml(clientInfo.name)}</span></div>`;
                     if (clientInfo.address) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Ubicación:</span><span class="muted">${escapeHtml(clientInfo.address)}</span></div>`;
                     if (clientInfo.phones && clientInfo.phones.length) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Tel:</span><span>${clientInfo.phones.map(p => escapeHtml(p)).join(' • ')}</span></div>`;
-                    if (clientInfo.emails && clientInfo.emails.length) clientInfoHtml += `<div class="ci-row"><span class="ci-label">Email:</span><span>${clientInfo.emails.map(e => escapeHtml(e)).join(' • ')}</span></div>`;
                     clientInfoHtml += `</div>`;
                 }
 
