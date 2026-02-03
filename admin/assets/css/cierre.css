@@ -1,29 +1,50 @@
-/* ============================================
-   CIERRE DE CAJA - Improved Styles
-   Cascade hierarchy: Vendedor > Motorizado > Pedido
-   ============================================ */
+/* cierre.css — Complete stylesheet for "Cierre de Caja"
+   - Incluye mejoras: panel de totales de comisiones dentro de .conciliation,
+     botón centrado, mejoras responsive para acordeones (.vendedor/.vh/.v-content),
+     y reducción de tamaños para que quepan en móviles.
+   - Mantiene la jerarquía: Vendedor > Motorizado > Pedido
+*/
 
-.main.cierre {
+/* =========================
+   VARIABLES & BASE
+   ========================= */
+:root {
   --c-primario: #7e3ff0;
   --c-secundario: #4caf50;
   --c-texto: #2d2d2d;
   --c-gris-claro: #f8f9fa;
   --c-blue-light: #e9f6ff;
-  --c-vendor-border: linear-gradient(180deg, #7e3ff0 0%, #5a2ed6 100%);
-  --c-moto-border: #7e3ff0;
+  --vendor-accent: linear-gradient(180deg, #7e3ff0 0%, #5a2ed6 100%);
+  --moto-border: #7e3ff0;
+  --muted: #6b7280;
+  --border: #e6e6e6;
+  --card-bg: #fff;
+  --shadow-soft: 0 8px 24px rgba(11, 15, 34, 0.06);
+  --radius: 10px;
+}
+
+/* Base for cierre pages */
+.main.cierre {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--c-texto);
   padding-bottom: 28px;
 }
 
-/* ============================================
-   HEADER (title + controls) layout
-   ============================================ */
+/* Panels */
+.panel {
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid rgba(14, 21, 45, 0.04);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03);
+  margin-bottom: 12px;
+}
+
+/* =========================
+   HEADER
+   ========================= */
 .panel.header {
   padding: 18px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #fff, #fbfdff);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03);
 }
 
 .header-row {
@@ -33,39 +54,27 @@
   gap: 16px;
   width: 100%;
 }
-
 .header-left {
   flex: 1 1 auto;
   min-width: 0;
 }
-
 .title {
   font-size: 20px;
   font-weight: 800;
   margin-bottom: 6px;
   color: #111;
 }
-
 .subtitle {
-  color: #6b7280;
+  color: var(--muted);
   margin-bottom: 12px;
 }
 
-/* controls on the right of the header */
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-
+/* Controls (date & icons) */
 .controls {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
-/* date input style */
 .controls input[type="date"] {
   padding: 10px 12px;
   border-radius: 10px;
@@ -75,45 +84,32 @@
   min-width: 150px;
 }
 
-/* primary apply button */
-.controls .btn-apply {
-  background: var(--c-primario);
-  color: white;
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.tab-btn {
+  background: transparent;
   border: none;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 700;
-  box-shadow: 0 4px 10px rgba(126, 63, 240, 0.12);
+  color: var(--muted);
+  transition: all 160ms ease;
+}
+.tab-btn.active {
+  color: var(--c-primario);
+  box-shadow: inset 0 -3px 0 0 rgba(126, 63, 240, 0.12);
+  border-bottom: 4px solid var(--c-primario);
 }
 
-/* small icon buttons */
-.icon-btn {
-  background: #7e3ff0;
-  color: #fff;
-  border: none;
-  padding: 8px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 700;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.04);
-}
-
-/* responsive: stack header items on small screens */
-@media (max-width: 720px) {
-  .header-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .header-right {
-    justify-content: flex-end;
-  }
-}
-
-/* ============================================
-   KPIS: grid / inline layout
-   ============================================ */
+/* =========================
+   KPI & SUMMARY
+   ========================= */
 .kpi-grid {
   display: flex;
   gap: 16px;
@@ -121,7 +117,6 @@
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
-
 .kpi {
   background: #f1f2f4;
   border-radius: 10px;
@@ -131,54 +126,44 @@
   text-align: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
-
 .kpi .label {
   font-size: 13px;
   color: #666;
   margin-bottom: 8px;
 }
-
 .kpi .value {
   font-size: 20px;
   font-weight: 800;
   color: #222;
 }
 
-/* ============================================
-   SUMMARY GRID: tarjetas lado a lado (responsive)
-   ============================================ */
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin-top: 12px;
 }
-
-/* individual card style (small) */
 .summary-grid .card {
   padding: 12px 14px;
   border-radius: 8px;
   border: 1px solid #eee;
   background: #fff;
 }
-
-/* value inside summary card */
-.summary-grid .card .label {
+.summary-grid .label {
   font-weight: 700;
   font-size: 13px;
   color: #333;
   margin-bottom: 6px;
 }
-
-.summary-grid .card .value {
+.summary-grid .value {
   font-weight: 800;
   font-size: 18px;
   color: #111;
 }
 
-/* ============================================
-   FILTER CARD
-   ============================================ */
+/* =========================
+   FILTERS
+   ========================= */
 .filter-card {
   background: #fff;
   border: 1px solid #e6e6e6;
@@ -186,23 +171,19 @@
   padding: 14px;
   margin-bottom: 14px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-  margin: 10px 0;
 }
-
 .filter-row {
   display: flex;
   gap: 12px;
   align-items: flex-end;
   flex-wrap: wrap;
 }
-
 .filter-col {
   flex: 1 1 300px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-
 .filter-col select {
   padding: 10px 12px;
   border-radius: 8px;
@@ -211,26 +192,17 @@
   font-weight: 600;
 }
 
-/* small card base */
-.card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px;
-  border: 1px solid #eee;
-}
-
-/* ============================================
-   REST (kept from previous styles; truncated here for brevity)
-   ============================================ */
-
-/* Vendor / Motorizado / Pedido styles (unchanged) */
-.main.cierre #cascade-container {
+/* =========================
+   CASCADE (Vendedor > Motorizado > Pedido)
+   ========================= */
+#cascade-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.main.cierre .vendedor {
+/* Vendedor box */
+.vendedor {
   background: var(--c-blue-light);
   border-radius: 12px;
   padding: 16px 20px 20px 32px;
@@ -238,9 +210,13 @@
   border: 1px solid rgba(126, 63, 240, 0.08);
   box-shadow: 0 2px 8px rgba(126, 63, 240, 0.06);
   overflow: visible;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.main.cierre .vendedor::before {
+/* vertical accent bar */
+.vendedor::before {
   content: "";
   position: absolute;
   left: 12px;
@@ -248,19 +224,27 @@
   bottom: 16px;
   width: 5px;
   border-radius: 6px;
-  background: var(--c-vendor-border);
+  background: var(--vendor-accent);
   box-shadow: 0 2px 8px rgba(126, 63, 240, 0.2);
 }
 
-.main.cierre .vh {
+/* header row */
+.vh {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.vh.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
 }
 
-.main.cierre .v-title {
+/* title */
+.v-title {
   font-weight: 700;
   font-size: 15px;
   color: #1a1a1a;
@@ -268,9 +252,18 @@
   align-items: center;
   gap: 8px;
   margin-left: 6px;
+  min-width: 0;
+}
+.v-title .truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 48ch;
 }
 
-.main.cierre .badge-total {
+/* badge total */
+.badge-total {
   background: linear-gradient(135deg, #fff3d9, #ffe8b3);
   color: #c45500;
   padding: 8px 14px;
@@ -284,9 +277,18 @@
   white-space: nowrap;
 }
 
-.main.cierre .motorizado {
+/* Collapsed/expanded states */
+.vendedor.collapsed .v-content {
+  display: none;
+}
+.vendedor.expanded .v-content {
+  display: block;
+}
+
+/* Motorizado box */
+.motorizado {
   background: #fafbfc;
-  border-left: 4px solid var(--c-moto-border);
+  border-left: 4px solid var(--moto-border);
   border-radius: 10px;
   margin: 14px 0 12px 28px;
   padding: 14px 16px;
@@ -294,7 +296,8 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
-.main.cierre .motorizado-badge {
+/* Motorizado badge */
+.motorizado-badge {
   background: linear-gradient(135deg, #d4edda, #a8e6b7);
   color: #155724;
   padding: 6px 12px;
@@ -305,7 +308,8 @@
   box-shadow: 0 2px 4px rgba(21, 87, 36, 0.1);
 }
 
-.main.cierre .pedido {
+/* Pedido card */
+.pedido {
   background: #fff;
   border: 1px solid #e8eaed;
   border-radius: 10px;
@@ -319,39 +323,46 @@
   transition:
     box-shadow 0.2s ease,
     transform 0.2s ease;
+  overflow: hidden;
 }
-
-.main.cierre .pedido:hover {
+.pedido:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
 }
 
+.pedido-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pedido .muted {
+  color: var(--muted);
+}
+
 /* payments */
-.main.cierre .payments {
+.payments {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 4px 0;
 }
-
-.main.cierre .payment-row {
+.payment-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 16px;
   align-items: center;
   padding: 6px 0;
-  width: 100%;
   min-width: 0;
 }
-
-.main.cierre .payment-left {
+.payment-left {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
-
-.main.cierre .payment-label {
+.payment-label {
   font-weight: 600;
   font-size: 14px;
   color: #2d2d2d;
@@ -360,8 +371,7 @@
   text-overflow: ellipsis;
   max-width: 100%;
 }
-
-.main.cierre .payment-amount {
+.payment-amount {
   text-align: right;
   min-width: 0;
   white-space: nowrap;
@@ -369,8 +379,7 @@
   font-size: 15px;
   color: #1a1a1a;
 }
-
-.main.cierre .payment-amount .small {
+.payment-amount .small {
   display: block;
   font-size: 12px;
   color: #666;
@@ -378,7 +387,45 @@
   margin-top: 2px;
 }
 
-/* conciliation & buttons */
+/* subtotal row */
+.subtotal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px dashed #e6eef8;
+  margin-top: 8px;
+}
+
+/* client info */
+.client-info {
+  margin-top: 8px;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #eef2ff;
+}
+.client-info .ci-row {
+  margin-bottom: 6px;
+  font-size: 0.95em;
+}
+.client-info .ci-label {
+  color: #374151;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+/* order products list */
+.order-products ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* =========================
+   CONCILIATION, BUTTON & CLOSURE FOOTER
+   ========================= */
+
+/* Conciliation row */
 .main.cierre .conciliation {
   display: flex;
   gap: 10px;
@@ -388,9 +435,11 @@
   padding: 16px;
   background: #f9fafb;
   border-radius: 10px;
+  position: relative; /* for commissions summary absolute positioning */
 }
 
-.main.cierre .conc-input {
+/* inputs */
+.conc-input {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid #ddd;
@@ -400,15 +449,37 @@
   font-size: 14px;
   font-weight: 600;
 }
-
-.main.cierre .conc-input:focus {
+.conc-input:focus {
   outline: none;
   border-color: var(--c-primario);
-  box-shadow: 0 0 0 3px rgba(126, 63, 240, 0.1);
+  box-shadow: 0 0 0 3px rgba(126, 63, 240, 0.08);
 }
 
-.main.cierre .close-btn,
-.main.cierre #btn-close-cash {
+/* Save conciliation button variant */
+.btn-copy {
+  background: linear-gradient(180deg, #ede3ff, #dac4ff);
+  color: #5320ab;
+  border-color: rgba(34, 197, 94, 0.06);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+/* Footer bottom contains centered close button */
+.panel-footer-bottom {
+  display: block;
+  padding: 8px 0 4px 0;
+  position: relative;
+  min-height: 56px;
+  margin-top: 8px;
+}
+.panel-footer-bottom > div {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Close cash button */
+#btn-close-cash {
   background: linear-gradient(135deg, #34d399, #10b981);
   color: #fff;
   padding: 14px 20px;
@@ -422,116 +493,362 @@
     transform 0.2s ease,
     box-shadow 0.2s ease;
 }
-
-.main.cierre .close-btn:hover,
-.main.cierre #btn-close-cash:hover {
+#btn-close-cash:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
 }
 
 /* =========================
-   Añadidos: estilos para Tabs y Calendario
+   COMMISSIONS SUMMARY (within .conciliation)
    ========================= */
 
-/* Tabs */
-.tabs {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.tab-btn {
-  background: transparent;
-  border: none;
+/* default: positioned to the right inside .conciliation */
+.main.cierre .conciliation .commissions-summary {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 220px;
+  max-width: 360px;
+  text-align: right;
+  font-weight: 600;
+  color: #111827;
+  background: #ffffff;
+  border: 1px solid rgba(14, 21, 45, 0.06);
   padding: 10px 14px;
-  border-radius: 8px;
-  cursor: pointer;
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+  z-index: 8;
+}
+
+/* small title row inside commissions */
+.main.cierre .conciliation .commissions-summary > div:first-child {
+  font-size: 12px;
+  color: var(--muted);
   font-weight: 700;
-  color: #64748b;
-  transition:
-    color 160ms ease,
-    box-shadow 160ms ease,
-    border-bottom 160ms ease;
+  margin-bottom: 6px;
+  text-align: right;
 }
 
-.tab-btn.active {
-  color: #7e3ff0;
-  box-shadow: inset 0 -3px 0 0 rgba(126, 63, 240, 0.12);
-  border-bottom: 4px solid #7e3ff0;
+/* each line (label / amount) */
+.main.cierre .conciliation .commissions-summary .line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 14px;
+  color: #374151;
+}
+.main.cierre .conciliation .commissions-summary .label {
+  font-weight: 600;
+  color: #4b5563;
+}
+.main.cierre .conciliation .commissions-summary .amount {
+  font-weight: 800;
+  color: #0f172a;
 }
 
-/* Calendar grid cells (basic) */
-#calendar-grid div {
-  box-sizing: border-box;
-}
-
-/* Small utility */
-.hidden {
-  display: none !important;
+/* small alt amounts class inside amount */
+.main.cierre .conciliation .commissions-summary .amount .alt {
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 8px;
+  font-size: 13px;
 }
 
 /* =========================
-   Rest of cierre.css (your original file content)
-   Keep everything below unchanged in your project
+   CALENDAR (mini) STYLES
    ========================= */
-
-/* CIERRE DE CAJA - Improved Styles
-   Cascade hierarchy: Vendedor > Motorizado > Pedido
-*/
-.main.cierre {
-  --c-primario: #7e3ff0;
-  --c-secundario: #4caf50;
-  --c-texto: #2d2d2d;
-  --c-gris-claro: #f8f9fa;
-  --c-blue-light: #e9f6ff;
-  --c-vendor-border: linear-gradient(180deg, #7e3ff0 0%, #5a2ed6 100%);
-  --c-moto-border: #7e3ff0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  color: var(--c-texto);
-  padding-bottom: 28px;
+#calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
 }
-
-/* ... the rest of your original cierre.css content should follow here unchanged ... */
-/* Añadidos: estilos para Calendar states & selection */
-
-/* Calendar cell base */
 .calendar-cell {
-  transition: box-shadow 120ms ease, transform 120ms ease;
+  transition:
+    box-shadow 120ms ease,
+    transform 120ms ease;
   background: #fff;
+  box-sizing: border-box;
 }
-
-/* closed = green (cierre realizado) */
-.calendar-closed {
+.calendar-cell.calendar-closed {
   background: rgba(16, 185, 129, 0.13);
   border-left: 4px solid #16a34a;
 }
-
-/* pending = red (hay pedidos, sin cierre) */
-.calendar-pending {
+.calendar-cell.calendar-pending {
   background: rgba(239, 68, 68, 0.13);
   border-left: 4px solid #ef4444;
 }
-
-/* empty = neutral */
-.calendar-empty {
+.calendar-cell.calendar-empty {
   background: #fff;
 }
-
-/* selected */
 .calendar-selected {
   outline: 3px solid rgba(126, 63, 240, 0.12);
   box-shadow: 0 6px 18px rgba(126, 63, 240, 0.06);
   background: rgba(126, 63, 240, 0.13) !important;
 }
+.calendar-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(11, 15, 34, 0.04);
+  cursor: pointer;
+}
 
-/* small helpers */
-.calendar-cell:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(11,15,34,0.04); cursor: pointer; }
+/* =========================
+   UTILITIES
+   ========================= */
+.muted {
+  color: var(--muted);
+}
+.small-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+.hidden {
+  display: none !important;
+}
 
-/* tabs styling already included in previous file; keep consistent */
-.tab-btn { background: transparent; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; color: #64748b; transition: color 160ms ease, box-shadow 160ms ease, border-bottom 160ms ease; }
-.tab-btn.active { color: #7E3FF0; box-shadow: inset 0 -3px 0 0 rgba(126, 63, 240, 0.12); border-bottom: 4px solid #7E3FF0; }
+/* badge-amount used by JS injected style too — ensure consistency */
+.badge-amount {
+  padding: 4px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #0f172a;
+  font-weight: 700;
+  border: 1px solid #c7d2fe;
+  font-size: 0.95em;
+  line-height: 1;
+}
+.badge-amount.small {
+  padding: 2px 8px;
+  font-size: 0.85em;
+}
 
-/* Ensure calendar cell content is responsive */
-.calendar-cell > div { box-sizing: border-box; }
+/* Make labels truncate where necessary */
+.v-title,
+.payment-label,
+.badge-total,
+.motorizado-badge {
+  max-width: 58ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* End of additions. El resto de cierre.css permanece igual (no duplicado aquí). */
+/* =========================
+   RESPONSIVE ADJUSTMENTS
+   ========================= */
+
+/* Medium screens */
+@media (max-width: 1100px) {
+  .kpi-grid {
+    gap: 12px;
+  }
+  .kpi {
+    min-height: 96px;
+    padding: 12px;
+  }
+  .summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  .main.cierre .vendedor {
+    padding: 14px 16px 16px 28px;
+  }
+}
+
+/* Tablet / small laptops */
+@media (max-width: 900px) {
+  /* Ensure sidebar collapsing behavior outside scope, but within cierre reduce padding */
+  .main.cierre .vendedor {
+    padding: 12px 14px 14px 22px;
+    border-radius: 10px;
+  }
+  .vendedor::before {
+    left: 8px;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+  }
+  .v-title {
+    font-size: 14px;
+  }
+  .badge-total {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  /* Make accordion header stack if too narrow — keep content visible and reduce sizes */
+  .vh {
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .vh > div {
+    min-width: 0;
+  }
+
+  /* Pedido cards shrink */
+  .pedido {
+    padding: 10px 12px;
+    margin-left: 20px;
+    min-height: 72px;
+  }
+  .motorizado {
+    margin-left: 20px;
+    padding: 12px;
+  }
+  .payment-label {
+    font-size: 13px;
+  }
+  .payment-amount {
+    font-size: 14px;
+  }
+  .client-info {
+    font-size: 0.92em;
+    padding: 8px;
+  }
+
+  /* Commission box become smaller but still absolute */
+  .main.cierre .conciliation .commissions-summary {
+    right: 10px;
+    min-width: 190px;
+    max-width: 300px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+  /* Header stacks */
+  .header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Conciliation: stack fields vertically */
+  .main.cierre .conciliation {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  /* Commission box moves to static below concat */
+  .main.cierre .conciliation .commissions-summary {
+    position: static !important;
+    transform: none !important;
+    margin-top: 8px;
+    width: 100%;
+    text-align: left;
+    box-shadow: 0 6px 16px rgba(11, 15, 34, 0.05);
+  }
+  .main.cierre .conciliation .commissions-summary > div:first-child {
+    text-align: left;
+  }
+
+  /* Center the close button and keep it full width-ish */
+  .panel-footer-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  #btn-close-cash {
+    min-width: 220px;
+    width: 100%;
+    max-width: 420px;
+    padding: 12px 18px;
+    border-radius: 10px;
+  }
+
+  /* Accordion sizing: allow headers to stack but prevent collapse from hiding content (collapsed still hides content if user clicks) */
+  .vh {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .v-title {
+    font-size: 15px;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .vendedor {
+    padding: 12px;
+    margin: 8px 0;
+  }
+  .vendedor::before {
+    left: 8px;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+  }
+
+  /* Pedidos: compact list look */
+  .pedido {
+    margin-left: 12px;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  .order-products ul {
+    padding-left: 14px;
+  }
+  .client-info {
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  /* Payment row to wrap gracefully */
+  .payment-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .payment-left {
+    justify-content: flex-start;
+  }
+  .payment-amount {
+    text-align: left;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 420px) {
+  .kpi {
+    padding: 10px;
+    font-size: 14px;
+  }
+  .badge-total {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  .main.cierre .conciliation {
+    padding: 10px;
+  }
+  #btn-close-cash {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  .main.cierre .conciliation .commissions-summary {
+    padding: 8px;
+    font-size: 13px;
+  }
+  .pedido {
+    padding: 8px;
+  }
+  .v-title {
+    font-size: 14px;
+  }
+}
+
+/* Accessibility focus outlines */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 3px solid rgba(126, 63, 240, 0.12);
+  outline-offset: 2px;
+}
+
+/* End of cierre.css */
