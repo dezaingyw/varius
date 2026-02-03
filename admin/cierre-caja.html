@@ -6,26 +6,67 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Cierre de Caja — Varius</title>
 
-    <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="assets/css/cierre.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
 
     <style>
         /* Mantengo tus estilos mínimos para acordeón y componentes locales */
-        .vendedor { border-radius: 10px; margin: 10px 0; overflow: hidden; background: #eef7ff; border: 1px solid #d6eefc; }
-        .vendedor .vh { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
-        .vendedor .vh .chev { font-size: 14px; display: inline-block; width: 20px; text-align: center; color: #3b3b3b; }
-        .vendedor .v-content { padding: 10px 14px; border-top: 1px solid rgba(0,0,0,0.04); background: #f9feff; }
-        .vendedor.collapsed .v-content { display: none; }
-        .vendedor.expanded .v-content { display: block; }
-        .vendedor .v-title { font-weight: 700; }
-        .badge-total { font-weight: 700; color: #333; background: transparent; padding-left: 8px; }
+        .vendedor {
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+            background: #eef7ff;
+            border: 1px solid #d6eefc;
+        }
+
+        .vendedor .vh {
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .vendedor .vh .chev {
+            font-size: 14px;
+            display: inline-block;
+            width: 20px;
+            text-align: center;
+            color: #3b3b3b;
+        }
+
+        .vendedor .v-content {
+            padding: 10px 14px;
+            border-top: 1px solid rgba(0, 0, 0, 0.04);
+            background: #f9feff;
+        }
+
+        .vendedor.collapsed .v-content {
+            display: none;
+        }
+
+        .vendedor.expanded .v-content {
+            display: block;
+        }
+
+        .vendedor .v-title {
+            font-weight: 700;
+        }
 
         /* Small responsive tweaks */
         @media (max-width:700px) {
-            .vendedor .vh { flex-direction: column; align-items: flex-start; gap: 6px; }
-            .badge-total { margin-top: 6px; }
+            .vendedor .vh {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .badge-total {
+                margin-top: 6px;
+            }
         }
     </style>
 </head>
@@ -82,7 +123,8 @@
 
             <!-- TABS -->
             <div class="tabs" style="margin-top:14px; margin-bottom:8px;">
-                <button id="tab-resumen-btn" class="tab-btn active" aria-pressed="true" style="margin-right:8px;">📋 Resumen</button>
+                <button id="tab-resumen-btn" class="tab-btn active" aria-pressed="true" style="margin-right:8px;">📋
+                    Resumen</button>
                 <button id="tab-calendario-btn" class="tab-btn" aria-pressed="false">🗓️ Calendario</button>
             </div>
         </section>
@@ -97,20 +139,27 @@
                     <div class="filter-row">
                         <div class="filter-col">
                             <label for="filter-seller" class="muted">Vendedor</label>
-                            <select id="filter-seller" aria-label="Filtrar por vendedor"><option value="all">Todos</option></select>
+                            <select id="filter-seller" aria-label="Filtrar por vendedor">
+                                <option value="all">Todos</option>
+                            </select>
                         </div>
                         <div class="filter-col">
                             <label for="filter-rider" class="muted">Motorizado</label>
-                            <select id="filter-rider" aria-label="Filtrar por motorizado"><option value="all">Todos</option></select>
+                            <select id="filter-rider" aria-label="Filtrar por motorizado">
+                                <option value="all">Todos</option>
+                            </select>
                         </div>
                         <div class="filter-col">
                             <label for="filter-payment" class="muted">Forma de pago</label>
-                            <select id="filter-payment" aria-label="Filtrar por forma de pago"><option value="all">Todas</option></select>
+                            <select id="filter-payment" aria-label="Filtrar por forma de pago">
+                                <option value="all">Todas</option>
+                            </select>
                         </div>
                     </div>
                     <div style="margin-top:10px">
                         <button id="btn-apply-filters" class="btn-apply">Aplicar filtros</button>
-                        <button id="btn-reset-filters" class="icon-btn" style="margin-left:8px;background:#ffffff;color:#222; border: #d1d1d1;">Limpiar</button>
+                        <button id="btn-reset-filters" class="icon-btn"
+                            style="margin-left:8px;background:#ffffff;color:#222; border: #d1d1d1;">Limpiar</button>
                     </div>
                 </div>
 
@@ -118,15 +167,29 @@
             </section>
 
             <section class="panel">
-                <div id="conciliation-section" class="conciliation">
+                <!-- Conciliación (igual que antes) -->
+                <div id="conciliation-section" class="conciliation" style="position:relative;">
                     <label class="muted">Conciliación (Bs):</label>
                     <input id="conciliation-bs" class="conc-input" type="text" placeholder="0.00" />
-                    <label class="muted">Conciliación (USD):</label>
+                    <label class="muted" style="margin-left:12px;">Conciliación (USD):</label>
                     <input id="conciliation-usd" class="conc-input" type="text" placeholder="0.00" />
-                    <button id="btn-save-conciliation" class="btn btn-copy">Guardar conciliación</button>
+                    <button id="btn-save-conciliation" class="btn btn-copy" style="margin-left:12px;">Guardar
+                        conciliación</button>
+
+                    <!-- NUEVO: contenedor de totales de comisiones dentro de .conciliation -->
+                    <div id="commissions-summary" class="commissions-summary" aria-live="polite" role="status"
+                        style="display:block;">
+                        <!-- Se rellenará con JS -->
+                    </div>
                 </div>
 
-                <button id="btn-close-cash" class="btn-apply-filters">Cerrar caja del día</button>
+                <!-- Footer inferior: botón centrado -->
+                <div class="panel-footer-bottom" style="margin-top:14px;">
+                    <div style="display:flex;justify-content:center;align-items:center;">
+                        <button id="btn-close-cash" class="btn-apply" style="min-width:220px;">Cerrar caja del
+                            día</button>
+                    </div>
+                </div>
             </section>
         </div>
 
@@ -136,25 +199,36 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;">
                     <div>
                         <h3 id="calendar-month-name" style="margin:0;font-size:16px;font-weight:700">Mes Año</h3>
-                        <div class="subtitle" style="margin-top:4px;">Historial de cierres registrados en el sistema</div>
+                        <div class="subtitle" style="margin-top:4px;">Historial de cierres registrados en el sistema
+                        </div>
                     </div>
 
                     <div style="display:flex;gap:8px;align-items:center;">
-                        <button id="cal-prev" class="icon-btn" title="Mes anterior" aria-label="Mes anterior" style="background:#fff;color:#374151;border:1px solid var(--border);">◀</button>
+                        <button id="cal-prev" class="icon-btn" title="Mes anterior" aria-label="Mes anterior"
+                            style="background:#fff;color:#374151;border:1px solid var(--border);">◀</button>
                         <button id="cal-today" class="btn-secondary" title="Hoy" style="padding:8px 12px;">Hoy</button>
-                        <button id="cal-next" class="icon-btn" title="Mes siguiente" aria-label="Mes siguiente" style="background:#fff;color:#374151;border:1px solid var(--border);">▶</button>
+                        <button id="cal-next" class="icon-btn" title="Mes siguiente" aria-label="Mes siguiente"
+                            style="background:#fff;color:#374151;border:1px solid var(--border);">▶</button>
                     </div>
                 </div>
 
                 <div class="card" style="padding:0;margin-bottom:10px;">
-                    <div style="display:grid;grid-template-columns:repeat(7,1fr);background:#fbfcfe;padding:8px;border-bottom:1px solid var(--border);">
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Lun</div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Mar</div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Mié</div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Jue</div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Vie</div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Sáb</div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Dom</div>
+                    <div
+                        style="display:grid;grid-template-columns:repeat(7,1fr);background:#fbfcfe;padding:8px;border-bottom:1px solid var(--border);">
+                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Lun
+                        </div>
+                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Mar
+                        </div>
+                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Mié
+                        </div>
+                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Jue
+                        </div>
+                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Vie
+                        </div>
+                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Sáb
+                        </div>
+                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Dom
+                        </div>
                     </div>
 
                     <div id="calendar-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:0;"></div>
@@ -164,14 +238,21 @@
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
                     <button id="select-week" class="btn-secondary">Seleccionar semana</button>
                     <button id="select-month" class="btn-secondary">Seleccionar mes</button>
-                    <button id="clear-selection" class="icon-btn" style="background:#fff;color:#374151;border:1px solid var(--border);">Limpiar selección</button>
+                    <button id="clear-selection" class="icon-btn"
+                        style="background:#fff;color:#374151;border:1px solid var(--border);">Limpiar selección</button>
                     <button id="apply-selection" class="btn-apply" style="margin-left:auto">Aplicar selección</button>
                 </div>
 
                 <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;">
-                    <div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;background:#16a34a;border-radius:50%;display:inline-block"></span><span class="small-muted">Cierre realizado</span></div>
-                    <div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;background:#ef4444;border-radius:50%;display:inline-block"></span><span class="small-muted">Cierre pendiente</span></div>
-                    <div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;background:#7E3FF0;border-radius:50%;display:inline-block"></span><span class="small-muted">Seleccionado</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;"><span
+                            style="width:10px;height:10px;background:#16a34a;border-radius:50%;display:inline-block"></span><span
+                            class="small-muted">Cierre realizado</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;"><span
+                            style="width:10px;height:10px;background:#ef4444;border-radius:50%;display:inline-block"></span><span
+                            class="small-muted">Cierre pendiente</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;"><span
+                            style="width:10px;height:10px;background:#7E3FF0;border-radius:50%;display:inline-block"></span><span
+                            class="small-muted">Seleccionado</span></div>
                 </div>
             </section>
         </div>
@@ -185,4 +266,3 @@
 </body>
 
 </html>
-
