@@ -43,24 +43,12 @@ function injectBadgeStyles() {
     if (_badgeStylesInjected) return;
     _badgeStylesInjected = true;
     const css = `
-    .badge-amount {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: #eef2ff;
-      color: #0f172a;
-      font-weight: 700;
-      border: 1px solid #c7d2fe;
-      font-size: 0.95em;
-      line-height: 1;
-    }
-    .badge-amount.small { padding: 2px 8px; font-size:0.85em; }
     .main-badge { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
-    .subtotal-row { display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px dashed #e6eef8; margin-top:8px; }
-    .pedido { padding:10px 0; border-bottom:1px solid #f1f5f9; }
+    .subtotal-row { display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px dashed #e6eef8; margin-top:8px; padding: 6px 12px;}
+    .pedido { padding: 6px 12px; border-bottom:1px solid #f1f5f9; }
     .pedido-header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
     .order-products ul { margin:0; padding-left:18px; }
-    .client-info { margin-top:8px; background: #f8fafc; padding:8px; border-radius:8px; border:1px solid #eef2ff; }
+    .client-info { margin-top:8px; background: #f8fafc; padding: 6px 12px; border-radius:8px; border:1px solid #eef2ff;}
     .client-info .ci-row { margin-bottom:6px; font-size:0.95em; }
     .client-info .ci-label { color:#374151; font-weight:700; margin-right:6px; }
     .muted { color:#6b7280; }
@@ -258,7 +246,7 @@ function determinePrimaryCurrency(m) {
             if (method.includes('cash') && currency.includes('usd')) return 'usd';
             return 'bs';
         }
-        if (method.includes('usd') || method.includes('dolar') || method.includes('zelle') || method.includes('paypal')) {
+        if (method.includes('usd') || method.includes('dolar') || method.includes('usd') || method.includes('zelle') || method.includes('paypal')) {
             if (method.includes('paypal') && bs > 0 && usd === 0) return 'bs';
             return 'usd';
         }
@@ -408,6 +396,8 @@ const applySelectionBtn = $('#apply-selection');
 
 const filterCard = $('#filter-card');
 const conciliationSection = $('#conciliation-section');
+
+const commissionsSummary = $('#commissions-summary'); // NUEVO: contenedor de totales de comisiones
 
 let currentUser = null;
 let lastFetchedOrders = []; // guard copy of displayed orders
@@ -1146,7 +1136,7 @@ function renderCascade(sellersMap) {
                 const productList = getOrderProducts(order);
                 let productsHtml = '';
                 if (productList && productList.length) {
-                    productsHtml = `<div class="order-products" style="margin-top:8px"><div style="font-weight:700;margin-bottom:6px">Productos:</div><ul style="margin:0;padding-left:18px">` +
+                    productsHtml = `<div class="order-products" style="margin-top:8px"><div style="font-weight:700;margin-bottom:6px;padding: 6px 12px;">Productos:</div><ul style="margin:0;padding-left:18px">` +
                         productList.map(p => `<li style="margin-bottom:4px"><strong>${p.quantity && p.quantity > 1 ? escapeHtml(String(p.quantity)) + '× ' : ''}</strong>${escapeHtml(p.name || '—')}${p.priceLabel ? ` <span class="muted" style="margin-left:8px">${escapeHtml(p.priceLabel)}</span>` : ''}</li>`).join('') +
                         `</ul></div>`;
                 }
@@ -1264,6 +1254,9 @@ function applyFiltersToLastFetched() {
     renderKpis(summary); renderSummaryCards(summary); renderCascade(sellers);
     if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
     if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
+
+    // NUEVO: renderizar totales de comisiones para el conjunto filtrado
+    try { renderCommissionTotals(filtered); } catch (e) { /* ignore */ }
 }
 
 // ---------- Calendar rendering & selection ----------
@@ -1526,6 +1519,9 @@ async function calculateAndRenderForSelected(datesSet = null) {
         if (concBsInput) concBsInput.value = formatNumberCustom(Math.round(summary.totalBs * 100) / 100, 2);
         if (concUsdInput) concUsdInput.value = formatNumberCustom(Math.round(summary.totalUsd * 100) / 100, 2);
 
+        // NUEVO: renderizar totales de comisiones para el conjunto mostrado
+        try { renderCommissionTotals(lastFetchedOrders); } catch (e) { /* ignore */ }
+
         const orderDateSet = new Set();
         for (const o of keep) {
             const info = getOrderDateInfo(o);
@@ -1705,6 +1701,34 @@ if (concUsdInput) { concUsdInput.addEventListener('keydown', sanitizeInputKey); 
 
 // ---------- Auth & init ----------
 onAuthStateChanged(auth, (u) => currentUser = u);
+
+// ---------- Render totals de comisiones (NUEVO) ----------
+function renderCommissionTotals(orders) {
+    if (!commissionsSummary) return;
+    let totalSellerBs = 0, totalSellerUsd = 0, totalRiderBs = 0, totalRiderUsd = 0;
+
+    const list = Array.isArray(orders) ? orders : (lastFetchedOrders || []);
+    for (const o of list) {
+        // campos que ya rellenas en attachCommissionsToOrders
+        totalSellerBs += Number(o._sellerCommissionBs || 0);
+        totalSellerUsd += Number(o._sellerCommissionUsd || 0);
+        totalRiderBs += Number(o._riderCommissionBs || 0);
+        totalRiderUsd += Number(o._riderCommissionUsd || 0);
+    }
+
+    // Redondeo simple para presentación
+    totalSellerBs = Math.round(totalSellerBs * 100) / 100;
+    totalSellerUsd = Math.round(totalSellerUsd * 100) / 100;
+    totalRiderBs = Math.round(totalRiderBs * 100) / 100;
+    totalRiderUsd = Math.round(totalRiderUsd * 100) / 100;
+
+    // Construir HTML
+    commissionsSummary.innerHTML = `
+      <div style="font-size:12px;color:#4f4f4f;font-weight:700;margin-bottom:6px">Total comisiones</div>
+      <div class="line"><span class="label">Vendedores</span><span class="amount">${formatCurrencyBs(totalSellerBs)}${totalSellerUsd ? ` &nbsp;/&nbsp; ${formatCurrencyUSD(totalSellerUsd)}` : ''}</span></div>
+      <div class="line"><span class="label">Motorizados</span><span class="amount">${formatCurrencyBs(totalRiderBs)}${totalRiderUsd ? ` &nbsp;/&nbsp; ${formatCurrencyUSD(totalRiderUsd)}` : ''}</span></div>
+    `;
+}
 
 (async function init() {
     injectBadgeStyles();
