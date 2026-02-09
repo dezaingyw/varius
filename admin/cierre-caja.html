@@ -5,68 +5,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Cierre de Caja — Varius</title>
-
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="assets/css/cierre.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* Mantengo tus estilos mínimos para acordeón y componentes locales */
-        .vendedor {
-            border-radius: 10px;
-            margin: 10px 0;
-            overflow: hidden;
-            background: #eef7ff;
-            border: 1px solid #d6eefc;
-        }
-
-        .vendedor .vh {
-            padding: 12px 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .vendedor .vh .chev {
-            font-size: 14px;
-            display: inline-block;
-            width: 20px;
-            text-align: center;
-            color: #3b3b3b;
-        }
-
-        .vendedor .v-content {
-            padding: 10px 14px;
-            border-top: 1px solid rgba(0, 0, 0, 0.04);
-            background: #f9feff;
-        }
-
-        .vendedor.collapsed .v-content {
+        .order-card .order-content {
             display: none;
+            padding: 1em 0;
         }
 
-        .vendedor.expanded .v-content {
+        .order-card.open .order-content {
             display: block;
         }
 
-        .vendedor .v-title {
-            font-weight: 700;
+        .order-card .arrow-icon {
+            transition: transform 0.2s;
         }
 
-        /* Small responsive tweaks */
-        @media (max-width:700px) {
-            .vendedor .vh {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 6px;
-            }
-
-            .badge-total {
-                margin-top: 6px;
-            }
+        .order-card.open .arrow-icon {
+            transform: rotate(180deg);
         }
     </style>
 </head>
@@ -79,11 +37,10 @@
                 <span class="hamburger-box"><span class="hamburger-inner"></span></span>
             </label>
             <a class="brand" href="./" aria-label="Dashboard">
-                <img src="assets/img/logo.png" alt="Varius" width="14%">
-                <span class="brand-text">VARIUS</span>
+                <img src="assets/img/logo.png" alt="Varius" width="44" style="height:auto">
+                <span class="brand-text" style="font-weight:800;margin-left:8px">VARIUS</span>
             </a>
         </div>
-
         <div class="top-search">
             <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
                 <span class="dot"></span>
@@ -91,178 +48,169 @@
             </div>
         </div>
     </header>
-
-    <div id="app-sidebar"></div>
-
+    <div id="app-sidebar" class="sidebar"></div>
     <main class="main cierre" id="main-cierre">
-        <section class="panel header">
-            <div class="header-row">
-                <div class="header-left">
-                    <div class="title" id="page-title">Cierre de Caja — <span id="display-date">cargando...</span></div>
-                    <div class="subtitle">Resumen de operaciones del día</div>
+        <div class="main-header">
+            <div class="top-tabs">
+                <button class="tab-btn active" data-tab="resumen">RESUMEN</button>
+                <button class="tab-btn" data-tab="calendario">CALENDARIO</button>
+            </div>
+        </div>
+        <!-- ----------- RESUMEN ------------- -->
+        <div id="tab-resumen">
+            <div class="cierre-header">
+                <div class="title-group">
+                    <h2>Cierre de Caja</h2>
+                    <p>RESUMEN DE OPERACIONES</p>
                 </div>
-
-                <div class="header-right">
-                    <div class="controls" aria-hidden="false">
-                        <!-- Ocultamos el input date para que el Resumen siempre muestre hoy por defecto.
-                             Mantenemos un pill legible que mostrará la fecha o el rango seleccionado desde calend. -->
-                        <input type="date" id="cierre-date" style="display:none;" />
-
-                        <button id="btn-calc" title="Refrescar" class="icon-btn" style="margin-left:8px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                                class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
-                                <path fill-rule="evenodd"
-                                    d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z" />
-                                <path
-                                    d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466" />
-                            </svg>
-                        </button>
+                <button class="btn-finalize"><i class="fa-regular fa-circle-check"></i> Finalizar Caja del Día</button>
+            </div>
+            <div class="stats-row">
+                <div class="stat-card">
+                    <span class="stat-label">TOTAL COBRADO (BS)</span>
+                    <div class="stat-main">
+                        <span id="total-bs" class="stat-value">Bs 0,00</span>
+                        <div class="stat-icon green-bg"><i class="fa-solid fa-dollar-sign"></i></div>
                     </div>
+                    <div class="progress-bar green-bar"></div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">TOTAL COBRADO (USD)</span>
+                    <div class="stat-main">
+                        <span id="total-usd" class="stat-value">$0.00</span>
+                        <div class="stat-icon green-bg"><i class="fa-solid fa-dollar-sign"></i></div>
+                    </div>
+                    <div class="progress-bar green-bar"></div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">TOTAL PEDIDOS</span>
+                    <div class="stat-main">
+                        <span id="total-orders" class="stat-value">0</span>
+                        <div class="stat-icon purple-bg"><i class="fa-solid fa-hashtag"></i></div>
+                    </div>
+                    <div class="progress-bar purple-bar"></div>
                 </div>
             </div>
-
-            <!-- TABS -->
-            <div class="tabs" style="margin-top:14px; margin-bottom:8px;">
-                <button id="tab-resumen-btn" class="tab-btn active" aria-pressed="true" style="margin-right:8px;">📋
-                    Resumen</button>
-                <button id="tab-calendario-btn" class="tab-btn" aria-pressed="false">🗓️ Calendario</button>
+            <div class="payment-methods-row" id="payment-methods-row"></div>
+            <div class="search-panel">
+                <div class="search-header">
+                    <div class="search-title">
+                        <i class="fa-solid fa-filter" style="color: #10b981;"></i> Panel de Búsqueda
+                    </div>
+                    <div class="clear-filters" onclick="clearFilters()">
+                        <i class="fa-solid fa-xmark"></i> Limpiar Filtros
+                    </div>
+                </div>
+                <div class="search-inputs">
+                    <div class="input-with-icon">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-input" placeholder="ID o Nombre de Cliente..."
+                            onkeyup="filterOrders()">
+                    </div>
+                    <select id="filter-vendedor" onchange="filterOrders()">
+                        <option value="">Vendedores (Todos)</option>
+                    </select>
+                    <select id="filter-motorizado" onchange="filterOrders()">
+                        <option value="">Motorizados (Todos)</option>
+                    </select>
+                    <select id="filter-pago" onchange="filterOrders()">
+                        <option value="">Forma de Pago (Todas)</option>
+                    </select>
+                </div>
             </div>
-        </section>
-
-        <!-- RESUMEN - visible por defecto -->
-        <div id="content-resumen">
-            <div id="kpi-cards" class="kpi-grid" aria-live="polite"></div>
-            <div id="summary-cards" class="summary-grid"></div>
-
-            <section class="panel" id="cascade-panel">
-                <div id="filter-card" class="filter-card card">
-                    <div class="filter-row">
-                        <div class="filter-col">
-                            <label for="filter-seller" class="muted">Vendedor</label>
-                            <select id="filter-seller" aria-label="Filtrar por vendedor">
-                                <option value="all">Todos</option>
-                            </select>
-                        </div>
-                        <div class="filter-col">
-                            <label for="filter-rider" class="muted">Motorizado</label>
-                            <select id="filter-rider" aria-label="Filtrar por motorizado">
-                                <option value="all">Todos</option>
-                            </select>
-                        </div>
-                        <div class="filter-col">
-                            <label for="filter-payment" class="muted">Forma de pago</label>
-                            <select id="filter-payment" aria-label="Filtrar por forma de pago">
-                                <option value="all">Todas</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div style="margin-top:10px">
-                        <button id="btn-apply-filters" class="btn-apply">Aplicar filtros</button>
-                        <button id="btn-reset-filters" class="icon-btn"
-                            style="margin-left:8px;background:#ffffff;color:#222; border: #d1d1d1;">Limpiar</button>
-                    </div>
-                </div>
-
-                <div class="cascade" id="cascade-container"></div>
-            </section>
-
-            <section class="panel">
-                <!-- Conciliación (igual que antes) -->
-                <div id="conciliation-section" class="conciliation" style="position:relative;">
-                    <label class="muted">Conciliación (Bs):</label>
-                    <input id="conciliation-bs" class="conc-input" type="text" placeholder="0.00" />
-                    <label class="muted" style="margin-left:12px;">Conciliación (USD):</label>
-                    <input id="conciliation-usd" class="conc-input" type="text" placeholder="0.00" />
-                    <button id="btn-save-conciliation" class="btn btn-copy" style="margin-left:12px;">Guardar
-                        conciliación</button>
-
-                    <!-- NUEVO: contenedor de totales de comisiones dentro de .conciliation -->
-                    <div id="commissions-summary" class="commissions-summary" aria-live="polite" role="status"
-                        style="display:block;">
-                        <!-- Se rellenará con JS -->
-                    </div>
-                </div>
-
-                <!-- Footer inferior: botón centrado -->
-                <div class="panel-footer-bottom" style="margin-top:14px;">
-                    <div style="display:flex;justify-content:center;align-items:center;">
-                        <button id="btn-close-cash" class="btn-apply" style="min-width:220px;">Cerrar caja del
-                            día</button>
-                    </div>
-                </div>
-            </section>
+            <div class="header-date" id="header-date-row"
+                style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.3rem;"></div>
+            <div class="orders-list" id="orders-list"></div>
+            <div class="bottom-grid" id="bottom-grid"></div>
         </div>
+        <!-- ----------- FIN RESUMEN ------------- -->
+        <!-- ----------- TAB CALENDARIO -------------- -->
+        <div id="tab-calendario" style="display: none;">
+            <div class="audit-dashboard">
+                <aside class="audit-sidebar">
+                    <div class="audit-sidebar-header">
+                        <p>HISTORIAL</p>
+                        <h2>Selecciona un día para auditar</h2>
+                    </div>
 
-        <!-- CALENDARIO -->
-        <div id="content-calendario" class="hidden">
-            <section class="panel">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;">
-                    <div>
-                        <h3 id="calendar-month-name" style="margin:0;font-size:16px;font-weight:700">Mes Año</h3>
-                        <div class="subtitle" style="margin-top:4px;">Historial de cierres registrados en el sistema
+                    <div class="audit-card">
+                        <div class="audit-calendar-header" id="calendar-month-label">Febrero 2026</div>
+                        <div class="calendar-controls">
+                            <button id="prev-month" aria-label="Mes anterior">&lt;</button>
+                            <button id="next-month" aria-label="Mes siguiente">&gt;</button>
+                        </div>
+                        <div class="audit-calendar-grid" id="calendar-grid">
+                            <!-- Aquí van los días del calendario -->
+                            <div class="day-name">D</div>
+                            <div class="day-name">L</div>
+                            <div class="day-name">M</div>
+                            <div class="day-name">M</div>
+                            <div class="day-name">J</div>
+                            <div class="day-name">V</div>
+                            <div class="day-name">S</div>
                         </div>
                     </div>
 
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <button id="cal-prev" class="icon-btn" title="Mes anterior" aria-label="Mes anterior"
-                            style="background:#fff;color:#374151;border:1px solid var(--border);">◀</button>
-                        <button id="cal-today" class="btn-secondary" title="Hoy" style="padding:8px 12px;">Hoy</button>
-                        <button id="cal-next" class="icon-btn" title="Mes siguiente" aria-label="Mes siguiente"
-                            style="background:#fff;color:#374151;border:1px solid var(--border);">▶</button>
+                    <div class="card-summary">
+                        <h3>Exportación</h3>
+                        <p>Genera un documento profesional con el desglose de comisiones.</p>
+                        <button class="btn-save" id="btnExportar"><i class="fa-solid fa-file-pdf"></i> Descargar Reporte
+                            PDF</button>
                     </div>
-                </div>
+                </aside>
 
-                <div class="card" style="padding:0;margin-bottom:10px;">
-                    <div
-                        style="display:grid;grid-template-columns:repeat(7,1fr);background:#fbfcfe;padding:8px;border-bottom:1px solid var(--border);">
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Lun
+                <section class="audit-main-content">
+                    <header class="audit-header">
+                        <div>
+                            <span class="audit-status-pill" id="statusPill">● SELECCIONA UN DÍA</span>
+                            <h1 id="selectedDateTitle">Sin selección</h1>
                         </div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Mar
-                        </div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Mié
-                        </div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Jue
-                        </div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Vie
-                        </div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Sáb
-                        </div>
-                        <div style="padding:10px;text-align:center;font-weight:700;font-size:11px;color:#64748b;">Dom
-                        </div>
+                    </header>
+
+                    <div class="audit-orders-list" id="audit-orders-list">
+                        <!-- Aquí se cargan las órdenes del día -->
+                    </div>
+                    <div class="audit-summary-row" id="audit-summary-row">
+                        <!-- Totales vendedores y motorizados -->
+                    </div>
+                    <div class="audit-dark-footer" id="audit-dark-footer">
+                        <!-- Suma total del día -->
                     </div>
 
-                    <div id="calendar-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:0;"></div>
-                </div>
-
-                <!-- Selección controls -->
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-                    <button id="select-week" class="btn-secondary">Seleccionar semana</button>
-                    <button id="select-month" class="btn-secondary">Seleccionar mes</button>
-                    <button id="clear-selection" class="icon-btn"
-                        style="background:#fff;color:#374151;border:1px solid var(--border);">Limpiar selección</button>
-                    <button id="apply-selection" class="btn-apply" style="margin-left:auto">Aplicar selección</button>
-                </div>
-
-                <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;">
-                    <div style="display:flex;align-items:center;gap:8px;"><span
-                            style="width:10px;height:10px;background:#16a34a;border-radius:50%;display:inline-block"></span><span
-                            class="small-muted">Cierre realizado</span></div>
-                    <div style="display:flex;align-items:center;gap:8px;"><span
-                            style="width:10px;height:10px;background:#ef4444;border-radius:50%;display:inline-block"></span><span
-                            class="small-muted">Cierre pendiente</span></div>
-                    <div style="display:flex;align-items:center;gap:8px;"><span
-                            style="width:10px;height:10px;background:#7E3FF0;border-radius:50%;display:inline-block"></span><span
-                            class="small-muted">Seleccionado</span></div>
-                </div>
-            </section>
+                    <button id="btnGestionar" class="btn-audit-alert" style="display: none;">⚠️ GESTIONAR CIERRE DE CAJA
+                        PENDIENTE</button>
+                </section>
+            </div>
         </div>
+        <!-- ----------- FIN TAB CALENDARIO -------------- -->
     </main>
-
     <div id="toast" role="status" aria-live="polite"></div>
-
-    <script type="module" src="../assets/js/cierre-caja.js"></script>
     <script type="module" src="../assets/js/sidebar-loader.js"></script>
     <script type="module" src="../assets/js/session-timeout.js"></script>
+    <script type="module" src="../assets/js/cierre-caja.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script>
+        // Inicializamos el calendario cuando cargue la página
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabs = document.querySelectorAll('.tab-btn');
+            const resumen = document.getElementById('tab-resumen');
+            const calendario = document.getElementById('tab-calendario');
+            tabs.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    tabs.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    if (btn.dataset.tab === "resumen") {
+                        resumen.style.display = "";
+                        calendario.style.display = "none";
+                    } else {
+                        resumen.style.display = "none";
+                        calendario.style.display = "";
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>
