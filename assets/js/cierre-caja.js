@@ -617,6 +617,7 @@ async function getOrdersForDay(fechaIso) {
         console.error("Error orders for day", e); return [];
     }
 }
+
 async function renderAuditDay(fechaIso, cierresDelMes, orders) {
     const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -635,67 +636,134 @@ async function renderAuditDay(fechaIso, cierresDelMes, orders) {
         }
     }
 
-    const listDiv = document.getElementById("audit-orders-list");
-    let totV_bs = 0, totV_usd = 0, totM_bs = 0, totM_usd = 0;
-    let html = '';
-    for (const ord of orders) {
-        const vendedor = resolveAgent(ord, 'vendedor');
-        const motorizado = resolveAgent(ord, 'motorizado');
-        let vendedorInfo = { commissionType: "amount", commissionValue: 0, comisionBs: 0, comisionUsd: 0 };
-        let motorizadoInfo = { commissionType: "amount", commissionValue: 0, comisionBs: 0, comisionUsd: 0 };
-        if (vendedor && vendedor.length > 1) vendedorInfo = await getUserCommissionInfo(db, vendedor);
-        if (motorizado && motorizado.length > 1) motorizadoInfo = await getUserCommissionInfo(db, motorizado);
-        const orderTotals = getOrderTotalInBsAndUsd((ord.payment && ord.payment.methods) || []);
-        vendedorInfo.comisionBs = calcularComision(vendedorInfo.commissionType, vendedorInfo.commissionValue, orderTotals.bs);
-        vendedorInfo.comisionUsd = calcularComision(vendedorInfo.commissionType, vendedorInfo.commissionValue, orderTotals.usd);
-        motorizadoInfo.comisionBs = calcularComision(motorizadoInfo.commissionType, motorizadoInfo.commissionValue, orderTotals.bs);
-        motorizadoInfo.comisionUsd = calcularComision(motorizadoInfo.commissionType, motorizadoInfo.commissionValue, orderTotals.usd);
+    // Agrupa por vendedor y motorizado
+    let vendedores = {};
+    let motorizados = {};
+    let totalV_bs = 0, totalV_usd = 0, totalM_bs = 0, totalM_usd = 0;
 
-        html += `
-        <div class="order-card">
-            <div class="order-header" style="cursor:pointer;">
-                <div class="order-icon">📦</div>
-                <div class="order-info">
-                <div>
-                    <span class="order-id">${ord.id || ''}</span>
-                    <span class="customer-name">• ${ord.customerData?.Customname ?? ''}</span>
-                </div>
-                <div class="agents">
-                    <span class="vendedor">👤 V: ${vendedor?.toUpperCase() || '—'}</span>
-                    <span class="motorizado">🛵 M: ${motorizado?.toUpperCase() || '—'}</span>
-                </div>
-                </div>
-                <div class="amounts-summary">
-                ${commissionBadge('Cobrado', orderTotals.bs, orderTotals.usd, 'blue')}
-                ${commissionBadge(`Vendedor`, vendedorInfo.comisionBs, vendedorInfo.comisionUsd, 'purple')}
-                ${commissionBadge(`Motorizado`, motorizadoInfo.comisionBs, motorizadoInfo.comisionUsd, 'green')}
+    for (const ord of orders) {
+        // Vendedor
+        const vendedor = resolveAgent(ord, 'vendedor');
+        if (vendedor && vendedor.length > 1) {
+            let vendedorInfo = await getUserCommissionInfo(db, vendedor);
+            const orderTotals = getOrderTotalInBsAndUsd((ord.payment && ord.payment.methods) || []);
+            vendedorInfo.comisionBs = calcularComision(vendedorInfo.commissionType, vendedorInfo.commissionValue, orderTotals.bs);
+            vendedorInfo.comisionUsd = calcularComision(vendedorInfo.commissionType, vendedorInfo.commissionValue, orderTotals.usd);
+            if (!vendedores[vendedor]) {
+                vendedores[vendedor] = { 
+                    count: 0, 
+                    comisionBs: 0, 
+                    comisionUsd: 0 
+                };
+            }
+            vendedores[vendedor].count += 1;
+            vendedores[vendedor].comisionBs += vendedorInfo.comisionBs;
+            vendedores[vendedor].comisionUsd += vendedorInfo.comisionUsd;
+            totalV_bs += vendedorInfo.comisionBs;
+            totalV_usd += vendedorInfo.comisionUsd;
+        }
+        // Motorizado
+        const motorizado = resolveAgent(ord, 'motorizado');
+        if (motorizado && motorizado.length > 1) {
+            let motorizadoInfo = await getUserCommissionInfo(db, motorizado);
+            const orderTotals = getOrderTotalInBsAndUsd((ord.payment && ord.payment.methods) || []);
+            motorizadoInfo.comisionBs = calcularComision(motorizadoInfo.commissionType, motorizadoInfo.commissionValue, orderTotals.bs);
+            motorizadoInfo.comisionUsd = calcularComision(motorizadoInfo.commissionType, motorizadoInfo.commissionValue, orderTotals.usd);
+            if (!motorizados[motorizado]) {
+                motorizados[motorizado] = { 
+                    count: 0, 
+                    comisionBs: 0, 
+                    comisionUsd: 0 
+                };
+            }
+            motorizados[motorizado].count += 1;
+            motorizados[motorizado].comisionBs += motorizadoInfo.comisionBs;
+            motorizados[motorizado].comisionUsd += motorizadoInfo.comisionUsd;
+            totalM_bs += motorizadoInfo.comisionBs;
+            totalM_usd += motorizadoInfo.comisionUsd;
+        }
+    }
+
+    // RENDER CARDS PARA VENDEDORES
+    const listDiv = document.getElementById("audit-orders-list");
+    let html = '';
+    if (Object.keys(vendedores).length > 0) {
+        html += `<div style="border-bottom:2px solid #0284c7; margin-bottom:0.7em; padding-bottom:4px;">
+                    <span style="font-weight:bold;font-size:1.1em;color:#0284c7">👤Vendedores</span>
+                 </div>`;
+        for (const vName in vendedores) {
+            const v = vendedores[vName];
+            html += `
+            <div class="order-card">
+                <div class="order-header" style="cursor:pointer;">
+                    <div class="order-icon">👤</div>
+                    <div class="order-info">
+                        <div>
+                            <span class="order-id">${vName}</span>
+                            <span class="customer-name">• Vendedor</span>
+                        </div>
+                        <div class="agents">
+                            <span class="vendedor">Pedidos: <strong>${v.count}</strong></span>
+                        </div>
+                    </div>
+                    <div class="amounts-summary">
+                        ${commissionBadge('Comisión total', v.comisionBs, v.comisionUsd, 'purple')}
+                    </div>
                 </div>
             </div>
-      </div>`;
-        totV_bs += vendedorInfo.comisionBs;
-        totV_usd += vendedorInfo.comisionUsd;
-        totM_bs += motorizadoInfo.comisionBs;
-        totM_usd += motorizadoInfo.comisionUsd;
+            `;
+        }
     }
+
+    // Separador visual para motorizados
+    if (Object.keys(motorizados).length > 0) {
+        html += `<div style="margin: 1.2em 0 0.7em 0; border-bottom:2px solid #10b981; padding-bottom:4px;">
+                    <span style="font-weight:bold;font-size:1.1em;color:#10b981">🛵Motorizados</span>
+                 </div>`;
+        for (const mName in motorizados) {
+            const m = motorizados[mName];
+            html += `
+            <div class="order-card">
+                <div class="order-header" style="cursor:pointer;">
+                    <div class="order-icon">🛵</div>
+                    <div class="order-info">
+                        <div>
+                            <span class="order-id">${mName}</span>
+                            <span class="customer-name">• Motorizado</span>
+                        </div>
+                        <div class="agents">
+                            <span class="motorizado">Pedidos: <strong>${m.count}</strong></span>
+                        </div>
+                    </div>
+                    <div class="amounts-summary">
+                        ${commissionBadge('Comisión total', m.comisionBs, m.comisionUsd, 'green')}
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+    }
+
     if (listDiv) listDiv.innerHTML = html.length ? html : '<div style="color:#aaa;padding:1em;">No hay órdenes.</div>';
 
+    // RESUMEN TOTAL
     const summaryDiv = document.getElementById("audit-summary-row");
     if (summaryDiv) {
         summaryDiv.innerHTML = `
         <div class="audit-sum-card">
           <div class="sum-label"><i class="fa-solid fa-user"></i> Total Vendedores</div>
-          <div class="sum-total">Bs ${totV_bs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
-          <div class="sum-sub">$${totV_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+          <div class="sum-total">Bs ${totalV_bs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+          <div class="sum-sub">$${totalV_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
         </div>
         <div class="audit-sum-card">
           <div class="sum-label"><i class="fa-solid fa-motorcycle"></i> Total Motorizados</div>
-          <div class="sum-total">Bs ${totM_bs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
-          <div class="sum-sub">$${totM_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+          <div class="sum-total">Bs ${totalM_bs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+          <div class="sum-sub">$${totalM_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
         </div>
       `;
     }
 
-    let totalBs = totV_bs + totM_bs, totalUsd = totV_usd + totM_usd;
+    let totalBs = totalV_bs + totalM_bs, totalUsd = totalV_usd + totalM_usd;
     const footerDiv = document.getElementById("audit-dark-footer");
     if (footerDiv) {
         footerDiv.innerHTML = `
