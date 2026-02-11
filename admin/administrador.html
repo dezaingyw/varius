@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="assets/css/payment-modal.css">
     <link rel="stylesheet" href="assets/css/orders.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
-    
+
 </head>
 
 <body>
@@ -120,6 +120,26 @@
                                 d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
                         </svg>
                     </button>
+                </div>
+            </article>
+
+            <!-- ...dentro de la sección de KPIs... -->
+            <article id="kpi-visitas-carrito" class="card kpi-card kpi-modern kpi-variant-info" role="button"
+                tabindex="0" aria-pressed="false" onclick="abrirModalVisitasCarrito()">
+                <div class="kpi-top">
+                    <div class="kpi-avatar">👁️</div>
+                    <div>
+                        <div class="kpi-title">Visitas Carrito</div>
+                        <div class="kpi-sub">Contador de visitas a carrito</div>
+                    </div>
+                </div>
+                <div class="kpi-divider"></div>
+                <div>
+                    <div class="kpi-amount"><span id="kpi-visitas-carrito-value">—</span></div>
+                </div>
+                <div class="kpi-bottom">
+                    <div class="kpi-meta">Última actualización</div>
+                    <button class="kpi-action" aria-label="Ver detalles"></button>
                 </div>
             </article>
 
@@ -251,6 +271,21 @@
         <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
     </main>
 
+    <!-- MODAL VISITAS DEL CARRITO -->
+    <div id="modal-visitas-carrito" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-content modal-lg" role="document">
+            <div class="modal-header">
+                <h2>Visitas al Carrito</h2>
+                <button class="close-btn" id="closeModalVisitasCarrito" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="modalVisitasCarritoBody">
+                <!-- Tabla se llena por JS -->
+            </div>
+            <div class="modal-footer" style="display:flex;justify-content:flex-end;">
+                <button class="btn-secondary" id="modalVisitasCarritoOk">Cerrar</button>
+            </div>
+        </div>
+    </div>
     <!-- View Modal -->
     <div id="order-view-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="modal-content modal-lg" role="document">
@@ -526,6 +561,7 @@
     <script type="module" src="../assets/js/bank-select.js"></script>
     <script type="module" src="../assets/js/orders-admin.js"></script>
     <script type="module" src="../assets/js/kpis.js"></script>
+    <script type="module" src="../assets/js/kpis-visits.js"></script>
     <script type="module" src="../assets/js/presence.js"></script>
     <script type="module" src="../assets/js/session-timeout.js"></script>
 
