@@ -328,7 +328,7 @@ nav .nav-list {
 */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   grid-auto-rows: 1fr;
   /* force rows to equal height */
   gap: 18px;
@@ -2461,3 +2461,4 @@ tr.row-suspendido td:first-child {
 }
 
 /* End of file */
+
