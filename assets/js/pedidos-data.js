@@ -969,7 +969,7 @@ if (addressInput) {
     });
 }
 function validateFormAll() {
-    const ok = validateName() && validatePhone() && validateAddress() && validateEmail() && validateAge();
+    const ok = validateName() && validatePhone() && validateAddress();
     const submitBtn = document.getElementById('checkoutSubmitBtn');
     if (submitBtn) submitBtn.disabled = !ok;
     return ok;
@@ -978,13 +978,9 @@ function validateFormAll() {
 function submitHandler(e) {
     e.preventDefault();
     const name = document.getElementById('cust_name').value.trim();
-    const emailUser = document.getElementById('cust_email').value.trim();
-    const emailDomain = document.getElementById('cust_email_domain')?.value || '';
-    const emailFull = emailUser ? `${emailUser}@${emailDomain}` : '';
     const operator = document.getElementById('cust_operator')?.value || '';
     const phoneRaw = document.getElementById('cust_phone').value.trim();
     const phoneFull = operator && phoneRaw ? `${operator}${phoneRaw}` : phoneRaw;
-    const age = document.getElementById('cust_age')?.value.trim() || "";
     const address = document.getElementById('cust_address').value.trim();
     const lat = document.getElementById('cust_lat')?.value || "";
     const lng = document.getElementById('cust_lng')?.value || "";
@@ -993,7 +989,7 @@ function submitHandler(e) {
         if (msg) { msg.textContent = 'Corrige los campos indicados antes de enviar.'; msg.style.color = '#ef4444'; }
         return;
     }
-    submitOrder({ name, email: emailFull, phone: phoneFull, age, address, lat, lng });
+    submitOrder({ name, phone: phoneFull, address, lat, lng });
 }
 
 let IS_SUBMITTING = false;
@@ -1034,10 +1030,8 @@ async function submitOrder(customerData) {
         cartToken: CART.cartToken,
         customerData: {
             Customname: customerData.name,
-            email: customerData.email,
             phone: customerData.phone || "",
             address: customerData.address,
-            age: customerData.age || "",
             lat: customerData.lat || "",
             lng: customerData.lng || "",
             readable_address: customerData.address
