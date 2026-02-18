@@ -193,7 +193,6 @@
           <button id="backToCart" class="back" aria-label="Volver al carrito">←</button>
           <h3 id="checkoutTotalHeader">Total: $0</h3>
         </header>
-
         <form id="checkoutForm" class="checkout-form" novalidate>
           <div class="form-row">
             <label for="cust_name">Nombre y Apellido <span class="req">*</span></label>
@@ -203,25 +202,9 @@
 
           <div class="form-row">
             <label for="cust_phone">Teléfono <span class="req">*</span></label>
-            <!-- inputmode y pattern ayudan en mobile; sanitización en JS asegura sólo dígitos -->
             <input id="cust_phone" name="phone" type="text" placeholder="Ej: 04121234567" required autocomplete="tel"
               inputmode="numeric" pattern="\d*" maxlength="15">
             <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
-          </div>
-
-          <div class="form-row">
-            <label for="cust_email">Correo Electrónico</label>
-            <input id="cust_email" name="email" type="email" placeholder="ejemplo@correo.com" autocomplete="email"
-              inputmode="email">
-            <div id="cust_email_err" class="field-err" aria-live="polite"></div>
-          </div>
-
-          <div class="form-row">
-            <label for="cust_age">Edad</label>
-            <!-- usar text + inputmode para controlar mejor la sanitización; maxlength evita valores grandes -->
-            <input id="cust_age" name="age" type="text" inputmode="numeric" pattern="\d*" maxlength="3"
-              placeholder="Edad">
-            <div id="cust_age_err" class="field-err" aria-live="polite"></div>
           </div>
 
           <div class="form-row" style="position:relative;">
