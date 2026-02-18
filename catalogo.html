@@ -136,6 +136,96 @@
       }
     }
   </style>
+  <style>
+  /* Filtros arriba del catálogo */
+  .catalog-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+
+  .catalog-categories {
+    display: flex;
+    gap: 14px;
+    padding: 10px 16px;
+    background: #fff;
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  }
+
+  .catalog-category-btn {
+    background: none;
+    border: none;
+    font: inherit;
+    font-weight: 500;
+    color: #4b5563;
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+    outline: none;
+  }
+  .catalog-category-btn.active {
+    background: #12c5ae2b;
+    color: #12c5ae;
+    font-weight: 700;
+    box-shadow: 0 2px 8px #12c5ae29;
+  }
+
+  .catalog-search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .catalog-search {
+    border: 1px solid #e0e1e6;
+    border-radius: 99px;
+    padding: 9px 36px 9px 14px;
+    font-size: 1rem;
+    width: 220px;
+    transition: border-color 0.18s;
+    outline: none;
+  }
+  .catalog-search:focus {
+    border-color: #12c5ae;
+    box-shadow: 0 2px 8px #12c5ae29;
+  }
+  .search-shortcut {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #f0f8fa;
+    color: #213;
+    font-size: 0.82rem;
+    padding: 2px 8px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px #0001;
+    pointer-events: none;
+    opacity: 0.8;
+    user-select: none;
+  }
+  @media (max-width: 760px) {
+    .catalog-filters-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .catalog-categories {
+      padding: 8px 6px;
+      gap: 7px;
+      font-size: 0.92rem;
+    }
+    .catalog-search {
+      width: 100%;
+      min-width: 0;
+      padding: 9px 36px 9px 12px;
+    }
+  }
+</style>
 </head>
 
 <body>
@@ -152,104 +242,14 @@
   </header>
 
   <main class="container">
-
-    <!-- Página de carrito: dividida en panel izquierdo (carrito) y derecho (checkout) -->
-    <section id="cartPage" class="cart-page">
-      <!-- Panel carrito (ahora inline, puede minimizarse) -->
-      <aside id="cartPanel" class="cart-panel" role="region" aria-label="Carrito">
-        <header class="cart-header">
-          <div class="cart-header-left">
-            <h2>Tu Carrito</h2>
-            <div class="cart-subhead">Envío: <strong id="cartShippingInline">GRATIS</strong></div>
-          </div>
-          <button id="minimizeCartBtn" class="mini-toggle" aria-label="Minimizar carrito"
-            title="Minimizar carrito">—</button>
-        </header>
-        <br>
-        <div id="selectedProducts" class="selected-products" aria-live="polite" tabindex="0">
-          <!-- Productos seleccionados con quantity > 0 -->
-        </div>
-
-        <hr class="divider">
-
-        <!-- MOVIDO: Resumen y acciones (ahora antes de "Productos Disponibles") -->
-        <div class="cart-summary" id="cartSummaryInline" aria-live="polite">
-          <div>Subtotal: <strong id="cartSubtotalInline">$0</strong></div>
-          <div>Envío: <strong id="cartShippingInline2">GRATIS</strong></div>
-          <div class="total" style="margin-top:8px;font-weight:800">Total: <strong id="cartTotalInline">$0</strong>
-          </div>
-        </div>
-
-        <div class="cart-actions-inline">
-          <button id="continueWithData" class="btn-primary" disabled>Continuar con mis datos</button>
-          <button id="clearCartBtn" class="btn-secondary">Vaciar Carrito</button>
-        </div>
-
-        <div class="available-head"><strong>Productos en Ofertas</strong></div>
-        <div id="availableProducts" class="available-products" aria-live="polite">
-          <div id="productsSpinner" class="spinner">Cargando productos…</div>
-        </div>
-
-      </aside>
-
-      <!-- Panel checkout (right) -->
-      <section id="checkoutPanel" class="checkout-panel hidden" role="region" aria-label="Checkout">
-        <header class="checkout-header">
-          <button id="backToCart" class="back" aria-label="Volver al carrito">←</button>
-          <h3 id="checkoutTotalHeader">Total: $0</h3>
-        </header>
-
-        <form id="checkoutForm" class="checkout-form" novalidate>
-          <div class="form-row">
-            <label for="cust_name">Nombre y Apellido <span class="req">*</span></label>
-            <input id="cust_name" name="name" type="text" placeholder="Ej: Ana Martínez" required autocomplete="name">
-            <div id="cust_name_err" class="field-err" aria-live="polite"></div>
-          </div>
-
-          <div class="form-row">
-            <label for="cust_phone">Teléfono <span class="req">*</span></label>
-            <!-- inputmode y pattern ayudan en mobile; sanitización en JS asegura sólo dígitos -->
-            <input id="cust_phone" name="phone" type="text" placeholder="Ej: 04121234567" required autocomplete="tel"
-              inputmode="numeric" pattern="\d*" maxlength="15">
-            <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
-          </div>
-
-          <div class="form-row">
-            <label for="cust_email">Correo Electrónico</label>
-            <input id="cust_email" name="email" type="email" placeholder="ejemplo@correo.com" autocomplete="email"
-              inputmode="email">
-            <div id="cust_email_err" class="field-err" aria-live="polite"></div>
-          </div>
-
-          <div class="form-row">
-            <label for="cust_age">Edad</label>
-            <!-- usar text + inputmode para controlar mejor la sanitización; maxlength evita valores grandes -->
-            <input id="cust_age" name="age" type="text" inputmode="numeric" pattern="\d*" maxlength="3"
-              placeholder="Edad">
-            <div id="cust_age_err" class="field-err" aria-live="polite"></div>
-          </div>
-
-          <div class="form-row" style="position:relative;">
-            <label for="cust_address">Dirección Completa <span class="req">*</span></label>
-            <button type="button" id="btnGeoLocation" class="btn-secondary"
-              style="margin-bottom:8px;width: fit-content;align-self: flex-start;">
-              📍 Ubicación
-            </button>
-            <textarea id="cust_address" name="address" placeholder="Calle, número, colonia, ciudad" required></textarea>
-            <div id="geo_error" class="field-err" aria-live="polite" style="margin-top:3px;"></div>
-            <input type="hidden" id="cust_lat" name="lat">
-            <input type="hidden" id="cust_lng" name="lng">
-          </div>
-
-          <div class="form-actions">
-            <button id="checkoutSubmitBtn" type="submit" class="btn-primary" disabled>Confirmar pedido</button>
-            <button type="button" id="cancelCheckout" class="btn-secondary">Cancelar</button>
-          </div>
-          <div id="checkoutMsg" class="form-msg" aria-live="polite"></div>
-        </form>
-      </section>
-    </section>
-
+    <div class="catalog-filters-row">
+      <div class="catalog-categories" id="catalogCategories"></div>
+      <div class="catalog-search-wrapper">
+        <input type="text" id="catalogSearch" class="catalog-search" placeholder="Buscar producto..." autocomplete="off"
+          aria-label="Buscar producto" tabindex="0" />
+        <span class="search-shortcut">Ctrl + K</span>
+      </div>
+    </div>
     <div class="section-divider">
       <span>Catalogo de Productos</span>
     </div>
@@ -306,14 +306,6 @@
   </div>
 
   <!-- Confirmación simple inline -->
-  <div id="orderConfirmInline" class="order-confirm hidden" role="status" aria-live="polite">
-    <div class="confirm-inner">
-      <h3>Pedido enviado</h3>
-      <p id="orderConfirmText">Su pedido será atendido pronto. Gracias por comprar con nosotros.</p>
-      <button id="closeConfirm" class="btn-primary">Cerrar</button>
-    </div>
-  </div>
-
   <div id="toast" class="toast" aria-live="polite"></div>
 
   <footer class="site-footer">
@@ -322,10 +314,17 @@
     </div>
   </footer>
 
-  <script type="module" src="assets/js/pedidos-data.js"></script>
+  <script type="module" src="assets/js/catalogo.js"></script>
   <script type="module" src="assets/js/contact-layout.js"></script>
   <script type="module" src="assets/js/ui-animations.js"></script>
   <script type="module" src="assets/js/visits.js"></script>
+  <script>
+    const cartBtn = document.getElementById('openCartBtn');
+
+    cartBtn.addEventListener('click', () => {
+      window.location.href = 'carrito.html';
+    });
+  </script>
 </body>
 
 </html>
