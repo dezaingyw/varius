@@ -1,7 +1,4 @@
-// Archivo JavaScript (actualizado): muestra badge pequeño en carrito para productos en oferta,
-// y en "Productos Disponibles" ahora SOLO muestra productos en oferta. También ajusta mensaje
-// cuando no hay productos en oferta.
-// Mantengo el resto de la lógica y comentarios intactos.
+// Archivo actualizado: Elimina todo lo relacionado con productsGrid y con el listado de productos en ofertas del carrito.
 
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -315,7 +312,7 @@ function showConfirm(message = '¿Estás seguro?') {
     });
 }
 
-/* ---------------------- Render carrito inline (con badge en items) ---------------------- */
+/* ---------------------- Render carrito inline ---------------------- */
 let SELECTED_PRODUCT_ID = null;
 function renderCartCount() {
     const count = CART.items.reduce((s, i) => s + i.quantity, 0);
@@ -325,12 +322,11 @@ function renderCartCount() {
 
 function renderCartPanel() {
     const selectedEl = document.getElementById('selectedProducts');
-    const availableEl = document.getElementById('availableProducts');
     const subtotalEl = document.getElementById('cartSubtotalInline');
     const totalEl = document.getElementById('cartTotalInline');
     const checkoutTotalHeader = document.getElementById('checkoutTotalHeader');
     const continueBtn = document.getElementById('continueWithData');
-    if (!selectedEl || !availableEl) return;
+    if (!selectedEl) return;
 
     const hasItems = CART.items && CART.items.length > 0;
     if (continueBtn) {
@@ -350,7 +346,6 @@ function renderCartPanel() {
         selectedEl.innerHTML = '<div style="padding:12px;color:#64748b">No hay artículos seleccionados.</div>';
     } else {
         for (const it of items) {
-            // Obtener info del producto para saber si está en oferta
             const p = PRODUCTS_BY_ID.get(it.productId);
             const isOffer = !!(p && (p.isOnSale || (p.discountPrice && p.discountPrice < p.price)));
             const badgeHtml = isOffer ? `<div class="offer-badge-small" aria-hidden="true">🎁 Oferta</div>` : '';
@@ -358,43 +353,42 @@ function renderCartPanel() {
             const div = document.createElement('div');
             div.className = 'cart-item';
             div.innerHTML = `
-          <div class="cart-item-product" style="width:100%;text-align:left;">
-            <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" style="display:block;margin:0 0 1rem 0;width:100%;max-width:400px;height:170px;object-fit:contain;border-radius:18px;box-shadow:0 8px 24px #0001;">
-            <div class="product-title-row">
-              <div class="left">
-                <div style="font-weight:700;font-size:1.1rem;margin-top:0.6rem;text-align:left;">${escapeHtml(it.name)}</div>
-                ${badgeHtml}
-              </div>
-              <div style="color:#8c99a6;font-size:1.05rem;margin-left:12px;text-align:right;">
-                ${formatCurrency(it.price)} x ${it.quantity} = <strong style="color:#222">${formatCurrency(it.subtotal)}</strong>
-              </div>
-            </div>
+              <div class="cart-item-product" style="width:100%;text-align:left;">
+                <img src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" style="display:block;margin:0 0 1rem 0;width:100%;max-width:400px;height:170px;object-fit:contain;border-radius:18px;box-shadow:0 8px 24px #0001;">
+                <div class="product-title-row">
+                  <div class="left">
+                    <div style="font-weight:700;font-size:1.1rem;margin-top:0.6rem;text-align:left;">${escapeHtml(it.name)}</div>
+                    ${badgeHtml}
+                  </div>
+                  <div style="color:#8c99a6;font-size:1.05rem;margin-left:12px;text-align:right;">
+                    ${formatCurrency(it.price)} x ${it.quantity} = <strong style="color:#222">${formatCurrency(it.subtotal)}</strong>
+                  </div>
+                </div>
 
-            <div class="qty-controls" style="justify-content:flex-start;gap:0.35rem;margin:0.6rem 0 0 0;">
-              <button class="qty-decr" data-id="${it.productId}" aria-label="Disminuir" style="background:#cdb4ff;color:#222;font-weight:700;">−</button>
-              <input class="qty-input" data-id="${it.productId}" type="number" min="0" max="999" value="${it.quantity}" style="width:56px;border-radius:10px;padding:8px 0 8px 0;text-align:center;">
-              <button class="qty-incr" data-id="${it.productId}" aria-label="Aumentar" style="background:#cdb4ff;color:#222;font-weight:700;">+</button>
-              <button class="btn-secondary remove-item" data-id="${it.productId}" style="margin-left:18px;border-radius:9px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
-                class="bi bi-trash" viewBox="0 0 16 16">
-                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                </svg>
-              </button>
-              <button class="btn-secondary view-btn" data-id="${it.productId}" style="margin-left:10px;border-radius:9px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
-                class="bi bi-eye" viewBox="0 0 16 16">
-                  <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
-                  <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        `;
+                <div class="qty-controls" style="justify-content:flex-start;gap:0.35rem;margin:0.6rem 0 0 0;">
+                  <button class="qty-decr" data-id="${it.productId}" aria-label="Disminuir" style="background:#cdb4ff;color:#222;font-weight:700;">−</button>
+                  <input class="qty-input" data-id="${it.productId}" type="number" min="0" max="999" value="${it.quantity}" style="width:56px;border-radius:10px;padding:8px 0 8px 0;text-align:center;">
+                  <button class="qty-incr" data-id="${it.productId}" aria-label="Aumentar" style="background:#cdb4ff;color:#222;font-weight:700;">+</button>
+                  <button class="btn-secondary remove-item" data-id="${it.productId}" style="margin-left:18px;border-radius:9px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+                    class="bi bi-trash" viewBox="0 0 16 16">
+                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                    </svg>
+                  </button>
+                  <button class="btn-secondary view-btn" data-id="${it.productId}" style="margin-left:10px;border-radius:9px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+                    class="bi bi-eye" viewBox="0 0 16 16">
+                      <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                      <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            `;
             selectedEl.appendChild(div);
         }
 
-        // Eventos controles cantidad
         selectedEl.querySelectorAll('.qty-incr').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const id = e.currentTarget.dataset.id;
@@ -431,125 +425,7 @@ function renderCartPanel() {
                 renderCartPanel();
             });
         });
-        // Evento para botón de ver (modal)
         selectedEl.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const id = e.currentTarget.dataset.id;
-                let p = PRODUCTS_BY_ID.get(id);
-                if (!p) p = await fetchProductByIdOrSlug(id);
-                if (!p) { showToast('Producto no encontrado'); return; }
-                await resolveProductImages(p);
-                openProductModal(p);
-            });
-        });
-    }
-
-    // Orden: ofertas primero (por mayor descuento) luego resto alfabéticamente
-    const inCartIds = new Set(CART.items.map(i => i.productId));
-
-    // MODIFICACIÓN CRÍTICA: aquí filtramos únicamente productos en oferta
-    const availProducts = PRODUCTS.filter(p =>
-        isProductVisible(p) &&
-        (typeof p.stock !== 'number' || p.stock > 0) &&
-        !inCartIds.has(p.id) &&
-        (p.isOnSale || (p.discountPrice && Number(p.discountPrice) < Number(p.price)))
-    );
-
-    availProducts.sort((a, b) => {
-        const aOffer = (a.isOnSale || (a.discountPrice && a.discountPrice < a.price)) ? 1 : 0;
-        const bOffer = (b.isOnSale || (b.discountPrice && b.discountPrice < b.price)) ? 1 : 0;
-        if (aOffer !== bOffer) return bOffer - aOffer; // ofertas primero
-        if (aOffer && bOffer) {
-            const aDisc = (Number(a.price) - Number(a.discountPrice || a.price)) || 0;
-            const bDisc = (Number(b.price) - Number(b.discountPrice || b.price)) || 0;
-            if (aDisc !== bDisc) return bDisc - aDisc; // mayor descuento primero
-        }
-        return String(a.name || '').localeCompare(String(b.name || ''));
-    });
-
-    availableEl.innerHTML = '';
-    if (!availProducts.length) {
-        availableEl.innerHTML = '<div style="padding:12px;color:#64748b">No hay productos en oferta.</div>';
-    } else {
-        for (const p of availProducts) {
-            const resolved = (p.__resolvedImages && p.__resolvedImages[0]) || p.image || '';
-            const div = document.createElement('div');
-            div.className = 'avail-item';
-
-            let priceHtml = '';
-            const isOffer = p.isOnSale || (p.discountPrice && Number(p.discountPrice) < Number(p.price));
-            if (p.discountPrice && Number(p.discountPrice) < Number(p.price)) {
-                priceHtml = `
-                  <span class="price-old" style="font-size:0.9rem;color:#9aa1ab;text-decoration:line-through;margin-right:6px;">
-                    ${formatCurrency(p.price)}
-                  </span>
-                  <span style="color:#9aa1ab;margin-right:6px;">→</span>
-                  <span class="price-new" style="font-size:1.05rem;color:#111;font-weight:700;">
-                    ${formatCurrency(p.discountPrice)}
-                  </span>
-                `;
-            } else {
-                priceHtml = `<span class="price-new" style="font-size:1.03rem;color:#111;font-weight:700;">${formatCurrency(p.price)}</span>`;
-            }
-
-            // Badge "🎁 OFERTA" cuando aplica
-            const badgeHtml = isOffer ? `` : '';
-
-            div.innerHTML = `
-              ${badgeHtml}
-              <img src="${escapeHtml(resolved)}" alt="${escapeHtml(p.name)}">
-              <div style="flex:1">
-                <div style="font-weight:700">${escapeHtml(p.name)}</div>
-                <div style="color:#94a3b8">${priceHtml}</div>
-                <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-                  <div class="qty-controls" style="align-items:center">
-                    <button class="qty-decr avail-decr" data-id="${escapeHtml(p.id)}" aria-label="Disminuir">−</button>
-                    <input class="avail-qty qty-input" data-id="${escapeHtml(p.id)}" type="number" min="0" max="999" value="0" style="width:70px;padding:6px;border-radius:8px;border:1px solid #e6eef6">
-                    <button class="qty-incr avail-incr" data-id="${escapeHtml(p.id)}" aria-label="Aumentar">+</button>
-                  </div>
-                  <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-left:8px">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
-                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
-                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            `;
-            availableEl.appendChild(div);
-        }
-
-        availableEl.querySelectorAll('.avail-qty').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const id = e.currentTarget.dataset.id;
-                let q = parseInt(e.currentTarget.value, 10);
-                if (isNaN(q) || q < 0) q = 0;
-                if (q === 0) { e.currentTarget.value = 0; return; }
-                const added = addToCart(id, q);
-                if (added) { renderCartPanel(); e.currentTarget.value = 0; }
-                else { e.currentTarget.value = 0; }
-            });
-        });
-
-        availableEl.querySelectorAll('.avail-incr').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const id = e.currentTarget.dataset.id;
-                addToCart(id, 1);
-                renderCartPanel();
-            });
-        });
-
-        availableEl.querySelectorAll('.avail-decr').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const id = e.currentTarget.dataset.id;
-                const item = CART.items.find(x => x.productId === id);
-                if (!item) { showToast('No hay unidades en el carrito para este producto'); return; }
-                updateQuantity(id, Math.max(0, item.quantity - 1));
-                renderCartPanel();
-            });
-        });
-
-        availableEl.querySelectorAll('.view-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const id = e.currentTarget.dataset.id;
                 let p = PRODUCTS_BY_ID.get(id);
@@ -567,94 +443,6 @@ function renderCartPanel() {
     if (checkoutTotalHeader) checkoutTotalHeader.textContent = `Total: ${formatCurrency(subtotal)}`;
 
     renderCartCount();
-}
-
-/* ---------------------- Product cards + carousel (carousel desactivado) ---------------------- */
-function createProductCardHtml(p, resolvedImages = []) {
-    const isOffer = !!(p.isOnSale || (p.discountPrice && p.discountPrice < p.price));
-    let priceHtml = '';
-    if (isOffer) {
-        priceHtml = `
-          <span class="price-old" aria-hidden="true" style="font-size:0.9rem;color:#9aa1ab;text-decoration:line-through;margin-right:6px;">
-            ${formatCurrency(p.price)}
-          </span>
-          <span style="color:#9aa1ab;margin-right:6px;">→</span>
-          <span class="price-new" style="font-size:1.05rem;color:#111;font-weight:700;">
-            ${formatCurrency(p.discountPrice)}
-          </span>
-        `;
-    } else {
-        priceHtml = `<span class="price-new" style="font-size:1.03rem;color:#111;font-weight:700;">${formatCurrency(p.price)}</span>`;
-    }
-    const sliderHtml = `<div class="card-slider" role="img" aria-label="${escapeHtml(p.name)}">${resolvedImages.length ? resolvedImages.map((u, i) => `<img src="${escapeHtml(u)}" alt="${escapeHtml(p.name)} ${i + 1}" style="opacity:${i === 0 ? 1 : 0}">`).join('') : `<img src="${escapeHtml(p.image || '')}" alt="${escapeHtml(p.name)}">`}</div>`;
-    return `
-      ${isOffer ? `<div class="offer-badge" aria-hidden="true">Oferta</div>` : ''}
-      ${sliderHtml}
-      <div class="product-info">
-        <div class="product-title">${escapeHtml(p.name)}</div>
-        <div class="product-meta">${escapeHtml(p.category || '')}</div>
-        <div class="product-price">${priceHtml}</div>
-        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-          <button class="btn-secondary view-btn" data-id="${escapeHtml(p.id)}" style="margin-right:8px" aria-label="Ver producto ${escapeHtml(p.name)}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
-                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
-                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
-            </svg>
-          </button>
-          <button class="btn-primary add-btn" data-id="${escapeHtml(p.id)}" aria-label="Agregar ${escapeHtml(p.name)}">Agregar</button>
-        </div>
-      </div>
-    `;
-}
-function initCardSliderDOM(cardEl) {
-    const imgs = Array.from(cardEl.querySelectorAll('.card-slider img'));
-    if (!imgs.length) return;
-    if (imgs.length <= 1) return;
-    let idx = 0;
-    setInterval(() => {
-        const prev = idx;
-        idx = (idx + 1) % imgs.length;
-        imgs[prev].style.opacity = '0';
-        imgs[idx].style.opacity = '1';
-    }, 2400);
-}
-async function renderProductsGrid() {
-    const el = document.getElementById('productsGrid');
-    if (!el) return;
-    el.innerHTML = '';
-    const visibleProducts = PRODUCTS.filter(isProductVisible);
-    if (!visibleProducts.length) { el.innerHTML = '<div class="spinner">No hay productos para mostrar.</div>'; return; }
-    await Promise.all(visibleProducts.map(async (p) => { try { await resolveProductImages(p); } catch (err) { console.warn('Error resolving images for', p.id, err); } }));
-    for (const p of visibleProducts) {
-        const resolved = p.__resolvedImages && p.__resolvedImages.length ? p.__resolvedImages : (p.image ? [p.image] : []);
-        const card = document.createElement('article');
-        card.className = 'product-card';
-        card.innerHTML = createProductCardHtml(p, resolved);
-        el.appendChild(card);
-        initCardSliderDOM(card);
-    }
-    el.querySelectorAll('.add-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            const p = PRODUCTS_BY_ID.get(id);
-            if (!p || !isProductVisible(p)) { showToast('Producto no disponible'); return; }
-            addToCart(id, 1);
-            renderCartPanel();
-        });
-    });
-
-    el.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const id = e.currentTarget.dataset.id;
-            let p = PRODUCTS_BY_ID.get(id);
-            if (!p) p = await fetchProductByIdOrSlug(id);
-            if (!p) { showToast('Producto no encontrado'); return; }
-            await resolveProductImages(p);
-            openProductModal(p);
-        });
-    });
-
-    try { document.getElementById('productsGrid').style.display = ''; } catch (e) { }
 }
 
 /* ---------------------- Carousel: desactivado (no eliminar para mantener compatibilidad) ---------------------- */
@@ -922,14 +710,6 @@ function onProductModalKeydown(e) {
     if (e.key === 'ArrowRight') productModalNext();
 }
 
-/* ---------------------- URL-handling, geolocation, form validation, submit, boot (sin cambios funcionales) ---------------------- */
-/* ... mantengo el resto del archivo tal y como estaban en tu archivo original (geolocalización, validaciones, envíos a Firestore, boot) ... */
-
-/* Para abreviar en esta respuesta incluyo las funciones restantes tal y como estaban en tu archivo original:
-   handleUrlAddParams, setupGeolocationButton, transformContactFields, validateName, validateEmail, validatePhone,
-   validateAddress, validateAge, validateFormAll, submitHandler, submitOrder, attachGlobalEvents, boot.
-   (No se cambia su lógica. En tu repo se mantienen exactamente.)
-*/
 
 async function handleUrlAddParams() {
     const params = new URLSearchParams(window.location.search);
@@ -1352,6 +1132,7 @@ function attachGlobalEvents() {
     });
 }
 
+/* Eventos y boot */
 async function boot() {
     loadCartFromCookie();
     attachGlobalEvents();
@@ -1359,18 +1140,12 @@ async function boot() {
     renderCartCount();
     try {
         await fetchAllProductsFromFirestore();
-        if (document.getElementById('productsGrid')) {
-            const spinner = document.getElementById('productsSpinner'); spinner?.remove();
-            renderProductsGrid();
-            if (typeof setupCarousel === 'function') setupCarousel();
-        }
+        if (typeof setupCarousel === 'function') setupCarousel();
         await Promise.all(PRODUCTS.map(p => resolveProductImages(p)));
         await handleUrlAddParams();
         renderCartPanel();
         validateFormAll();
     } catch (err) {
-        const productsGrid = document.getElementById('productsGrid');
-        if (productsGrid) { productsGrid.innerHTML = `<div style="padding:16px;color:#ef4444">No se pudieron cargar los productos. Revisa la conexión o la colección "product" en Firestore.</div>`; }
         showToast('Error cargando productos (ver consola).', 4000);
     }
 }
@@ -1378,3 +1153,4 @@ async function boot() {
 window.addEventListener('load', boot);
 
 export { };
+// FIN DEL ARCHIVO
