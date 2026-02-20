@@ -15,6 +15,10 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// ----- NUEVAS VARIABLES PARA PAGINACION -----
+let CATALOG_PAGE_SIZE = 20;
+let CATALOG_CURRENT_PAGE = 1;
+
 // Helpers cookies/cart
 function generateCartToken() {
   const rnds = crypto.getRandomValues(new Uint8Array(16));
@@ -487,6 +491,7 @@ function isProductVisible(p) {
 }
 const toastEl = document.getElementById('toast');
 let toastTimeout = null;
+
 function showToast(msg, ms = 2200) {
   if (!toastEl) return;
   toastEl.textContent = msg;
@@ -494,6 +499,7 @@ function showToast(msg, ms = 2200) {
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => toastEl.classList.remove('show'), ms);
 }
+
 function escapeHtml(s) {
   if (!s) return '';
   return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
@@ -582,6 +588,7 @@ function renderCategoryButtons() {
     btn.setAttribute("data-cat", cat);
     btn.onclick = () => {
       CURRENT_CATEGORY = cat;
+      CATALOG_CURRENT_PAGE = 1; // <-- vuelve a página 1
       renderProductsGridFiltered();
       renderCategoryButtons();
     };
@@ -599,19 +606,36 @@ function filterProducts() {
   });
 }
 
+// --- Renderizar paginado ---
 async function renderProductsGridFiltered() {
   const el = document.getElementById('productsGrid');
   if (!el) return;
-  el.innerHTML = '';
+
+  // FILTRADO y orden según categoria/filtros búsqueda
   const visibleProducts = filterProducts();
-  if (!visibleProducts.length) {
+
+  // PAGINADO
+  const totalProducts = visibleProducts.length;
+  const totalPages = Math.ceil(totalProducts / CATALOG_PAGE_SIZE);
+
+  // Ajusta CATALOG_CURRENT_PAGE por si alguien cambió el filtro y quedaron menos páginas
+  if (CATALOG_CURRENT_PAGE > totalPages) CATALOG_CURRENT_PAGE = totalPages > 0 ? totalPages : 1;
+  if (CATALOG_CURRENT_PAGE < 1) CATALOG_CURRENT_PAGE = 1;
+
+  const startIdx = (CATALOG_CURRENT_PAGE - 1) * CATALOG_PAGE_SIZE;
+  const paginatedProducts = visibleProducts.slice(startIdx, startIdx + CATALOG_PAGE_SIZE);
+
+  el.innerHTML = '';
+  if (!paginatedProducts.length) {
     el.innerHTML = '<div class="spinner">No hay productos para mostrar.</div>';
+    renderCatalogPagination(totalPages);
     return;
   }
-  await Promise.all(visibleProducts.map(async (p) => {
+
+  await Promise.all(paginatedProducts.map(async (p) => {
     try { await resolveProductImages(p); } catch (err) { }
   }));
-  for (const p of visibleProducts) {
+  for (const p of paginatedProducts) {
     const resolved = p.__resolvedImages && p.__resolvedImages.length ? p.__resolvedImages : (p.image ? [p.image] : []);
     const card = document.createElement('article');
     card.className = 'product-card';
@@ -619,6 +643,7 @@ async function renderProductsGridFiltered() {
     el.appendChild(card);
     initCardSliderDOM(card);
   }
+  // Add listeners as antes...
   el.querySelectorAll('.add-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = e.currentTarget.dataset.id;
@@ -638,8 +663,77 @@ async function renderProductsGridFiltered() {
       openProductModal(p);
     });
   });
-  try { document.getElementById('productsGrid').style.display = ''; } catch (e) { }
+
+  renderCatalogPagination(totalPages);
+  try { el.style.display = ''; } catch (e) { }
 }
+
+function renderCatalogPagination(totalPages) {
+  const el = document.getElementById('catalogPagination');
+  if (!el) return;
+  el.innerHTML = '';
+  if (totalPages <= 1) return; // No mostrar si hay solo una página
+
+  // Botón anterior
+  const prevBtn = document.createElement('button');
+  prevBtn.textContent = '←';
+  prevBtn.disabled = CATALOG_CURRENT_PAGE === 1;
+  prevBtn.onclick = () => {
+    if (CATALOG_CURRENT_PAGE > 1) {
+      CATALOG_CURRENT_PAGE--;
+      renderProductsGridFiltered();
+    }
+  };
+  el.appendChild(prevBtn);
+
+  // Botones de página (máximo 8 cuando son muchas páginas)
+  let firstPage = Math.max(1, CATALOG_CURRENT_PAGE - 3);
+  let lastPage = Math.min(totalPages, CATALOG_CURRENT_PAGE + 3);
+
+  if (CATALOG_CURRENT_PAGE <= 4) {
+    firstPage = 1;
+    lastPage = Math.min(totalPages, 7);
+  } else if (CATALOG_CURRENT_PAGE >= totalPages - 3) {
+    lastPage = totalPages;
+    firstPage = Math.max(1, totalPages - 6);
+  }
+
+  for (let i = firstPage; i <= lastPage; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    btn.className = (i === CATALOG_CURRENT_PAGE) ? 'active' : '';
+    btn.disabled = i === CATALOG_CURRENT_PAGE;
+    btn.onclick = () => {
+      CATALOG_CURRENT_PAGE = i;
+      renderProductsGridFiltered();
+    };
+    el.appendChild(btn);
+  }
+
+  // Botón siguiente
+  const nextBtn = document.createElement('button');
+  nextBtn.textContent = '→';
+  nextBtn.disabled = CATALOG_CURRENT_PAGE === totalPages;
+  nextBtn.onclick = () => {
+    if (CATALOG_CURRENT_PAGE < totalPages) {
+      CATALOG_CURRENT_PAGE++;
+      renderProductsGridFiltered();
+    }
+  };
+  el.appendChild(nextBtn);
+}
+
+function setupCatalogPageSizeSelector() {
+  const select = document.getElementById('catalogPageSize');
+  if (!select) return;
+  select.value = String(CATALOG_PAGE_SIZE);
+  select.onchange = function(e) {
+    CATALOG_PAGE_SIZE = parseInt(e.target.value, 10) || 10;
+    CATALOG_CURRENT_PAGE = 1;
+    renderProductsGridFiltered();
+  };
+}
+
 
 function setupCatalogSearch() {
   const searchEl = document.getElementById('catalogSearch');
@@ -647,6 +741,7 @@ function setupCatalogSearch() {
   searchEl.value = CURRENT_SEARCH;
   searchEl.oninput = function(e) {
     CURRENT_SEARCH = e.target.value;
+    CATALOG_CURRENT_PAGE = 1; // <-- vuelve a página 1
     renderProductsGridFiltered();
   };
   document.addEventListener('keydown', function(ev) {
@@ -967,6 +1062,7 @@ async function boot() {
     await fetchAllProductsFromFirestore();
     renderCategoryButtons();
     setupCatalogSearch();
+    setupCatalogPageSizeSelector(); // <-- importante
     await Promise.all(PRODUCTS.map(p => resolveProductImages(p)));
     renderProductsGridFiltered();
   } catch (err) {
