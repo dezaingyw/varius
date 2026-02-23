@@ -1,75 +1,139 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Varius Online</title>
+  <title>Varius Online | Splash</title>
   <style>
+    /* Reset y variables para fácil mantenimiento */
+    :root {
+      --bg-color: #FFFFFF;
+      --transition-speed: 0.5s;
+    }
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
+
     body, html {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #FFFFFF;
+      background-color: var(--bg-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-    #video-container {
+
+    .splash-wrapper {
       position: relative;
       width: 100%;
-      height: 100%;
-    }
-    #splash-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    /* Opcional: overlay con logo */
-    #overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
-      /* background: rgba(255, 255, 255, 0.2); */
+    }
+
+    .splash-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* Asegura que el video llene la pantalla sin deformarse */
+      display: block;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0; /* Atajo para top, left, bottom, right: 0 */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none; /* Permite clicks a través del overlay */
+    }
+    
+    /* Clase para desvanecimiento al salir (opcional) */
+    .fade-out {
+      opacity: 0;
+      transition: opacity var(--transition-speed) ease-out;
     }
   </style>
 </head>
 <body>
-  <div id="video-container">
-    <!-- 🔁 RUTA DEL VIDEO: cámbiala aquí -->
-    <video id="splash-video" muted autoplay playsinline>
-      <source src="assets/video/animacion-bienvenida.mp4" type="video/mp4" />
+
+  <main class="splash-wrapper" id="app">
+    <video 
+      id="splash-video" 
+      muted 
+      autoplay 
+      playsinline 
+      preload="auto"
+      class="splash-video">
+      <source id="video-source" src="" type="video/mp4">
       Tu navegador no soporta videos.
     </video>
-    <div id="overlay">
-      <!-- Opcional: <img src="logo.png" alt="Varius Online" width="120" /> -->
-    </div>
-  </div>
+
+    <div class="overlay">
+      </div>
+  </main>
 
   <script>
-    // 🔁 RUTA DE REDIRECCIÓN: cámbiala aquí
-    const REDIRECT_URL = "catalogo.html";
-    const VIDEO_DURATION = 5000; // 5 segundos
-
-    const video = document.getElementById("splash-video");
-
-    // Redirigir cuando el video termina
-    video.onended = () => {
-      window.location.href = REDIRECT_URL;
+    /**
+     * CONFIGURACIÓN
+     */
+    const CONFIG = {
+      REDIRECT_URL: "catalogo.html",
+      MAX_WAIT_TIME: 5000, // 5 segundos máximo
+      MOBILE_BREAKPOINT: 768,
+      VIDEOS: {
+        DESKTOP: "assets/video/Quisiera_que_utilizando_202602231931_f1fd5.mp4",
+        MOBILE: "assets/video/Quisiera_que_utilizando_202602231937_i0sd6.mp4" // 🔁 Cambia esto
+      }
     };
 
-    // Redirigir después de 5 segundos (incluso si el video no termina)
+    const videoElement = document.getElementById("splash-video");
+    const sourceElement = document.getElementById("video-source");
+
+    /**
+     * Lógica para seleccionar el video según el ancho de pantalla
+     */
+    function setupVideoSource() {
+      const isMobile = window.innerWidth <= CONFIG.MOBILE_BREAKPOINT;
+      const selectedVideo = isMobile ? CONFIG.VIDEOS.MOBILE : CONFIG.VIDEOS.DESKTOP;
+      
+      sourceElement.setAttribute("src", selectedVideo);
+      videoElement.load(); // Recarga el video con la nueva fuente
+    }
+
+    /**
+     * Lógica de Redirección
+     */
+    function redirectToNextPage() {
+      document.getElementById('app').classList.add('fade-out');
+      setTimeout(() => {
+        window.location.href = CONFIG.REDIRECT_URL;
+      }, 300); // Pequeño delay para la transición visual
+    }
+
+    // Inicializar video
+    setupVideoSource();
+
+    // Evento: El video termina de reproducirse
+    videoElement.onended = redirectToNextPage;
+
+    // Evento: Timer de seguridad (por si el video tarda en cargar o falla)
     setTimeout(() => {
-      if (!video.ended) {
-        window.location.href = REDIRECT_URL;
+      if (!videoElement.ended) {
+        redirectToNextPage();
       }
-    }, VIDEO_DURATION);
+    }, CONFIG.MAX_WAIT_TIME);
+
+    // Opcional: Manejar cambio de tamaño de pantalla en tiempo real
+    // (Nota: Esto reiniciaría el video si el usuario rota el celular)
+    /*
+    window.addEventListener('resize', () => {
+       // lógica de cambio si es estrictamente necesario
+    });
+    */
   </script>
 </body>
 </html>
