@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Categoria — Varius</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+    <link rel="stylesheet" href="../assets/css/presence.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Animación suave para la aparición del modal */
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-content {
+            animation: modalIn 0.3s ease-out;
+        }
+    </style>
+
+</head>
+
+<body>
+    <input id="nav-toggle" type="checkbox" class="nav-toggle" aria-hidden="true">
+
+    <!-- Top bar -->
+    <header class="topbar">
+        <div class="top-left">
+            <label for="nav-toggle" class="hamburger" aria-hidden="true">
+                <span class="hamburger-box"><span class="hamburger-inner"></span></span>
+            </label>
+            <a class="brand" href="./" aria-label="Dashboard">
+                <img src="assets/img/logo.png" alt="Varius" width="14%">
+                <span class="brand-text">VARIUS</span>
+            </a>
+        </div>
+
+        <div class="top-search">
+            <!-- input eliminado intencionalmente -->
+            <div id="presence-pill" class="presence-pill offline" role="status" aria-live="polite">
+                <span class="dot"></span>
+                <span class="label">Desconectado</span>
+            </div>
+        </div>
+    </header>
+
+    <div id="app-sidebar"></div>
+
+    <!-- Main content -->
+    <main class="main">
+        <!-- Filters -->
+        <section class="card filters-card" aria-label="Filtros">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Maestro de Categorías</h3>
+                <button onclick="openModal('create')" title="Agregar Nueva Categoria" class="btn-add"><span
+                        class="plus">＋</span> Añadir Categoría</button>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items: flex-end;">
+                <div class="filter-field" style="display:flex; flex-direction:column; flex:1; min-width:200px;">
+                    <label for="filter-client" style="margin-bottom: 4px;">Buscar Categoria</label>
+                    <input id="filter-client" type="search" placeholder="Filtrar categoria..." />
+                </div>
+
+                <div style="display:flex; gap:8px; padding-bottom: 1px;">
+                    <button id="btnFilter" class="btn-apply" style="height: fit-content;">Buscar</button>
+                    <button id="btnClear" class="icon-btn" style="height: fit-content;">Limpiar</button>
+                </div>
+
+            </div>
+        </section>
+
+        <section style="display:flex;gap:16px;margin-top:12px;">
+
+            <!-- Desktop / tablet table -->
+            <div id="categoriesGrid"
+                class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            </div>
+            <!-- Mobile: cards -->
+            <div id="ordersCards" aria-live="polite"></div>
+            <!-- Chats column removed -->
+        </section>
+
+        <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+    </main>
+    <div id="categoryModal" class="modal hidden">
+        <div
+            class="modal-content bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="p-6 flex justify-between items-center border-b border-slate-100 sticky top-0 bg-white z-10">
+                <h2 id="modalTitle" class="text-xl font-bold text-slate-800">Nueva Categoría</h2>
+                <button onclick="closeModal()"
+                    class="h-10 w-10 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-2xl transition-colors">&times;</button>
+            </div>
+
+            <form id="categoryForm" class="p-6 space-y-5">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1.5">Nombre de la Categoría</label>
+                    <input type="text" id="catName" placeholder="Ej. Accesorios"
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                        required>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1.5">Descripción</label>
+                    <textarea id="catDesc" rows="3" placeholder="Breve descripción de la categoría..."
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all resize-none"
+                        required></textarea>
+                </div>
+
+                <div
+                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl">
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Color</label>
+                            <div class="flex items-center gap-2 mt-1">
+                                <input type="color" id="catColor" value="#10b981"
+                                    class="h-8 w-8 rounded-lg cursor-pointer border-none bg-transparent">
+                                <input type="text" id="catHex" value="#10B981"
+                                    class="w-20 bg-transparent font-mono text-sm text-slate-600 outline-none" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        class="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-3 sm:pt-0">
+                        <span class="text-sm font-bold text-slate-700">Categoría Activa</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="catStatus" checked class="sr-only peer">
+                            <div
+                                class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+                    <button type="button" onclick="closeModal()"
+                        class="w-full py-3.5 border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
+                    <button type="submit"
+                        class="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all">Guardar
+                        Categoría</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script type="module" src="../assets/js/master.category.js"></script>
+    <script type="module" src="../assets/js/sidebar-loader.js"></script>
+    <script type="module" src="../assets/js/session-timeout.js"></script>
+
+</body>
+
+</html>
