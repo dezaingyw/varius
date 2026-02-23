@@ -7,7 +7,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
-    getFirestore, collection, query, orderBy, onSnapshot,
+    getFirestore, collection, query, orderBy, where, getDocs, onSnapshot,
     addDoc, doc, updateDoc, getDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 import {
@@ -73,12 +73,55 @@ let pendingDeletePaths = [];
 
 const productsCol = collection(db, 'product');
 
-const CATEGORY_PREFIX = {
-    "Ropa": "ROP",
-    "Electrónica": "ELE",
-    "Hogar": "HOG",
-    "Accesorios": "ACC"
-};
+async function fetchActiveCategories() {
+    try {
+        const categoriesCol = collection(db, 'category');
+        // Solo esta línea, sin orderBy
+        const q = query(categoriesCol, where('active', '==', true));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (err) {
+        console.error('Firestore categorias', err); // <--- Agrega esto
+        return [];
+    }
+}
+
+// NUEVO: Función para llenar el <select> de categorías en el formulario
+async function fillCategorySelect(selectedCategory = '') {
+    try {
+        if (!categoryField) return;
+        categoryField.innerHTML = ''; // Limpia opciones
+        const cats = await fetchActiveCategories();
+        if (!cats.length) {
+            const op = document.createElement('option');
+            op.value = '';
+            op.textContent = 'No hay categorías activas';
+            categoryField.appendChild(op);
+            return;
+        }
+        const opEmpty = document.createElement('option');
+        opEmpty.value = '';
+        opEmpty.textContent = 'Seleccione categoría';
+        categoryField.appendChild(opEmpty);
+
+        cats.forEach(cat => {
+            const op = document.createElement('option');
+            op.value = cat.name;
+            op.textContent = cat.name;
+            if (selectedCategory && cat.name === selectedCategory) op.selected = true;
+            categoryField.appendChild(op);
+        });
+    } catch (err) {
+        categoryField.innerHTML = '';
+        const op = document.createElement('option');
+        op.value = '';
+        op.textContent = 'Error cargando categorías';
+        categoryField.appendChild(op);
+    }
+}
 
 /* ---------------- PAGINACIÓN ---------------- */
 let pageSize = 10;
@@ -201,7 +244,7 @@ function calculateDiscountPercentage(original, offered) {
     return Math.round(perc);
 }
 function generateSKUForCategory(category) {
-    const prefix = CATEGORY_PREFIX[category] || (category ? category.slice(0, 3).toUpperCase() : 'PRD');
+    const prefix = (category ? category.slice(0, 3).toUpperCase() : 'PRD');
     const timePortion = String(Date.now()).slice(-6);
     const rnd = Math.random().toString(36).slice(-4).toUpperCase();
     return `${prefix}-${timePortion}${rnd}`;
@@ -1756,6 +1799,10 @@ function openAddModal() {
     updatePriceFieldFromBuffers();
     if (priceField) { priceField.type = 'text'; priceField.setAttribute('inputmode', 'numeric'); }
     setDiscountEnabled(!!onOfferField?.checked);
+
+    // LLENAR SELECT DE CATEGORÍAS (por defecto, sin selección)
+    fillCategorySelect();
+
     productModal.classList.remove('hidden');
     productModal.setAttribute('aria-hidden', 'false');
 }
@@ -1773,7 +1820,8 @@ async function openEditProduct(id) {
         nameField.value = prod.name || '';
         descriptionField.value = prod.description || '';
         setPriceBuffersFromNumber(Number(prod.price || 0));
-        categoryField.value = prod.category || '';
+        // LLENAR CATEGORÍAS Y MARCAR LA ACTUAL
+        await fillCategorySelect(prod.category || '');
         statusField.value = prod.status || 'Activo';
         onOfferField.checked = !!prod.onOffer;
         discountField.value = prod.discount || 0;
