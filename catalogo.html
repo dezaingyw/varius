@@ -192,6 +192,16 @@
       outline: none;
     }
 
+    .catalog-select {
+      border: 1px solid #e0e1e6;
+      border-radius: 99px;
+      padding: 9px 36px 9px 14px;
+      font-size: 1rem;
+      width: 100px;
+      transition: border-color 0.18s;
+      outline: none;
+    }
+
     .catalog-search:focus {
       border-color: #12c5ae;
       box-shadow: 0 2px 8px #12c5ae29;
@@ -288,7 +298,7 @@
       style="display: flex; justify-content: space-between; align-items: center; margin: 10px 0;">
       <div>
         <label>Mostrar
-          <select id="catalogPageSize">
+          <select id="catalogPageSize" class="catalog-select">
             <option value="20">20</option>
             <option value="50">50</option>
             <option value="100">100</option>
