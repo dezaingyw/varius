@@ -5,149 +5,70 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Productos — Varius</title>
-    <link rel="stylesheet" href="assets/css/styles-pruducts.css">
-    <link rel="stylesheet" href="assets/css/admin-products.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
 
-    <!-- Nuevo: estilos específicos y seguros para el modal de producto -->
-    <link rel="stylesheet" href="assets/css/product-modal.css">
-
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Correcciones: tamaño fijo 56x56 para mini-thumbs y reglas de objeto para no deformar
-           Además: botones de mover (visibles sólo en touch) para reordenar en móvil */
-        :root {
-            --border: #e6e8eb;
+        .row-out-of-stock {
+            background-color: #fef2f2;
         }
 
-        /* Mini thumbs en tabla y mini-slider */
-        .mini-slide,
-        .mini-slide img,
-        .thumb,
-        .mini-slider .mini-slide,
-        .mini-slider .mini-slide img {
-            width: 56px !important;
-            height: 56px !important;
-            min-width: 56px !important;
-            min-height: 56px !important;
-            max-width: 56px !important;
-            max-height: 56px !important;
-            object-fit: cover !important;
-            display: inline-block;
-            border-radius: 6px;
-            overflow: hidden;
+        /* Rojo suave */
+        .row-low-stock {
+            background-color: #fff7ed;
         }
 
-        /* Asegura que los items del slider modal mantienen proporción y no estiren la imagen */
-        .slide-item {
-            min-width: 120px;
-            height: 80px;
-            border-radius: 8px;
-            overflow: hidden;
+        /* Naranja suave */
+        .row-suspended {
+            background-color: #f1f5f9;
+            filter: grayscale(0.5);
+        }
+
+        /* Gris */
+        .dropzone-active {
+            border-color: #10b981;
+            background-color: #ecfdf5;
+        }
+
+        .image-preview-card:hover .remove-btn {
+            display: flex;
+        }
+
+        #productModal {
+            z-index: 100 !important;
+        }
+
+        #lightbox {
+            z-index: 110 !important;
+        }
+
+        /* Animación de desvanecimiento para el carrusel de la tabla */
+        .img-slider {
             position: relative;
-            background: #fff;
-            border: 1px solid var(--border);
-            display: flex;
-            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            overflow: hidden;
         }
 
-        /* Imagenes dentro de slide-item siempre cover */
-        .slide-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
-        /* Banner en tarjeta: mantener cover y no salirse */
-        .card-banner {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            max-height: 260px;
-            /* límite razonable */
-        }
-
-        /* Botones de mover sólo visibles en dispositivos táctiles */
-        .img-move {
+        .img-slider img {
             position: absolute;
-            bottom: 6px;
-            width: 30px;
-            height: 30px;
-            border-radius: 6px;
-            border: none;
-            background: rgba(0, 0, 0, 0.56);
-            color: #fff;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            cursor: pointer;
-            z-index: 6;
-            opacity: 0.95;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
         }
 
-        /* botón izquierda y derecha */
-        .img-move-left {
-            left: 6px;
+        .img-slider img.active {
+            opacity: 1;
         }
 
-        .img-move-right {
-            right: 6px;
-        }
-
-        /* Ocultar botones por defecto (sólo se mostrarán en touch mediante la clase .touch-enabled) */
-        .touch-enabled .slide-item .img-move {
-            display: inline-flex;
-        }
-
-        .slide-item .img-move {
-            display: none;
-        }
-
-        /* Si deseas que el área de slide tenga espacio en móviles para los botones */
-        @media (max-width: 700px) {
-            .slide-item {
-                min-width: 110px;
-                height: 76px;
-            }
-
-            .mini-slide,
-            .mini-slide img {
-                width: 56px;
-                height: 56px;
-            }
-        }
-
-        /* pequeño ajuste visual para el botón eliminar sobre imágenes */
-        .img-remove {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            border: none;
-            background: rgba(0, 0, 0, 0.55);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 7;
-        }
-
-        /* aseguramos que el thumb placeholder respete tamaño */
-        .thumb {
-            width: 56px !important;
-            height: 56px !important;
-            min-width: 56px !important;
-            min-height: 56px !important;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
+        /* Estilos para las miniaturas del Lightbox */
+        .thumbnail-active {
+            border: 2px solid #10b981;
+            transform: scale(1.1);
         }
     </style>
 </head>
@@ -180,201 +101,248 @@
 
     <!-- Main content -->
     <main class="main">
+        <div class="max-w-[98%] 2xl:max-w-[95%] mx-auto">
 
-        <section class="table-wrap card">
-            <div class="table-header">
-                <h3>Gestión de Productos</h3>
-                <!-- Add button has admin-only class; JS will hide it for non-admin -->
-                <button id="openAddBtn" class="btn-add admin-only" title="Agregar nuevos Productos">
-                    <span class="plus">+</span> Añadir productos
-                </button>
-            </div>
-            <div class="table-scroll">
-                <main class="container">
-                    <section class="filters-card">
-                        <div class="search-row">
-                            <div class="search" style="width:100%">
-                                <input id="searchInput" type="text" placeholder="Buscar por nombre..." />
-                            </div>
-
-                            <select id="stateFilter" class="filter-select">
-                                <option value="">Todos los estados</option>
-                                <option value="Activo">Activo</option>
-                                <option value="Inactivo">Inactivo</option>
-                            </select>
-
-                            <select id="offerFilter" class="filter-select">
-                                <option value="">Todas las ofertas</option>
-                                <option value="en_oferta">En oferta</option>
-                                <option value="no_oferta">No</option>
-                            </select>
-
-                            <!-- Apply / Clear buttons for filters -->
-                            <div class="filters-actions" style="display:flex;gap:8px;align-items:center;">
-                                <button id="applyFiltersBtn" class="btn-apply" type="button">Buscar</button>
-                                <button id="clearFiltersBtn" class="btn-secondary" type="button">Limpiar</button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="table-card">
-                        <table id="productsTable" aria-live="polite" role="table" class="products-table">
-                            <thead>
-                                <tr>
-                                    <th>Imagen</th>
-                                    <th>Nombre</th>
-                                    <th>Precio</th>
-                                    <th>Oferta</th>
-                                    <th>Descuento</th>
-                                    <th>Precio Oferta</th>
-                                    <th>Stock</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="productsBody">
-                                <!-- Filas renderizadas por JS -->
-                            </tbody>
-                        </table>
-
-                    </section>
-                </main>
-                <section class="tarjeta-card">
-                    <!-- Cards view (hidden by default) -->
-                    <div id="productsCards" class="products-cards hidden" aria-live="polite" role="list">
-                        <!-- Tarjetas renderizadas por JS en modo responsive -->
+            <header class="mb-8">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                            <span class="bg-emerald-500 text-white p-2 rounded-lg">📦</span>
+                            Gestion de Productos
+                        </h1>
                     </div>
-                </section>
-            </div>
-        </section>
-
-        <!-- Modal -->
-        <div id="productModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
-            <div class="modal-content modal-lg" role="document">
-                <header class="modal-header">
-                    <div class="header-content">
-                        <span class="header-icon">📦</span>
-                        <div>
-                            <h2 id="modalTitle">Gestión de Producto</h2>
-                            <p class="header-subtitle">Completa la información detallada del artículo</p>
-                        </div>
-                    </div>
-                    <button id="closeModal" class="close-btn" aria-label="Cerrar">&times;</button>
-                </header>
-
-                <div class="modal-body">
-                    <form id="productForm" class="modal-form" novalidate>
-                        <input type="hidden" id="productId" />
-
-                        <div class="form-section main-info">
-                            <div class="form-row full-width">
-                                <label for="name">Nombre del Producto <span class="required">*</span></label>
-                                <input id="name" type="text" placeholder="Ej: Camiseta de Algodón Premium" required />
-                            </div>
-
-                            <div class="form-row full-width">
-                                <label for="description">Descripción detallada</label>
-                                <textarea id="description" rows="3"
-                                    placeholder="Describe las características principales..."></textarea>
-                            </div>
-                        </div>
-
-                        <div class="form-section attributes-grid">
-                            <div class="form-group">
-                                <label for="category">Categoría <span class="required">*</span></label>
-                                <select id="category" required>
-                                    <option value="">Seleccionar...</option>
-                                    <option>Ropa</option>
-                                    <option>Electrónica</option>
-                                    <option>Hogar</option>
-                                    <option>Accesorios</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="status">Estado de visibilidad</label>
-                                <select id="status">
-                                    <option>Activo</option>
-                                    <option>Inactivo</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-section pricing-card">
-                            <div class="pricing-row">
-                                <div class="form-group">
-                                    <label for="price">Precio Base (USD) <span class="required">*</span></label>
-                                    <div class="input-with-icon">
-                                        <input id="price" type="number" min="0" step="0.01" required />
-                                    </div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="stock">Stock Disponible</label>
-                                    <input id="stock" type="number" min="0" value="0" />
-                                </div>
-                            </div>
-
-                            <div class="offer-container">
-                                <label class="toggle-switch">
-                                    <input id="onOffer" type="checkbox" />
-                                    <span class="slider"></span>
-                                    <span class="toggle-label">Producto en Oferta</span>
-                                </label>
-
-                                <div id="discountWrapper" class="discount-input">
-                                    <label for="discount">Descuento (%)</label>
-                                    <input id="discount" type="number" min="0" max="100" value="0" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-section gallery-section">
-                            <label>Galería de Imágenes <span class="muted">(Máx. 8)</span></label>
-                            <div id="imageDropZone" class="image-dropzone">
-                                <input id="imageFile" type="file" accept="image/*" multiple />
-                                <div class="dz-content">
-                                    <span class="dz-icon">📸</span>
-                                    <p>Suelte sus imágenes aquí o haga clic para explorar</p>
-                                </div>
-                            </div>
-
-                            <div id="imagePreviewSlider" class="image-slider hidden">
-                                <button type="button" id="prevSlide" class="slide-btn">‹</button>
-                                <div class="slide-track" id="slideTrack"></div>
-                                <button type="button" id="nextSlide" class="slide-btn">›</button>
-                            </div>
-                        </div>
-
-                        <div class="form-section sku-footer">
-                            <div class="form-row full-width">
-                                <label for="sku">Código SKU</label>
-                                <input id="sku" type="text" readonly placeholder="Se generará automáticamente" />
-                            </div>
-                        </div>
-                    </form>
+                    <button onclick="abrirModal('add')"
+                        class="bg-[#10b981] hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-emerald-100 flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Producto Nuevo
+                    </button>
                 </div>
 
-                <footer class="modal-footer">
-                    <div class="footer-info">
-                        <span class="required-note">* Campos obligatorios</span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">Total Productos</p>
+                            <h3 class="text-2xl font-bold" id="kpi-total">0</h3>
+                        </div>
+                        <div class="bg-blue-50 text-blue-500 p-3 rounded-xl"><i class="fas fa-box"></i></div>
                     </div>
-                    <div class="form-actions">
-                        <button type="button" id="cancelBtn" class="btn-secondary">Descartar</button>
-                        <button type="submit" form="productForm" class="btn-primary admin-only">Guardar
-                            Producto</button>
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">Activos</p>
+                            <h3 class="text-2xl font-bold" id="kpi-active">0</h3>
+                        </div>
+                        <div class="bg-emerald-50 text-emerald-500 p-3 rounded-xl"><i class="fas fa-check-circle"></i>
+                        </div>
                     </div>
-                </footer>
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">En Oferta</p>
+                            <h3 class="text-2xl font-bold" id="kpi-offer">0</h3>
+                        </div>
+                        <div class="bg-orange-50 text-orange-500 p-3 rounded-xl"><i class="fas fa-tag"></i></div>
+                    </div>
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                        <div>
+                            <p class="text-slate-500 text-sm font-medium">Agotados (Stock 0)</p>
+                            <h3 class="text-2xl font-bold text-red-500" id="kpi-stock">0</h3>
+                        </div>
+                        <div class="bg-red-50 text-red-500 p-3 rounded-xl"><i class="fas fa-ghost"></i></div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4">
+                    <div class="relative flex-grow">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="searchInput" placeholder="Busca por nombre o código SKU..."
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <select id="categoryFilter"
+                        class="px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="">Todas las Categorías</option>
+                        <option value="Electronics">Electrónica</option>
+                        <option value="Clothing">Ropa / Textil</option>
+                        <option value="Home">Hogar</option>
+                        <option value="Beauty">Belleza</option>
+                    </select>
+                    <button onclick="aplicarFiltros()"
+                        class="bg-[#10b981] text-white px-8 py-3 rounded-xl font-medium hover:bg-emerald-600 transition-colors">Buscar</button>
+                    <button onclick="limpiarFiltros()"
+                        class="bg-white border border-slate-200 text-slate-600 px-8 py-3 rounded-xl font-medium hover:bg-slate-50">Limpiar</button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 text-slate-400 uppercase text-xs font-semibold">
+                            <tr>
+                                <th class="px-6 py-4">Producto</th>
+                                <th class="px-6 py-4">Categoría</th>
+                                <th class="px-6 py-4">Precio ($)</th>
+                                <th class="px-6 py-4">Existencia</th>
+                                <th class="px-6 py-4">Estado</th>
+                                <th class="px-6 py-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-t border-slate-100">
+                    <p class="text-sm text-slate-500" id="paginationInfo">Mostrando 1 de 20 resultados</p>
+                    <div class="flex gap-2" id="paginationControls"></div>
+                </div>
+            </main>
+
+            <div id="lightbox"
+                class="fixed inset-0 bg-black/95 z-[110] hidden flex flex-col items-center justify-center p-4"
+                onclick="this.classList.add('hidden')">
+
+                <div class="relative max-w-4xl w-full flex justify-center items-center h-[70vh]">
+                    <img id="lightboxImg" src="" class="max-w-full max-h-full object-contain rounded-xl shadow-2xl">
+                </div>
+
+                <div id="lightboxThumbs"
+                    class="flex gap-3 mt-8 p-4 bg-white/10 backdrop-blur-md rounded-2xl overflow-x-auto max-w-full">
+                </div>
+
+                <p class="text-white/50 text-xs mt-4 italic">Haz clic fuera de la imagen para cerrar</p>
             </div>
         </div>
     </main>
+
+    <div id="productModal"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] overflow-y-auto">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h2 id="modalTitle" class="text-xl font-bold text-slate-800">Agregar Producto</h2>
+                <button onclick="cerrarModal()" class="text-slate-400 hover:text-slate-600"><i
+                        class="fas fa-times text-xl"></i></button>
+            </div>
+
+            <form id="productForm" class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Nombre del
+                            Producto</label>
+                        <input type="text" name="name" required placeholder="Ej. Audífonos Bluetooth"
+                            class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Descripción
+                            Detallada</label>
+                        <textarea name="description" rows="4" placeholder="Cuéntanos más del producto..."
+                            class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
+                        <p class="text-[10px] text-slate-400 mt-1 italic"><i class="fas fa-info-circle"></i>
+                            Puedes
+                            poner emojis, íconos y usar varios párrafos.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Categoría</label>
+                            <select name="category" onchange="actualizarSKU()"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
+                                <option value="ELEC">Electrónica</option>
+                                <option value="CLOT">Ropa</option>
+                                <option value="HOME">Hogar</option>
+                                <option value="BEAU">Belleza</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Estado</label>
+                            <select name="status"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
+                                <option value="ACTIVE">Activo</option>
+                                <option value="INACTIVE">Inactivo</option>
+                                <option value="SUSPENDED">Suspendido / Pausado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Código SKU</label>
+                        <input type="text" name="sku" id="skuInput" readonly
+                            class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 italic">
+                        <p class="text-[10px] text-slate-400 mt-1">Se crea solo según la categoría.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Precio Base
+                                ($)</label>
+                            <input type="text" name="price" placeholder="1.200,00" oninput="formatearPrecio(this)"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Existencia
+                                (Stock)</label>
+                            <input type="number" name="stock" placeholder="0"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="p-4 border border-slate-100 rounded-2xl bg-slate-50/50">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="isOffer" onchange="toggleOferta(this)"
+                                class="w-5 h-5 accent-emerald-500">
+                            <span class="font-semibold text-slate-700">¿Tiene Oferta / Rebaja?</span>
+                        </label>
+                        <div id="offerInputContainer" class="hidden mt-4">
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">% de
+                                Descuento</label>
+                            <input type="number" name="discount" placeholder="15"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Galería de Fotos</label>
+                        <div id="dropzone"
+                            class="border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-emerald-400">
+                            <i class="fas fa-cloud-upload-alt text-3xl mb-2"></i>
+                            <p class="text-sm">Suelta las fotos aquí o haz click</p>
+                            <input type="file" id="fileInput" multiple hidden>
+                        </div>
+                        <div id="previewContainer" class="flex flex-wrap gap-2 mt-4 min-h-[80px]"></div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2 border-t border-slate-100 pt-6 flex justify-end gap-4">
+                    <button type="button" onclick="cerrarModal()"
+                        class="px-8 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Cancelar</button>
+                    <button type="submit" id="submitBtn"
+                        class="px-10 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg transition-all">Guardar
+                        Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-success"
+        class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[500] hidden">
+        <div class="bg-white rounded-2xl shadow-xl p-10 flex flex-col items-center">
+            <i class="fas fa-check-circle text-4xl text-emerald-500 mb-4"></i>
+            <h2 class="text-2xl font-bold mb-2" id="modal-success-title">¡Guardado exitoso!</h2>
+            <p class="text-slate-500 text-base mb-4" id="modal-success-body">El producto se ha guardado correctamente.
+            </p>
+            <button
+                class="mt-3 px-7 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition"
+                onclick="ocultarModalExito()">OK</button>
+        </div>
+    </div>
+    
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+    <script type="module" src="../assets/js/product-inventory.js"></script>
     <script type="module" src="../assets/js/sidebar-loader.js"></script>
-    <script type="module" src="../assets/js/product-admin.js"></script>
-    <script type="module" src="../assets/js/mini-rotator.js"></script>
     <script type="module" src="../assets/js/session-timeout.js"></script>
 </body>
 
 </html>
-
