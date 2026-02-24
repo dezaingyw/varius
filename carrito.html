@@ -135,6 +135,16 @@
         grid-template-columns: 1fr !important;
       }
     }
+    .product-modal-description {
+      white-space: pre-line;
+      /* Esto hará que los saltos de línea se respeten */
+      line-height: 1.6;
+      /* Mejora la legibilidad entre líneas */
+      color: #4b5563;
+      /* Un gris oscuro es más suave que el negro puro */
+      margin-top: 15px;
+      font-size: 0.95rem;
+    }
   </style>
 </head>
 
@@ -262,7 +272,9 @@
           <h2 id="productModalTitle"></h2>
           <div id="productModalCategory" class="product-modal-category"></div>
           <div id="productModalPrices" class="product-modal-prices"></div>
-          <p id="productModalDescription" class="product-modal-description"></p>
+          <div style="max-height: 250px; overflow-y: auto; padding-right: 10px; margin-bottom: 15px;">
+            <p id="productModalDescription" class="product-modal-description"></p>
+          </div>
           <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
             <label style="display:flex;align-items:center;gap:8px">Cantidad:
               <input id="productModalQty" type="number" min="1" max="999" value="1"
