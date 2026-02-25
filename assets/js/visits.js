@@ -5,6 +5,18 @@ import { firebaseConfig } from "./firebase-config.js";
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Extrae los parámetros UTM de la URL
+function getUTMParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    utm_source: params.get("utm_source") || "",
+    utm_medium: params.get("utm_medium") || "",
+    utm_campaign: params.get("utm_campaign") || "",
+    utm_term: params.get("utm_term") || "",
+    utm_content: params.get("utm_content") || ""
+  };
+}
+
 async function getIP() {
   try {
     const res = await fetch('https://api.ipify.org?format=json');
@@ -17,10 +29,7 @@ async function getIP() {
 
 function getUserInfo() {
   let info = {
-    // Si tienes autenticación, puedes poner aquí el nombre o email del usuario
     nombre: "N/A",
-
-    // Datos básicos del navegador
     navegador: navigator.userAgent,
     idioma: navigator.language,
     idiomas_preferidos: navigator.languages ? navigator.languages.join(', ') : '',
@@ -32,20 +41,18 @@ function getUserInfo() {
     url_pagina: location.href,
     zona_horaria: Intl.DateTimeFormat().resolvedOptions().timeZone,
     hora_local: new Date().toLocaleString(),
-
-    // Datos de pantalla (más detallado)
     screen: {
       width: window.screen.width,
       height: window.screen.height,
       colorDepth: window.screen.colorDepth,
       pixelRatio: window.devicePixelRatio
     },
-
-    // Touch support
     soporte_tactil: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
-
     fecha_registro: new Date().toISOString()
   };
+
+  // Agregar parámetros UTM
+  Object.assign(info, getUTMParams());
 
   return info;
 }
