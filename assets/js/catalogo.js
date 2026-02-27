@@ -19,6 +19,9 @@ const storage = getStorage(app);
 let CATALOG_PAGE_SIZE = 20;
 let CATALOG_CURRENT_PAGE = 1;
 
+// ---- NUEVO: Filtro solo ofertas ----
+let FILTER_ONLY_OFFERS = false;
+
 // Helpers cookies/cart
 function generateCartToken() {
   const rnds = crypto.getRandomValues(new Uint8Array(16));
@@ -93,7 +96,6 @@ function renderCartPanel() {
                 ${formatCurrency(it.price)} x ${it.quantity} = <strong style="color:#222">${formatCurrency(it.subtotal)}</strong>
               </div>
             </div>
-
             <div class="qty-controls" style="justify-content:flex-start;gap:0.35rem;margin:0.6rem 0 0 0;">
               <button class="qty-decr" data-id="${it.productId}" aria-label="Disminuir" style="background:#cdb4ff;color:#222;font-weight:700;">−</button>
               <input class="qty-input" data-id="${it.productId}" type="number" min="0" max="999" value="${it.quantity}" style="width:56px;border-radius:10px;padding:8px 0 8px 0;text-align:center;">
@@ -596,12 +598,14 @@ function renderCategoryButtons() {
   });
 }
 
+// ---- ACTUALIZADO: Filtro también por solo ofertas si el toggle está activo ----
 function filterProducts() {
   return PRODUCTS.filter(p => {
     if (CURRENT_CATEGORY !== "All" && toTitleCase(p.category) !== CURRENT_CATEGORY) return false;
     if (CURRENT_SEARCH && !((p.name || "").toLowerCase().includes(CURRENT_SEARCH.toLowerCase())
       || (p.category || "").toLowerCase().includes(CURRENT_SEARCH.toLowerCase())
       || (p.description || "").toLowerCase().includes(CURRENT_SEARCH.toLowerCase()))) return false;
+    if (FILTER_ONLY_OFFERS && !(p.isOnSale || (p.discountPrice && Number(p.discountPrice) < Number(p.price)))) return false;
     return isProductVisible(p);
   });
 }
@@ -734,7 +738,6 @@ function setupCatalogPageSizeSelector() {
   };
 }
 
-
 function setupCatalogSearch() {
   const searchEl = document.getElementById('catalogSearch');
   if (!searchEl) return;
@@ -750,6 +753,18 @@ function setupCatalogSearch() {
       ev.preventDefault();
     }
   });
+}
+
+// NUEVO: SETUP DEL TOGGLE OFERTAS
+function setupOfferToggle() {
+  const offerToggle = document.getElementById('offerToggle');
+  if (!offerToggle) return;
+  offerToggle.checked = FILTER_ONLY_OFFERS;
+  offerToggle.onchange = function() {
+    FILTER_ONLY_OFFERS = !!offerToggle.checked;
+    CATALOG_CURRENT_PAGE = 1;
+    renderProductsGridFiltered();
+  };
 }
 
 /* ------------------- Product cards + slider ------------------- */
@@ -1062,7 +1077,8 @@ async function boot() {
     await fetchAllProductsFromFirestore();
     renderCategoryButtons();
     setupCatalogSearch();
-    setupCatalogPageSizeSelector(); // <-- importante
+    setupCatalogPageSizeSelector();
+    setupOfferToggle(); // <-- NUEVO
     await Promise.all(PRODUCTS.map(p => resolveProductImages(p)));
     renderProductsGridFiltered();
   } catch (err) {
