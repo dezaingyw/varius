@@ -5,300 +5,24 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Tienda - Varius</title>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
   <link rel="stylesheet" href="assets/css/carrito.css">
-  <style>
-    /* Asegura que el grid de productos se muestre en móviles igual que en escritorio. */
-    .products-grid {
-      display: grid !important;
-    }
+  <link rel="stylesheet" href="assets/css/catalogo.css">
 
-    /* Badge para productos disponibles (más visible) */
-    .offer-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
-      background: linear-gradient(90deg, #fff7cc, #ffd166);
-      color: #4b2e05;
-      padding: 6px 10px;
-      border-radius: 999px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-      margin-bottom: 8px;
-      font-size: 0.92rem;
-    }
-
-    /* Badge pequeño y delicado para items dentro del carrito */
-    .offer-badge-small {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
-      background: linear-gradient(90deg, #fff7cc, #ffd166);
-      color: #4b2e05;
-      padding: 4px 8px;
-      border-radius: 999px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-      margin-left: 6px;
-      font-size: 0.78rem;
-    }
-
-    /* Posicionar badge pequeño junto al título del producto en carrito */
-    .cart-item .product-title-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      justify-content: space-between;
-    }
-
-    .cart-item .product-title-row .left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Ajuste estético para el summary panel (opcional) */
-    .cart-summary {
-      background: #f8fafc;
-      border-radius: 10px;
-      padding: 12px;
-      margin: 12px 0;
-      box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
-    }
-
-    .cart-actions-inline {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 12px;
-      align-items: center;
-    }
-
-    /* ==========================
-   Responsive: 2 columnas en mobile
-   Añadir al final de carrito.css
-   ========================== */
-    @media (max-width: 760px) {
-
-      /* Forzar 2 columnas en vista responsive manteniendo el estilo */
-      .products-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 0.6rem;
-        /* reducir gap para mejor ajuste */
-      }
-
-      /* Hacer las tarjetas más compactas para que entren bien en dos columnas */
-      .product-card {
-        padding: 0.6rem;
-        border-radius: 0.75rem;
-      }
-
-      /* Ajuste de imagen para no desbordar y mantener composición visual */
-      .product-card .card-slider {
-        aspect-ratio: 1 / 1;
-        /* más cuadrado en móviles para mejor encaje */
-        margin-bottom: 0.4rem;
-      }
-
-      .product-card .card-slider img {
-        object-fit: cover;
-      }
-
-      /* Reducir tamaño y espaciado en el footer de la tarjeta para consistencia */
-      .product-card-footer {
-        gap: 0.5rem;
-        min-height: 3rem;
-      }
-
-      .product-card-footer .btn-primary,
-      .product-card-footer .btn-secondary,
-      .product-card-footer .icon-btn {
-        height: 2.5rem;
-        min-height: 2.5rem;
-        padding: 0 0.6rem;
-        font-size: 0.88rem;
-      }
-
-      /* Ajustes de título/meta para evitar quiebres extraños en columnas estrechas */
-      .product-title {
-        font-size: 0.95rem;
-        -webkit-line-clamp: 2;
-        min-height: calc(2 * 1.2em);
-      }
-
-      .product-meta {
-        font-size: 0.82rem;
-      }
-    }
-
-    /* Pequeño ajuste: en pantallas muy pequeñas, permitir pasar a 1 columna si queda demasiado justo */
-    @media (max-width: 340px) {
-      .products-grid {
-        grid-template-columns: 1fr !important;
-      }
-    }
-  </style>
-  <style>
-    /* Filtros arriba del catálogo */
-    .catalog-filters-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-      gap: 12px;
-    }
-
-    .catalog-categories {
-      display: flex;
-      gap: 14px;
-      padding: 10px 16px;
-      background: #fff;
-      border-radius: 999px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-    }
-
-    .catalog-category-btn {
-      background: none;
-      border: none;
-      font: inherit;
-      font-weight: 500;
-      color: #4b5563;
-      padding: 8px 16px;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: background 0.18s, color 0.18s;
-      outline: none;
-    }
-
-    .catalog-category-btn.active {
-      background: #12c5ae2b;
-      color: #12c5ae;
-      font-weight: 700;
-      box-shadow: 0 2px 8px #12c5ae29;
-    }
-
-    .catalog-search-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    .catalog-search {
-      border: 1px solid #e0e1e6;
-      border-radius: 99px;
-      padding: 9px 36px 9px 14px;
-      font-size: 1rem;
-      width: 220px;
-      transition: border-color 0.18s;
-      outline: none;
-    }
-
-    .catalog-select {
-      border: 1px solid #e0e1e6;
-      border-radius: 99px;
-      padding: 9px 36px 9px 14px;
-      font-size: 1rem;
-      width: 100px;
-      transition: border-color 0.18s;
-      outline: none;
-    }
-
-    .catalog-search:focus {
-      border-color: #12c5ae;
-      box-shadow: 0 2px 8px #12c5ae29;
-    }
-
-    .search-shortcut {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: #f0f8fa;
-      color: #213;
-      font-size: 0.82rem;
-      padding: 2px 8px;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px #0001;
-      pointer-events: none;
-      opacity: 0.8;
-      user-select: none;
-    }
-
-    @media (max-width: 760px) {
-      .catalog-filters-row {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-      }
-
-      .catalog-categories {
-        padding: 8px 6px;
-        gap: 7px;
-        font-size: 0.92rem;
-      }
-
-      .catalog-search {
-        width: 100%;
-        min-width: 0;
-        padding: 9px 36px 9px 12px;
-      }
-    }
-
-    .pagination-controls {
-      display: flex;
-      justify-content: center;
-      /* Centra los botones horizontalmente */
-      align-items: center;
-      gap: 10px;
-      /* Espacio entre botones */
-      margin-top: 30px;
-      /* Separa el paginado de los productos */
-      margin-bottom: 50px;
-      /* Separa el paginado del footer */
-      flex-wrap: wrap;
-      /* Permite que los números bajen si no caben en móvil */
-    }
-
-    .pagination-controls button {
-      padding: 8px 16px;
-      border: 1px solid #e2e8f0;
-      background-color: white;
-      cursor: pointer;
-      border-radius: 6px;
-      transition: all 0.2s;
-    }
-
-    .pagination-controls button.active {
-      background-color: #000;
-      /* O el color primario de tu marca */
-      color: white;
-      border-color: #000;
-    }
-
-    .pagination-controls button:hover:not(.active) {
-      background-color: #f8fafc;
-    }
-
-    .product-modal-description {
-      white-space: pre-line;
-      /* Esto hará que los saltos de línea se respeten */
-      line-height: 1.6;
-      /* Mejora la legibilidad entre líneas */
-      color: #4b5563;
-      /* Un gris oscuro es más suave que el negro puro */
-      margin-top: 15px;
-      font-size: 0.95rem;
-    }
-  </style>
   <!-- Meta Pixel Code -->
   <script>
     !function (f, b, e, v, n, t, s) {
-      if (f.fbq) return; n = f.fbq = function () {
+      if (f.fbq) return;
+      n = f.fbq = function () {
         n.callMethod ?
-        n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+          n.callMethod.apply(n, arguments) : n.queue.push(arguments)
       };
       if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
-      n.queue = []; t = b.createElement(e); t.async = !0;
-      t.src = v; s = b.getElementsByTagName(e)[0];
+      n.queue = [];
+      t = b.createElement(e);
+      t.async = !0;
+      t.src = v;
+      s = b.getElementsByTagName(e)[0];
       s.parentNode.insertBefore(t, s)
     }(window, document, 'script',
       'https://connect.facebook.net/en_US/fbevents.js');
@@ -307,7 +31,6 @@
   </script>
   <noscript><img height="1" width="1" style="display:none"
       src="https://www.facebook.com/tr?id=959500979748263&ev=PageView&noscript=1" /></noscript>
-  <!-- End Meta Pixel Code -->
 </head>
 
 <body>
@@ -324,8 +47,7 @@
   </header>
 
   <main class="container">
-    <div class="catalog-controls-row"
-      style="display: flex; justify-content: space-between; align-items: center; margin: 10px 0;">
+    <div class="catalog-controls-row">
       <div>
         <label>Mostrar
           <select id="catalogPageSize" class="catalog-select">
@@ -340,10 +62,17 @@
     </div>
     <div class="catalog-filters-row">
       <div class="catalog-categories" id="catalogCategories"></div>
-      <div class="catalog-search-wrapper">
-        <input type="text" id="catalogSearch" class="catalog-search" placeholder="Buscar producto..." autocomplete="off"
-          aria-label="Buscar producto" tabindex="0" />
-        <span class="search-shortcut">Ctrl + K</span>
+      <div class="search-offer-row">
+        <div class="catalog-search-wrapper">
+          <input type="text" id="catalogSearch" class="catalog-search" placeholder="Buscar producto..."
+            autocomplete="off" aria-label="Buscar producto" tabindex="0" />
+          <span class="search-shortcut-inside">Ctrl + K</span>
+        </div>
+        <label class="offer-toggle-label" for="offerToggle">
+          <input type="checkbox" id="offerToggle">
+          <span class="offer-toggle-switch" tabindex="0"><span></span></span>
+          <span class="offer-switch-text">Solo ofertas</span>
+        </label>
       </div>
     </div>
     <div class="section-divider">
@@ -353,10 +82,7 @@
     <section class="products-grid" id="productsGrid" aria-live="polite" style="margin-top:22px">
       <!-- Renderizado por script.js -->
     </section>
-
     <div id="catalogPagination" class="pagination-controls" style="display: flex; gap: 6px;"></div>
-
-
   </main>
 
   <!-- Custom confirm modal (mejor estilo y accesible) -->
@@ -422,7 +148,6 @@
   <script type="module" src="assets/js/visits.js"></script>
   <script>
     const cartBtn = document.getElementById('openCartBtn');
-
     cartBtn.addEventListener('click', () => {
       window.location.href = 'carrito.html';
     });
