@@ -4,155 +4,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tienda - Varius</title>
+  <title>Tienda - Varius</title>  
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
   <link rel="stylesheet" href="assets/css/carrito.css">
-  <style>
-    /* Asegura que el grid de productos se muestre en móviles igual que en escritorio. */
-    .products-grid {
-      display: grid !important;
-    }
-
-    /* Badge para productos disponibles (más visible) */
-    .offer-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
-      background: linear-gradient(90deg, #fff7cc, #ffd166);
-      color: #4b2e05;
-      padding: 6px 10px;
-      border-radius: 999px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-      margin-bottom: 8px;
-      font-size: 0.92rem;
-    }
-
-    /* Badge pequeño y delicado para items dentro del carrito */
-    .offer-badge-small {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
-      background: linear-gradient(90deg, #fff7cc, #ffd166);
-      color: #4b2e05;
-      padding: 4px 8px;
-      border-radius: 999px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-      margin-left: 6px;
-      font-size: 0.78rem;
-    }
-
-    /* Posicionar badge pequeño junto al título del producto en carrito */
-    .cart-item .product-title-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      justify-content: space-between;
-    }
-
-    .cart-item .product-title-row .left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Ajuste estético para el summary panel (opcional) */
-    .cart-summary {
-      background: #f8fafc;
-      border-radius: 10px;
-      padding: 12px;
-      margin: 12px 0;
-      box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
-    }
-
-    .cart-actions-inline {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 12px;
-      align-items: center;
-    }
-
-    /* ==========================
-   Responsive: 2 columnas en mobile
-   Añadir al final de carrito.css
-   ========================== */
-    @media (max-width: 760px) {
-
-      /* Forzar 2 columnas en vista responsive manteniendo el estilo */
-      .products-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 0.6rem;
-        /* reducir gap para mejor ajuste */
-      }
-
-      /* Hacer las tarjetas más compactas para que entren bien en dos columnas */
-      .product-card {
-        padding: 0.6rem;
-        border-radius: 0.75rem;
-      }
-
-      /* Ajuste de imagen para no desbordar y mantener composición visual */
-      .product-card .card-slider {
-        aspect-ratio: 1 / 1;
-        /* más cuadrado en móviles para mejor encaje */
-        margin-bottom: 0.4rem;
-      }
-
-      .product-card .card-slider img {
-        object-fit: cover;
-      }
-
-      /* Reducir tamaño y espaciado en el footer de la tarjeta para consistencia */
-      .product-card-footer {
-        gap: 0.5rem;
-        min-height: 3rem;
-      }
-
-      .product-card-footer .btn-primary,
-      .product-card-footer .btn-secondary,
-      .product-card-footer .icon-btn {
-        height: 2.5rem;
-        min-height: 2.5rem;
-        padding: 0 0.6rem;
-        font-size: 0.88rem;
-      }
-
-      /* Ajustes de título/meta para evitar quiebres extraños en columnas estrechas */
-      .product-title {
-        font-size: 0.95rem;
-        -webkit-line-clamp: 2;
-        min-height: calc(2 * 1.2em);
-      }
-
-      .product-meta {
-        font-size: 0.82rem;
-      }
-    }
-
-    /* Pequeño ajuste: en pantallas muy pequeñas, permitir pasar a 1 columna si queda demasiado justo */
-    @media (max-width: 340px) {
-      .products-grid {
-        grid-template-columns: 1fr !important;
-      }
-    }
-
-    .product-modal-description {
-      white-space: pre-line;
-      /* Esto hará que los saltos de línea se respeten */
-      line-height: 1.6;
-      /* Mejora la legibilidad entre líneas */
-      color: #4b5563;
-      /* Un gris oscuro es más suave que el negro puro */
-      margin-top: 15px;
-      font-size: 0.95rem;
-    }
-  </style>
   <!-- Meta Pixel Code -->
   <script>
     !function (f, b, e, v, n, t, s) {
       if (f.fbq) return; n = f.fbq = function () {
         n.callMethod ?
-        n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+          n.callMethod.apply(n, arguments) : n.queue.push(arguments)
       };
       if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
       n.queue = []; t = b.createElement(e); t.async = !0;
@@ -232,8 +92,8 @@
 
           <div class="form-row">
             <label for="cust_phone">Teléfono <span class="req">*</span></label>
-            <input id="cust_phone" name="phone" type="text" placeholder="Ej: 04121234567" required autocomplete="tel"
-              inputmode="numeric" pattern="\d*" maxlength="15">
+            <input id="cust_phone" name="phone" type="text" placeholder="Ej: 1234567" required autocomplete="tel"
+              inputmode="numeric" pattern="\d*" maxlength="7">
             <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
           </div>
 
