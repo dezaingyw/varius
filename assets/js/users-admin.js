@@ -1,12 +1,3 @@
-// assets/js/users-admin.js
-// Archivo completo y definitivo con todas las mejoras:
-// - Modal estilo "prueba.html"
-// - Sección de comisiones visible SOLO para roles 'vendedor' y 'motorizado' y obligatoria en esos casos
-// - Creación vía Cloud Function + fallback para asegurar que commissionType/commissionValue queden en Firestore
-// - Edición con updateDoc (guarda comisiones)
-// - Mejor manejo de toggles de contraseña para evitar "huérfanos"
-// - Validaciones y UX mejoradas
-
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {
@@ -26,14 +17,14 @@ import {
     orderBy,
     where
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
-
 // Inicializa Firebase (solo si no está)
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Configurables
-const CREATE_USER_FUNCTION_URL = 'https://us-central1-varius-7de76.cloudfunctions.net/createUser';
+const CREATE_USER_FUNCTION_URL = 'https://us-central1-variusonline-976f8.cloudfunctions.net/createUser';
+const UPDATE_PASSWORD_URL = `${CREATE_USER_FUNCTION_URL}/updatePassword`; // NUEVO ENDPOINT
 
 // Teléfono: operador(3) + local(7) => total 10 dígitos esperado.
 const PHONE_MIN_DIGITS = 9;
@@ -47,7 +38,6 @@ const userForm = document.getElementById('userForm');
 const cancelBtn = document.getElementById('cancelBtn');
 const toastEl = document.getElementById('toast');
 const usersBody = document.getElementById('usersBody');
-
 const searchInput = document.getElementById('searchInput');
 const roleFilter = document.getElementById('roleFilter');
 const statusFilter = document.getElementById('statusFilter');
@@ -57,10 +47,8 @@ const nextPageBtn = document.getElementById('nextPage');
 const pageInfo = document.getElementById('pageInfo');
 const applyFiltersBtn = document.getElementById('applyFilters');
 const clearFiltersBtn = document.getElementById('clearFilters');
-
 const loadingModal = document.getElementById('loadingModal');
 const loadingText = document.getElementById('loadingText');
-
 // Commission DOM
 const commissionSection = document.getElementById('commissionSection');
 const commissionPercentRadio = document.getElementById('commission_percent_radio');
@@ -69,12 +57,24 @@ const commissionPercentBox = document.getElementById('commission_percent_box');
 const commissionAmountBox = document.getElementById('commission_amount_box');
 const commissionPercentInput = document.getElementById('commission_percent');
 const commissionAmountInput = document.getElementById('commission_amount');
-
 // Password inputs & toggles
 const pwdInput = document.getElementById('u_password');
 const pwdConfirmInput = document.getElementById('u_password_confirm');
 let pwdToggle = null;
 let pwdConfirmToggle = null;
+
+// NUEVO: helpers para alertas input
+function setInputAlert(id, msg, error = true) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.color = error ? 'red' : 'green';
+    el.style.fontWeight = error && msg ? 'bold' : 'normal';
+    el.style.display = msg ? 'block' : 'none';
+}
+function clearAllAlerts() {
+    ['u_name_alert', 'u_email_alert', 'u_phone_alert', 'u_password_alert', 'u_password_confirm_alert', 'u_role_alert', 'pw_new_alert', 'pw_new_confirm_alert'].forEach(id => setInputAlert(id, '', false));
+}
 
 let allUsers = [];
 let filteredUsers = [];
@@ -170,7 +170,6 @@ function formatTimestamp(ts) {
     }
 }
 
-// Load users
 async function loadUsers() {
     try {
         const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
@@ -272,17 +271,21 @@ function renderTable() {
                         <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
                     </svg>
                 </button>
-
                 <button class="btn-small ${toggleClass} btn-toggle-status" data-id="${u.id}" data-action="${toggleAction}" title="${toggleTitle}">
                     ${isActive ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-slash-circle" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/><path d="M11.354 4.646a.5.5 0 0 0-.708 0l-6 6a.5.5 0 0 0 .708.708l6-6a.5.5 0 0 0 0-.708"/></svg>' : '✔'}
                 </button>
-
                 <button class="btn-small btn-suspender" data-id="${u.id}" title="Suspender" aria-label="Suspender">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                     <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
                     <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                    </svg></button>
-                </div>`;
+                    </svg>
+                </button>
+                <button class="btn-small btn-password" data-id="${u.id}" title="Cambiar contraseña" aria-label="Cambiar contraseña">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 1a4 4 0 0 0-4 4v2a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2V5a4 4 0 0 0-4-4zm-3 4a3 3 0 1 1 6 0v2H5V5zm9 4v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1z"/>
+                    </svg>
+                </button>
+            </div>`;
 
         tr.appendChild(tdName);
         tr.appendChild(tdRole);
@@ -338,6 +341,97 @@ function renderTable() {
             }
         });
     });
+    usersBody.querySelectorAll('.btn-password').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            openPasswordModal(id);
+        });
+    });
+}
+
+// ---------- MODAL CAMBIO CONTRASEÑA ----------
+function openPasswordModal(uid) {
+    let modal = document.getElementById('modalPassword');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalPassword';
+        modal.className = 'modal-password';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h2>Cambiar contraseña</h2>
+                <input id="pw_new" type="password" placeholder="Nueva contraseña" required style="display:block;margin-bottom:5px;">
+                <span id="pw_new_alert" class="alert-input" style="color:red;font-size:13px;display:none;"></span>
+                <input id="pw_new_confirm" type="password" placeholder="Confirmar contraseña" required style="display:block;margin-bottom:5px;">
+                <span id="pw_new_confirm_alert" class="alert-input" style="color:red;font-size:13px;display:none;"></span>
+                <div style="margin-top:1em;">
+                    <button id="pw_save_btn" class="btn">Guardar</button>
+                    <button id="pw_cancel_btn" class="btn-secondary" style="margin-left:12px;">Cancelar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('pw_new').value = '';
+    setInputAlert('pw_new_alert', '', false);
+    document.getElementById('pw_new_confirm').value = '';
+    setInputAlert('pw_new_confirm_alert', '', false);
+
+    document.getElementById('pw_cancel_btn').onclick = () => {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    };
+    document.getElementById('pw_save_btn').onclick = async () => {
+        const newPw = document.getElementById('pw_new').value;
+        const confirmPw = document.getElementById('pw_new_confirm').value;
+        let ok = true;
+
+        // Validaciones robustas
+        if (!newPw) {
+            setInputAlert('pw_new_alert', 'Campo requerido', true); ok = false;
+        } else if (
+            newPw.length < 6 || newPw.length > 8 ||
+            !/[A-Z]/.test(newPw) ||
+            !/[a-z]/.test(newPw) ||
+            !/[0-9]/.test(newPw) ||
+            !/[\W_]/.test(newPw)) {
+            setInputAlert('pw_new_alert', 'Debe tener 6-8 caracteres, mayúsculas, minúsculas, número y carácter especial.', true);
+            ok = false;
+        } else {
+            setInputAlert('pw_new_alert', '', false);
+        }
+        if (newPw !== confirmPw) {
+            setInputAlert('pw_new_confirm_alert', 'Las contraseñas no coinciden.', true); ok = false;
+        } else {
+            setInputAlert('pw_new_confirm_alert', '', false);
+        }
+        if (!ok) return;
+        showLoading('Actualizando contraseña...');
+        try {
+            const idToken = await auth.currentUser.getIdToken(true);
+            const res = await fetch(UPDATE_PASSWORD_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + idToken
+                },
+                body: JSON.stringify({ uid, password: newPw })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast('Contraseña actualizada.');
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+            } else {
+                setInputAlert('pw_new_alert', data.error || 'Error actualizando contraseña', true);
+            }
+        } catch (err) {
+            setInputAlert('pw_new_alert', 'Error de red/server.', true);
+        } finally {
+            hideLoading();
+        }
+    };
 }
 
 // -----------------------------
@@ -398,7 +492,6 @@ function getCommissionFromForm() {
     }
     return { commissionType: null, commissionValue: null };
 }
-
 // -----------------------------
 // Password toggles (limpieza y control)
 // -----------------------------
@@ -415,8 +508,8 @@ function createToggleBtn() {
     return btn;
 }
 function removePasswordToggles() {
-    try { if (pwdToggle && pwdToggle.parentNode) pwdToggle.remove(); } catch (e) {}
-    try { if (pwdConfirmToggle && pwdConfirmToggle.parentNode) pwdConfirmToggle.remove(); } catch (e) {}
+    try { if (pwdToggle && pwdToggle.parentNode) pwdToggle.remove(); } catch (e) { }
+    try { if (pwdConfirmToggle && pwdConfirmToggle.parentNode) pwdConfirmToggle.remove(); } catch (e) { }
     pwdToggle = null;
     pwdConfirmToggle = null;
     if (pwdInput) {
@@ -469,39 +562,32 @@ if (pwdInput && pwdConfirmInput) {
 // -----------------------------
 function validateForm(values, isEdit = false) {
     let ok = true;
-    const setAlert = (id, msg) => { const el = document.getElementById(id); if (el) el.textContent = msg || ''; };
-
-    if (!values.name || !values.name.trim()) { setAlert('u_name_alert', 'El nombre es requerido.'); ok = false; } else setAlert('u_name_alert', '');
-
+    clearAllAlerts();
+    // Nombre
+    if (!values.name || !values.name.trim()) { setInputAlert('u_name_alert', 'El nombre es requerido.', true); ok = false; }
+    // Correo
     const emailAlertEl = document.getElementById('u_email_alert');
     const emailExtSelectEl = document.getElementById('u_email_ext');
     const emailExtCustomEl = document.getElementById('u_email_ext_custom');
-    if (!values.email) {
-        if (emailAlertEl) emailAlertEl.textContent = 'Correo requerido.';
-        ok = false;
-    } else if (!EMAIL_REGEX.test(values.email)) {
-        if (emailAlertEl) emailAlertEl.textContent = 'Correo inválido.';
-        ok = false;
-    } else {
-        if (emailExtSelectEl && emailExtSelectEl.value === 'otro') {
-            const custom = (emailExtCustomEl?.value || '').trim();
-            if (!custom) { if (emailAlertEl) emailAlertEl.textContent = 'Ingresa la extensión de correo.'; ok = false; }
-            else if (!DOMAIN_REGEX.test(custom)) { if (emailAlertEl) emailAlertEl.textContent = 'Dominio inválido.'; ok = false; }
-            else if (emailAlertEl) emailAlertEl.textContent = '';
-        } else if (emailAlertEl) emailAlertEl.textContent = '';
-    }
-
+    if (!values.email) { setInputAlert('u_email_alert', 'Correo requerido.', true); ok = false; }
+    else if (!EMAIL_REGEX.test(values.email)) { setInputAlert('u_email_alert', 'Correo inválido.', true); ok = false; }
+    else if (emailExtSelectEl && emailExtSelectEl.value === 'otro') {
+        const custom = (emailExtCustomEl?.value || '').trim();
+        if (!custom) { setInputAlert('u_email_alert', 'Ingresa la extensión de correo.', true); ok = false; }
+        else if (!DOMAIN_REGEX.test(custom)) { setInputAlert('u_email_alert', 'Dominio inválido.', true); ok = false; }
+        else setInputAlert('u_email_alert', '', false);
+    } else { setInputAlert('u_email_alert', '', false); }
+    // Teléfono
     const operator = (document.getElementById('u_operator')?.value || '').trim();
     const phoneLocal = (document.getElementById('u_phone_local')?.value || '').trim();
     const fullPhone = values.phone || '';
-
-    if (!operator) { setAlert('u_phone_alert', 'Selecciona la operadora.'); ok = false; }
-    else if (phoneLocal.length !== 7) { setAlert('u_phone_alert', 'El número local debe tener 7 dígitos.'); ok = false; }
-    else if (!isPhoneFormatValid(fullPhone)) { setAlert('u_phone_alert', `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos.`); ok = false; }
-    else setAlert('u_phone_alert', '');
-
-    if (!values.role || !values.role.trim()) { setAlert('u_role_alert', 'Selecciona un rol.'); ok = false; } else setAlert('u_role_alert', '');
-
+    if (!operator) { setInputAlert('u_phone_alert', 'Selecciona la operadora.', true); ok = false; }
+    else if (phoneLocal.length !== 7) { setInputAlert('u_phone_alert', 'El número local debe tener 7 dígitos.', true); ok = false; }
+    else if (!isPhoneFormatValid(fullPhone)) { setInputAlert('u_phone_alert', `Teléfono inválido. Debe tener entre ${PHONE_MIN_DIGITS} y ${PHONE_MAX_DIGITS} dígitos.`, true); ok = false; }
+    else setInputAlert('u_phone_alert', '', false);
+    // Rol
+    if (!values.role || !values.role.trim()) { setInputAlert('u_role_alert', 'Selecciona un rol.', true); ok = false; } else setInputAlert('u_role_alert', '', false);
+    // Contraseña
     if (!isEdit || (values.password || values.confirm)) {
         const pw = values.password || '';
         const confirm = values.confirm || '';
@@ -511,34 +597,29 @@ function validateForm(values, isEdit = false) {
         const okNumber = /[0-9]/.test(pw);
         const okSpecial = /[\W_]/.test(pw);
         if (!okLen || !okUpper || !okLower || !okNumber || !okSpecial) {
-            setAlert('u_password_alert', 'La contraseña debe tener 6-8 caracteres e incluir mayúscula, minúscula, número y carácter especial.');
+            setInputAlert('u_password_alert', 'La contraseña debe tener 6-8 caracteres e incluir mayúscula, minúscula, número y carácter especial.', true);
             ok = false;
-        } else setAlert('u_password_alert', '');
-        if (pw !== confirm) { setAlert('u_password_confirm_alert', 'Las contraseñas no coinciden.'); ok = false; } else setAlert('u_password_confirm_alert', '');
+        } else setInputAlert('u_password_alert', '', false);
+        if (pw !== confirm) { setInputAlert('u_password_confirm_alert', 'Las contraseñas no coinciden.', true); ok = false; } else setInputAlert('u_password_confirm_alert', '', false);
     } else {
-        setAlert('u_password_alert', ''); setAlert('u_password_confirm_alert', '');
+        setInputAlert('u_password_alert', '', false);
+        setInputAlert('u_password_confirm_alert', '', false);
     }
-
-    // If role requires commission => must have commissionType and valid value
+    // Comisión
     if (shouldShowCommissionForRole(values.role)) {
-        if (!values.commissionType) {
-            showToast('Selecciona el tipo de comisión (porcentaje o monto).');
-            ok = false;
-        } else {
+        if (!values.commissionType) { showToast('Selecciona el tipo de comisión (porcentaje o monto).'); ok = false; }
+        else {
             if (values.commissionType === 'percent') {
                 if (values.commissionValue == null || isNaN(values.commissionValue) || values.commissionValue < 0 || values.commissionValue > 100) {
-                    showToast('Ingresa un porcentaje de comisión válido (0-100).');
-                    ok = false;
+                    showToast('Ingresa un porcentaje de comisión válido (0-100).'); ok = false;
                 }
             } else if (values.commissionType === 'amount') {
                 if (values.commissionValue == null || isNaN(values.commissionValue) || values.commissionValue < 0) {
-                    showToast('Ingresa un monto de comisión válido.');
-                    ok = false;
+                    showToast('Ingresa un monto de comisión válido.'); ok = false;
                 }
             }
         }
     }
-
     return ok;
 }
 
@@ -568,14 +649,13 @@ userForm?.addEventListener('submit', async (e) => {
     // duplicados
     try {
         const emailTaken = await isEmailTaken(email, isEdit ? userId : null);
-        if (emailTaken) { const el = document.getElementById('u_email_alert'); if (el) el.textContent = 'El correo ya está registrado.'; return; }
+        if (emailTaken) { setInputAlert('u_email_alert', 'El correo ya está registrado.', true); return; }
         if (phone) {
             const phoneTaken = await isPhoneTaken(phone, isEdit ? userId : null);
-            if (phoneTaken) { const el = document.getElementById('u_phone_alert'); if (el) el.textContent = 'El teléfono ya está registrado.'; return; }
+            if (phoneTaken) { setInputAlert('u_phone_alert', 'El teléfono ya está registrado.', true); return; }
         }
     } catch (err) {
-        console.error('Error checking duplicates', err);
-        showToast('Error verificando duplicados. Intenta más tarde.');
+        showToast('Error verificando duplicados.');
         return;
     }
 
@@ -589,9 +669,6 @@ userForm?.addEventListener('submit', async (e) => {
                 payload.commissionType = commissionType;
                 payload.commissionValue = commissionValue;
             }
-            console.log('[users-admin] Crear usuario -> payload:', payload);
-
-            // token
             let idToken = null;
             try {
                 if (!auth || !auth.currentUser) {
@@ -602,41 +679,32 @@ userForm?.addEventListener('submit', async (e) => {
             } catch (tErr) {
                 console.error('[users-admin] Error obteniendo idToken:', tErr);
             }
-
             const headers = { 'Content-Type': 'application/json' };
             if (idToken) headers['Authorization'] = 'Bearer ' + idToken;
-
             const res = await fetch(CREATE_USER_FUNCTION_URL, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(payload),
             });
-
             let textBody = '';
             let jsonBody = null;
             try {
                 textBody = await res.text();
                 try { jsonBody = JSON.parse(textBody); } catch (_) { /* no JSON */ }
-            } catch (readErr) {
-                console.error('[users-admin] error leyendo body de la respuesta:', readErr);
-            }
-
+            } catch (readErr) { }
             if (!res.ok) {
-                console.error('[users-admin] createUser NO ok', res.status, textBody);
                 let userMsg = 'Error creando usuario.';
                 try {
                     const parsed = JSON.parse(textBody || '{}');
                     if (parsed && parsed.error) userMsg = parsed.error;
                     else if (parsed && parsed.message) userMsg = parsed.message;
-                } catch (_) {}
+                } catch (_) { }
                 showToast(userMsg);
                 return;
             }
-
             // CREACIÓN EXITOSA en el backend. Aseguramos campos de comisión en Firestore:
             try {
                 if (jsonBody && jsonBody.uid) {
-                    // Si la función devuelve el uid del usuario creado, usamos ese uid
                     const uid = jsonBody.uid;
                     const userRef = doc(db, 'users', uid);
                     const userSnap = await getDoc(userRef);
@@ -679,55 +747,27 @@ userForm?.addEventListener('submit', async (e) => {
                             if (Object.keys(updateObj).length) {
                                 await updateDoc(doc(db, 'users', firstDoc.id), updateObj);
                             }
-                        } else {
-                            // Fallback: no se encontró documento. Opcional: crear uno nuevo si lo deseas.
-                            // Por ahora lo dejamos sin crear para evitar duplicados. Puedes descomentar y ajustar si quieres crear:
-                            /*
-                            const newRef = doc(collection(db, 'users'));
-                            const toSet = {
-                                name,
-                                email,
-                                phone: normalizePhone(phone),
-                                role,
-                                status,
-                                emailLower,
-                                createdAt: serverTimestamp(),
-                            };
-                            if (commissionType) {
-                                toSet.commissionType = commissionType;
-                                toSet.commissionValue = commissionValue;
-                            }
-                            await setDoc(newRef, toSet);
-                            */
                         }
                     }
                 }
             } catch (fireErr) {
-                console.error('[users-admin] Error guardando comisiones en Firestore:', fireErr);
                 // no interrumpimos: usuario ya fue creado en backend
             }
-
             showToast('Usuario creado correctamente.');
         } else {
-            // EDIT MODE: actualizar documento existente
             const updateObj = { name, phone, role, status, updatedAt: serverTimestamp() };
             if (commissionType) {
                 updateObj.commissionType = commissionType;
                 updateObj.commissionValue = commissionValue;
-            } else {
-                // Si deseas eliminar comisiones cuando no aplican, usa deleteField() y updateDoc accordingly.
             }
             await updateDoc(doc(db, 'users', userId), updateObj);
             if (password) showToast('Datos actualizados. Email para restablecer contraseña enviado.');
             else showToast('Usuario actualizado.');
         }
-
-        // cerrar modal, recargar lista
         closeModal();
         await loadUsers();
     } catch (err) {
-        console.error('Error saving user', err);
-        showToast('Error guardando usuario. Revisa consola (Network).');
+        showToast('Error guardando usuario.');
     } finally {
         hideLoading();
     }
@@ -753,15 +793,19 @@ function getFullPhoneFromForm() {
 }
 
 function openModal(mode = 'add', data = null) {
-    // limpiar toggles y valores residuales
     removePasswordToggles();
-
     modalMode = mode;
     const titleEl = document.getElementById('modalTitle');
     const userIdEl = document.getElementById('userId');
     if (titleEl) titleEl.textContent = mode === 'add' ? 'Agregar Usuario' : 'Editar Usuario';
     if (userIdEl) userIdEl.value = data?.id || '';
     if (document.getElementById('u_name')) document.getElementById('u_name').value = data?.name || '';
+    // ... resto igual que antes ...
+    // Añade botón "Cambiar contraseña" en modal, solo en modo admin y edit.
+    if (mode === 'edit' && data?.id && document.getElementById('btnChangePassword')) {
+        document.getElementById('btnChangePassword').style.display = 'inline-block';
+        document.getElementById('btnChangePassword').onclick = () => openPasswordModal(data.id);
+    }
 
     // email split
     const emailLocalEl = document.getElementById('u_email_local');
@@ -811,17 +855,11 @@ function openModal(mode = 'add', data = null) {
             phoneLocalEl.value = '';
         }
     }
-
     if (document.getElementById('u_role')) document.getElementById('u_role').value = data?.role || '';
     if (document.getElementById('u_status')) document.getElementById('u_status').value = data?.status || 'Activo';
-
     if (pwdInput) pwdInput.value = '';
     if (pwdConfirmInput) pwdConfirmInput.value = '';
-
-    ['u_name_alert', 'u_email_alert', 'u_phone_alert', 'u_password_alert', 'u_password_confirm_alert', 'u_role_alert'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.textContent = '';
-    });
-
+    clearAllAlerts();
     // Required flags
     const setRequired = (id, req) => { const el = document.getElementById(id); if (!el) return; if (req) el.setAttribute('required', 'true'); else el.removeAttribute('required'); };
     const addRequired = mode === 'add';
@@ -832,10 +870,8 @@ function openModal(mode = 'add', data = null) {
     setRequired('u_role', addRequired);
     setRequired('u_password', addRequired);
     setRequired('u_password_confirm', addRequired);
-
     if (emailExtSelect && emailExtSelect.value === 'otro' && addRequired) emailExtCustom.setAttribute('required', 'true');
     else if (emailExtCustom) emailExtCustom.removeAttribute('required');
-
     // rellenar comisiones si vienen en data
     const cType = data?.commissionType || '';
     const cValue = data?.commissionValue != null ? data.commissionValue : '';
@@ -843,19 +879,15 @@ function openModal(mode = 'add', data = null) {
     if (commissionAmountRadio) commissionAmountRadio.checked = cType === 'amount';
     if (commissionPercentInput) commissionPercentInput.value = (cType === 'percent' && cValue !== '') ? cValue : '';
     if (commissionAmountInput) commissionAmountInput.value = (cType === 'amount' && cValue !== '') ? cValue : '';
-
     // mostrar/ocultar sección de comisiones según rol actual
     const currentRole = document.getElementById('u_role')?.value || '';
     updateCommissionVisibilityByRole(currentRole);
-
     if (userModal) {
         userModal.classList.remove('hidden');
         userModal.setAttribute('aria-hidden', 'false');
     }
 }
-
 function closeModal() {
-    // limpiar toggles y campos sensibles
     removePasswordToggles();
     if (!userModal) return;
     userModal.classList.add('hidden');
@@ -870,7 +902,6 @@ closeModalBtn?.addEventListener('click', closeModal);
 cancelBtn?.addEventListener('click', (e) => { e.preventDefault(); closeModal(); });
 userModal?.addEventListener('click', (e) => { if (e.target === userModal) closeModal(); });
 
-// role select: mostrar/ocultar comisiones según selección
 const roleSelectEl = document.getElementById('u_role');
 if (roleSelectEl) {
     roleSelectEl.addEventListener('change', (e) => {
@@ -878,28 +909,23 @@ if (roleSelectEl) {
         updateCommissionVisibilityByRole(role);
     });
 }
-
-// Phone local input: only digits, max 7
 const phoneLocalInput = document.getElementById('u_phone_local');
 if (phoneLocalInput) {
     phoneLocalInput.addEventListener('input', (e) => {
         const cleaned = normalizePhone(e.target.value);
         if (cleaned.length > 7) {
             e.target.value = cleaned.slice(0, 7);
-            const el = document.getElementById('u_phone_alert'); if (el) el.textContent = 'Máximo 7 dígitos (parte local).';
-            setTimeout(() => { const el2 = document.getElementById('u_phone_alert'); if (el2) el2.textContent = ''; }, 2200);
+            setInputAlert('u_phone_alert', 'Máximo 7 dígitos (parte local).', true);
+            setTimeout(() => setInputAlert('u_phone_alert', '', false), 2200);
         } else {
             e.target.value = cleaned;
-            const el = document.getElementById('u_phone_alert'); if (el) el.textContent = '';
+            setInputAlert('u_phone_alert', '', false);
         }
     });
 }
-
-// Email local input: UX for pasting local@domain
 const emailLocalInput = document.getElementById('u_email_local');
 const emailExtSelectEl = document.getElementById('u_email_ext');
 const emailExtCustomEl = document.getElementById('u_email_ext_custom');
-
 if (emailLocalInput) {
     emailLocalInput.addEventListener('input', (e) => {
         const v = e.target.value;
@@ -921,15 +947,13 @@ if (emailLocalInput) {
                     if (modalMode === 'add') emailExtCustomEl.setAttribute('required', 'true');
                 }
             }
-            const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
+            setInputAlert('u_email_alert', '', false);
         } else {
             e.target.value = v.replace(/\s+/g, ' ').trimStart();
-            const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
+            setInputAlert('u_email_alert', '', false);
         }
     });
 }
-
-// Email extension select handling
 if (emailExtSelectEl) {
     emailExtSelectEl.addEventListener('change', () => {
         if (!emailExtCustomEl) return;
@@ -942,25 +966,21 @@ if (emailExtSelectEl) {
             emailExtCustomEl.value = '';
             emailExtCustomEl.removeAttribute('required');
         }
-        const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
+        setInputAlert('u_email_alert', '', false);
     });
 }
 if (emailExtCustomEl) {
     emailExtCustomEl.addEventListener('input', (e) => {
         const v = e.target.value;
         if (v.includes('@')) e.target.value = v.replace(/@/g, '');
-        const el = document.getElementById('u_email_alert'); if (el) el.textContent = '';
+        setInputAlert('u_email_alert', '', false);
     });
 }
-
-// Commission radios wiring (delegated)
 document.addEventListener('click', (e) => {
     if (e.target && (e.target.id === 'commission_percent_radio' || e.target.id === 'commission_amount_radio')) {
         setTimeout(showCommissionBoxes, 0);
     }
 });
-
-// Filters & pagination events
 applyFiltersBtn?.addEventListener('click', () => applyFiltersAndRender());
 clearFiltersBtn?.addEventListener('click', () => { if (searchInput) searchInput.value = ''; if (roleFilter) roleFilter.value = ''; if (statusFilter) statusFilter.value = ''; if (perPageSelect) perPageSelect.value = '10'; applyFiltersAndRender(); });
 if (searchInput) searchInput.addEventListener('input', () => { currentPage = 1; applyFiltersAndRender(); });
@@ -976,7 +996,6 @@ nextPageBtn?.addEventListener('click', () => {
     renderTable();
 });
 
-// Presence listener
 window.addEventListener('presence:list', (e) => {
     const users = (e.detail && e.detail.users) || [];
     const map = {};
@@ -985,7 +1004,6 @@ window.addEventListener('presence:list', (e) => {
     if (allUsers.length) renderTable();
 });
 
-// Auth check & initial load
 onAuthStateChanged(auth, async (user) => {
     if (!user) { window.location.href = 'index.html'; return; }
     try {
@@ -994,8 +1012,6 @@ onAuthStateChanged(auth, async (user) => {
             const r = s.data().role;
             if (r !== 'administrador') { window.location.href = `/admin/${r}.html`; return; }
         } else { window.location.href = 'index.html'; return; }
-    } catch (err) {
-        console.error('Role check error', err);
-    }
+    } catch (err) { }
     await loadUsers();
 });

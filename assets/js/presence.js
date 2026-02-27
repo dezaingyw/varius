@@ -1,31 +1,3 @@
-/**
- * assets/js/presence.js
- *
- * Módulo responsable de:
- * - Registrar presencia online/offline del usuario en Firebase Realtime Database (uso de onDisconnect)
- * - Actualizar el documento del usuario en Firestore con online/lastSeen para usos de consulta
- * - Emitir eventos DOM custom para que el resto de la UI (sidebar-user.js, etc.) actualice indicadores
- *
- * Notas importantes:
- * - Para que onDisconnect funcione correctamente debes añadir `databaseURL` a tu firebase-config.js:
- *     databaseURL: "https://<TU-PROYECTO>.firebaseio.com"
- *   Revisa el archivo firebase-config.js incluido junto a este módulo.
- *
- * - Este módulo asume que otras páginas importan `sidebar-user.js`, el cual a su vez importa este módulo;
- *   así evitamos tener que añadir manualmente el <script> en todas las páginas.
- *
- * Eventos custom emitidos:
- * - window.dispatchEvent(new CustomEvent('presence:me', { detail: { uid, state } }))
- *     -> cuando cambia el estado del usuario autenticado (online|offline|error)
- *
- * - window.dispatchEvent(new CustomEvent('presence:list', { detail: { users: [{uid, state, last_changed}, ...] } }))
- *     -> envía la lista completa de estados leída desde Realtime Database (útil para ver "lista de usuarios activos")
- *
- * - window.dispatchEvent(new CustomEvent('presence:change', { detail: { uid, state } }))
- *     -> cuando un usuario cambia su estado
- *
- */
-
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";

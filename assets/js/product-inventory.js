@@ -1,12 +1,21 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-storage.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
 
-// Inicializa Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+const auth = getAuth(app);
+signInAnonymously(auth)
+    .then(() => {
+        console.log("Usuario autenticado anónimamente");
+    })
+    .catch((error) => {
+        console.error("Error autenticando:", error);
+    });
 
 let productos = [];
 let paginaActual = 1;
@@ -61,7 +70,7 @@ function renderPreviewImages() {
     currentImages.forEach((imgObj, idx) => {
         const div = document.createElement('div');
         div.className = 'image-preview-card relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden shadow border border-slate-200 flex items-center justify-center group';
-        
+
         // Imagen
         const image = document.createElement('img');
         image.className = 'object-cover w-full h-full';
@@ -106,10 +115,13 @@ function renderPreviewImages() {
 
 async function subirTodasLasImagenes(productSkuOrId) {
     let urlsFinales = [];
+    if (!auth.currentUser) {
+        await signInAnonymously(auth);
+    }
     for (let i = 0; i < currentImages.length; i++) {
         let imgObj = currentImages[i];
         if (!imgObj.isUploaded) {
-            const imgRef = storageRef(storage, `productos/${productSkuOrId}/${Date.now()}_${i}.jpg`);
+            const imgRef = storageRef(storage, `products/${productSkuOrId}/${Date.now()}_${i}.jpg`);
             await new Promise((resolve, reject) => {
                 const uploadTask = uploadBytesResumable(imgRef, imgObj.file);
                 uploadTask.on('state_changed', (snap) => {
@@ -471,7 +483,7 @@ function actualizarSKU() {
     }
     // SKU: 3 letras mayúsculas de categoría sin tildes, -número 6 cifras, 4 random mayúsculas/números
     let prefix = cat.normalize("NFD").replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 3);
-    if (prefix.length < 3) prefix = (prefix + 'XXX').slice(0,3);
+    if (prefix.length < 3) prefix = (prefix + 'XXX').slice(0, 3);
     const num = Math.floor(100000 + Math.random() * 900000); // 6 cifras
     const sufijo = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 caracteres
     document.getElementById('skuInput').value = `${prefix}-${num}${sufijo}`;
