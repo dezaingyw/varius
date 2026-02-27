@@ -832,62 +832,6 @@ function setupGeolocationButton() {
 }
 window.addEventListener('DOMContentLoaded', setupGeolocationButton);
 
-const VENEZUELA_OPERATORS = [
-    { value: '0414', label: '0414' },
-    { value: '0424', label: '0424' },
-    { value: '0412', label: '0412' },
-    { value: '0422', label: '0422' },
-    { value: '0416', label: '0416' },
-    { value: '0426', label: '0426' }
-];
-const COMMON_EMAIL_DOMAINS = [
-    'gmail.com',
-    'hotmail.com',
-    'yahoo.com',
-    'outlook.com',
-    'live.com'
-];
-
-function transformContactFields() {
-    const phoneInput = document.getElementById('cust_phone');
-    if (phoneInput && !document.getElementById('cust_operator')) {
-        const select = document.createElement('select');
-        select.id = 'cust_operator';
-        select.name = 'operator';
-        select.style.width = '92px';
-        select.style.padding = '8px';
-        select.style.borderRadius = '8px';
-        select.style.marginRight = '8px';
-        select.setAttribute('aria-label', 'Operadora');
-        VENEZUELA_OPERATORS.forEach(op => {
-            const opt = document.createElement('option');
-            opt.value = op.value;
-            opt.textContent = op.label;
-            select.appendChild(opt);
-        });
-        phoneInput.parentElement.insertBefore(select, phoneInput);
-    }
-
-    const emailInput = document.getElementById('cust_email');
-    if (emailInput && !document.getElementById('cust_email_domain')) {
-        const select = document.createElement('select');
-        select.id = 'cust_email_domain';
-        select.name = 'email_domain';
-        select.style.width = '140px';
-        select.style.padding = '8px';
-        select.style.borderRadius = '8px';
-        select.style.marginLeft = '8px';
-        select.setAttribute('aria-label', 'Extensión de correo');
-        COMMON_EMAIL_DOMAINS.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d;
-            opt.textContent = d;
-            select.appendChild(opt);
-        });
-        emailInput.parentElement.insertBefore(select, emailInput.nextSibling);
-    }
-}
-
 function validateName() {
     const el = document.getElementById('cust_name');
     const err = document.getElementById('cust_name_err');
@@ -895,39 +839,6 @@ function validateName() {
     const v = el.value.trim();
     if (!v) { if (err) err.textContent = 'El nombre es obligatorio.'; return false; }
     if (v.length < 2) { if (err) err.textContent = 'Nombre demasiado corto.'; return false; }
-    if (err) err.textContent = '';
-    return true;
-}
-function validateEmail() {
-    const el = document.getElementById('cust_email');
-    const domain = document.getElementById('cust_email_domain');
-    const err = document.getElementById('cust_email_err');
-    if (!el) return true;
-    const user = el.value.trim();
-    if (!user) { if (err) err.textContent = ''; return true; }
-    if (!/^[A-Za-z0-9._-]+$/.test(user)) {
-        if (err) err.textContent = 'Caracteres inválidos en usuario. Solo letras, números, ., - y _';
-        return false;
-    }
-    if (!domain || !domain.value) {
-        if (err) err.textContent = 'Selecciona una extensión de correo.'; return false;
-    }
-    const email = `${user}@${domain.value}`;
-    const re = /^\S+@\S+\.\S+$/;
-    if (!re.test(email)) {
-        if (err) err.textContent = 'Correo inválido.'; return false;
-    }
-    if (err) err.textContent = '';
-    return true;
-}
-function validateAge() {
-    const el = document.getElementById('cust_age');
-    const err = document.getElementById('cust_age_err');
-    if (!el) return true;
-    const v = el.value.trim();
-    if (v && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > 120)) {
-        if (err) err.textContent = 'Edad inválida.'; return false;
-    }
     if (err) err.textContent = '';
     return true;
 }
@@ -990,6 +901,41 @@ function submitHandler(e) {
         return;
     }
     submitOrder({ name, phone: phoneFull, address, lat, lng });
+}
+
+/* ---------------------- EVENTOS PRINCIPALES ---------------------- */
+function attachGlobalEvents() {
+    const nameEl = document.getElementById('cust_name');
+    const phoneOpEl = document.getElementById('cust_operator');
+    const phoneEl = document.getElementById('cust_phone');
+    const addrEl = document.getElementById('cust_address');
+
+    if (nameEl) { nameEl.addEventListener('input', () => { validateName(); validateFormAll(); }); nameEl.addEventListener('blur', validateName); }
+    if (phoneOpEl) {
+        phoneOpEl.addEventListener('change', () => { validatePhone(); validateFormAll(); });
+    }
+    if (phoneEl) {
+        phoneEl.addEventListener('input', (e) => {
+            const v = e.currentTarget.value;
+            const cleaned = v.replace(/\D+/g, '').slice(0, 7);
+            if (cleaned !== v) e.currentTarget.value = cleaned;
+            validatePhone();
+            validateFormAll();
+        });
+        phoneEl.addEventListener('blur', validatePhone);
+    }
+    if (addrEl) { addrEl.addEventListener('input', () => { validateAddress(); validateFormAll(); }); addrEl.addEventListener('blur', validateAddress); }
+
+    const checkoutForm = document.getElementById('checkoutForm');
+    if (checkoutForm) {
+        try { checkoutForm.removeEventListener('submit', submitHandler); } catch (e) { }
+        checkoutForm.addEventListener('submit', submitHandler);
+    }
+
+    document.getElementById('clearCartBtn')?.addEventListener('click', async () => {
+        const ok = await showConfirm('Vaciar el carrito?');
+        if (ok) clearCart();
+    });
 }
 
 let IS_SUBMITTING = false;
@@ -1063,70 +1009,7 @@ async function submitOrder(customerData) {
     }
 }
 
-/* Eventos y boot */
-function attachGlobalEvents() {
-    transformContactFields();
-
-    const nameEl = document.getElementById('cust_name');
-    const emailEl = document.getElementById('cust_email');
-    const emailDomainEl = document.getElementById('cust_email_domain');
-    const phoneOpEl = document.getElementById('cust_operator');
-    const phoneEl = document.getElementById('cust_phone');
-    const addrEl = document.getElementById('cust_address');
-    const ageEl = document.getElementById('cust_age');
-
-    if (nameEl) { nameEl.addEventListener('input', () => { validateName(); validateFormAll(); }); nameEl.addEventListener('blur', validateName); }
-    if (emailEl) {
-        emailEl.addEventListener('input', (e) => {
-            const v = e.currentTarget.value;
-            const cleaned = v.replace(/[^A-Za-z0-9._-]/g, '');
-            if (cleaned !== v) e.currentTarget.value = cleaned;
-            validateEmail();
-            validateFormAll();
-        });
-        emailEl.addEventListener('blur', validateEmail);
-    }
-    if (emailDomainEl) {
-        emailDomainEl.addEventListener('change', () => { validateEmail(); validateFormAll(); });
-    }
-    if (phoneOpEl) {
-        phoneOpEl.addEventListener('change', () => { validatePhone(); validateFormAll(); });
-    }
-    if (phoneEl) {
-        phoneEl.addEventListener('input', (e) => {
-            const v = e.currentTarget.value;
-            const cleaned = v.replace(/\D+/g, '').slice(0, 7);
-            if (cleaned !== v) e.currentTarget.value = cleaned;
-            validatePhone();
-            validateFormAll();
-        });
-        phoneEl.addEventListener('blur', validatePhone);
-    }
-    if (addrEl) { addrEl.addEventListener('input', () => { validateAddress(); validateFormAll(); }); addrEl.addEventListener('blur', validateAddress); }
-    if (ageEl) {
-        ageEl.addEventListener('input', (e) => {
-            const v = e.currentTarget.value;
-            const cleaned = v.replace(/\D+/g, '').slice(0, 3);
-            if (cleaned !== v) e.currentTarget.value = cleaned;
-            validateAge();
-            validateFormAll();
-        });
-        ageEl.addEventListener('blur', validateAge);
-    }
-
-    const checkoutForm = document.getElementById('checkoutForm');
-    if (checkoutForm) {
-        try { checkoutForm.removeEventListener('submit', submitHandler); } catch (e) { }
-        checkoutForm.addEventListener('submit', submitHandler);
-    }
-
-    document.getElementById('clearCartBtn')?.addEventListener('click', async () => {
-        const ok = await showConfirm('Vaciar el carrito?');
-        if (ok) clearCart();
-    });
-}
-
-/* Eventos y boot */
+/* ---------------------- BOOTSTRAP ---------------------- */
 async function boot() {
     loadCartFromCookie();
     attachGlobalEvents();

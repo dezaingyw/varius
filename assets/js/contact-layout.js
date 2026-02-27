@@ -1,5 +1,4 @@
-// Pequeño módulo que mejora el layout de los campos de contacto sin cambiar IDs ni listeners existentes.
-// Cargar este script después de pedidos-data.js
+// SOLO maneja el input de teléfono y el selector de operadora. NO EMAIL NI EDAD
 
 const VENEZUELA_OPERATORS = [
     { value: '0412', label: '0412' },
@@ -11,14 +10,7 @@ const VENEZUELA_OPERATORS = [
     { value: 'other', label: 'Otro' }
 ];
 
-const COMMON_EMAIL_DOMAINS = [
-    'gmail.com',
-    'hotmail.com',
-    'yahoo.com',
-    'outlook.com',
-    'live.com'
-];
-
+// Crea el <select> para operadora solo si no existe
 function createOperatorSelectIfMissing() {
     let sel = document.getElementById('cust_operator');
     if (sel) return sel;
@@ -35,109 +27,53 @@ function createOperatorSelectIfMissing() {
     return sel;
 }
 
-function createEmailDomainSelectIfMissing() {
-    let sel = document.getElementById('cust_email_domain');
-    if (sel) return sel;
-    sel = document.createElement('select');
-    sel.id = 'cust_email_domain';
-    sel.name = 'email_domain';
-    sel.setAttribute('aria-label', 'Extensión del correo');
-    COMMON_EMAIL_DOMAINS.forEach(d => {
-        const o = document.createElement('option');
-        o.value = d;
-        o.textContent = d;
-        sel.appendChild(o);
-    });
-    return sel;
-}
+// Organiza input y select juntos en la .form-row del teléfono
+function enhanceContactLayout() {
+    const phoneInput = document.getElementById('cust_phone');
+    if (!phoneInput) return;
 
-function wrapControlsIntoRow(rowEl, controlsEl) {
-    // rowEl: .form-row (label + input)
-    // controlsEl: container con elementos de control ya preparados
-    rowEl.classList.add('field-inline'); // para CSS
-    let controls = rowEl.querySelector('.field-controls');
+    // Si ya está el <select> dentro del mismo .form-row, no hagas nada
+    if (document.getElementById('cust_operator') && document.getElementById('cust_operator').parentElement === phoneInput.parentElement) {
+        return;
+    }
+
+    const operator = createOperatorSelectIfMissing();
+    operator.classList.add('operator-select');
+    phoneInput.classList.add('phone-input-adj');
+
+    // Busca la form-row para usar como contenedor
+    const phoneRow = phoneInput.closest('.form-row') || phoneInput.parentElement;
+
+    // Elimina el select si está en otro lado
+    if (operator.parentElement && operator.parentElement !== phoneRow) {
+        operator.parentElement.removeChild(operator);
+    }
+
+    // Crea un WRAPPER solo si aún no se ha agrupado
+    let controls = phoneRow.querySelector('.field-controls');
     if (!controls) {
         controls = document.createElement('div');
         controls.className = 'field-controls';
-        // insert controls after label if label exists
-        const label = rowEl.querySelector('label');
+        const label = phoneRow.querySelector('label');
         if (label) label.after(controls);
-        else rowEl.insertBefore(controls, rowEl.firstChild);
+        else phoneRow.insertBefore(controls, phoneRow.firstChild);
+    } else {
+        // Limpia controles para evitar duplicados
+        controls.innerHTML = '';
     }
-    // append children of controlsEl into controls (avoid duplicates)
-    Array.from(controlsEl.children || []).forEach(child => {
-        if (!controls.contains(child)) controls.appendChild(child);
-    });
+
+    // Agrega el select y luego el input, en ese orden
+    controls.appendChild(operator);
+    controls.appendChild(phoneInput);
+
+    if (!phoneInput.placeholder) phoneInput.placeholder = 'Ej: 1234567';
+    phoneInput.setAttribute('inputmode', 'numeric');
+    phoneInput.setAttribute('autocomplete', 'tel');
 }
 
-function enhanceContactLayout() {
-    const phoneInput = document.getElementById('cust_phone');
-    if (phoneInput) {
-        const operator = createOperatorSelectIfMissing();
-        operator.classList.add('operator-select');
-        phoneInput.classList.add('phone-input-adj');
-
-        // If the operator select isn't in DOM, insert it (we will move into wrapper anyway)
-        if (!operator.parentElement) {
-            // create a temp container
-            const tmp = document.createElement('div');
-            tmp.appendChild(operator);
-            tmp.appendChild(phoneInput);
-            const phoneRow = phoneInput.closest('.form-row') || phoneInput.parentElement;
-            if (phoneRow) wrapControlsIntoRow(phoneRow, tmp);
-        } else {
-            // operator exists somewhere: ensure both are wrapped
-            const phoneRow = phoneInput.closest('.form-row') || phoneInput.parentElement;
-            if (phoneRow) {
-                const tmp = document.createElement('div');
-                tmp.appendChild(operator);
-                tmp.appendChild(phoneInput);
-                wrapControlsIntoRow(phoneRow, tmp);
-            }
-        }
-
-        // placeholder example, claro y útil
-        if (!phoneInput.placeholder) phoneInput.placeholder = 'Ej: 1234567';
-        // inputmode y patrón ya están en HTML original; asegurar atributos útiles
-        phoneInput.setAttribute('inputmode', 'numeric');
-        phoneInput.setAttribute('autocomplete', 'tel');
-    }
-
-    const emailInput = document.getElementById('cust_email');
-    if (emailInput) {
-        const domain = createEmailDomainSelectIfMissing();
-        domain.classList.add('email-domain-select');
-        emailInput.classList.add('email-input-adj');
-
-        // Wrap email and domain together
-        const emailRow = emailInput.closest('.form-row') || emailInput.parentElement;
-        if (emailRow) {
-            const tmp = document.createElement('div');
-            tmp.appendChild(emailInput);
-            tmp.appendChild(domain);
-            wrapControlsIntoRow(emailRow, tmp);
-        }
-
-        if (!emailInput.placeholder) emailInput.placeholder = 'usuario';
-        emailInput.setAttribute('autocomplete', 'email');
-    }
-
-    // Small accessibility tweak: ensure labels remain associated
-    // (We didn't change IDs so label[for] remains valid)
-}
-
-// Run after a short delay to let pedidos-data.js create selects if it does
+// Ejecuta siempre tras cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
-    // Delay a bit in case pedidos-data.js runs on DOMContentLoaded too
-    setTimeout(() => {
-        try {
-            enhanceContactLayout();
-        } catch (err) {
-            // fail silently - no break
-            console.warn('contact-layout enhancement failed', err);
-        }
-    }, 100);
+    setTimeout(enhanceContactLayout, 150);
 });
 
-// Also expose function for manual invocation during debugging
 export { enhanceContactLayout };
