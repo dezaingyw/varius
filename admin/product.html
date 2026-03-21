@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Productos — Varius</title>
+    <link rel="icon" type="image/png" href="../assets/img/favicon.png">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/presence.css">
@@ -111,8 +112,8 @@
                             Gestion de Productos
                         </h1>
                     </div>
-                    <button onclick="abrirModal('add')"
-                        class="bg-[#10b981] hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-emerald-100 flex items-center gap-2">
+                    <button id="btnNuevoProducto" onclick="abrirModal('add')"
+                        class="admin-only bg-[#10b981] hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-emerald-100 flex items-center gap-2">
                         <i class="fas fa-plus"></i> Producto Nuevo
                     </button>
                 </div>
@@ -334,10 +335,58 @@
                 onclick="ocultarModalExito()">OK</button>
         </div>
     </div>
-    
+
+    <div id="modal-compartir"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-slate-800">Compartir Producto</h2>
+                <button onclick="cerrarModalCompartir()" class="text-slate-400 hover:text-slate-600"><i
+                        class="fas fa-times text-xl"></i></button>
+            </div>
+            <form id="formCompartir" class="p-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                    <!-- Inputs -->
+                    <div class="flex flex-col gap-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Red social</label>
+                            <select id="selectRedSocial" required
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
+                                <option value="">Selecciona la red</option>
+                                <option value="instagram">Instagram</option>
+                                <option value="facebook">Facebook</option>
+                                <option value="youtube">YouTube</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">URL del Reels o Video</label>
+                            <input type="url" id="inputUrlVideo" required placeholder="Pega aquí la URL del video"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
+                        </div>
+                    </div>
+                    <!-- Previsualización -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Previsualización</label>
+                        <div id="previewVideoContainer"
+                            class="rounded-xl overflow-hidden bg-slate-100 min-h-[360px] flex items-center justify-center p-3 aspect-[9/16] md:aspect-[9/16]">
+                            <span class="text-slate-400">Previsualización del video...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-4 pt-8">
+                    <button type="button" onclick="cerrarModalCompartir()"
+                        class="px-8 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Cancelar</button>
+                    <button type="submit"
+                        class="px-10 py-3 rounded-xl font-bold text-white bg-yellow-500 hover:bg-yellow-600 shadow-lg transition-all">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script async src="//www.instagram.com/embed.js"></script>
     <script
         src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
     <script type="module" src="../assets/js/product-inventory.js"></script>
