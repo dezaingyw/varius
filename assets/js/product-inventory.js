@@ -65,6 +65,7 @@ async function processFiles(fileList) {
     renderPreviewImages();
 }
 
+
 function renderPreviewImages() {
     previewContainer.innerHTML = '';
     currentImages.forEach((imgObj, idx) => {
@@ -195,9 +196,11 @@ async function cargarProductosFirebase() {
                 price: data.price || 0,
                 stock: data.stock || 0,
                 status: (data.status || "Activo").toUpperCase(),
-                offer: data.offer || data.discount || 0,
+                onOffer: data.onOffer === true, // asegúrate de booleano
+                discount: data.discount || 0,
                 images: (data.imageUrls && data.imageUrls.length > 0) ? data.imageUrls : ["https://via.placeholder.com/400x300"],
-                description: data.description || ""
+                description: data.description || "",
+                sharedVideo: data.sharedVideo || null
             });
         });
         return productosData;
@@ -264,6 +267,112 @@ async function poblarCategorias() {
     }
 }
 
+/****
+ * 
+ * 
+ * GESTION DE VIDEO PARA COMPARTIR
+ * 
+ * *****/
+// —————— COMPARTIR PRODUCTO: MODAL, PREVIEW Y GUARDADO ——————
+
+// Variable global para saber qué producto estamos compartiendo
+let compartirProductoId = null;
+
+// Abre el modal de compartir, precargando red social y url si existen
+function abrirModalCompartir(id) {
+    compartirProductoId = id;
+    const p = productos.find(pr => pr.id === id);
+    let red = '';
+    let videoUrl = '';
+    if (p && p.sharedVideo) {
+        red = p.sharedVideo.network || '';
+        videoUrl = p.sharedVideo.url || '';
+    }
+    document.getElementById('selectRedSocial').value = red;
+    document.getElementById('inputUrlVideo').value = videoUrl;
+    renderPrevisualizacionVideo();
+    document.getElementById('modal-compartir').classList.remove('hidden');
+}
+
+// Cierra el modal de compartir
+function cerrarModalCompartir() {
+    compartirProductoId = null;
+    document.getElementById('modal-compartir').classList.add('hidden');
+}
+
+// Cambia preview en el modal dependiendo de la red y la URL
+function renderPrevisualizacionVideo() {
+    const red = document.getElementById('selectRedSocial').value;
+    const url = document.getElementById('inputUrlVideo').value.trim();
+    const cont = document.getElementById('previewVideoContainer');
+    cont.innerHTML = '<span class="text-slate-400">Previsualización del video...</span>';
+    if (!url || !red) return;
+
+    let embedHtml = '';
+    if (red === 'youtube') {
+        // Soporta normal y shorts
+        let videoId = null;
+        let matchNormal = url.match(/(?:youtube\.com.*(?:\?|&)v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+        let matchShort = url.match(/(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/i);
+
+        if (matchNormal && matchNormal[1]) {
+            videoId = matchNormal[1];
+        } else if (matchShort && matchShort[1]) {
+            videoId = matchShort[1];
+        }
+        if (videoId) {
+            embedHtml = `<iframe width="100%" height="520" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen class="rounded-xl"></iframe>`;
+        }
+    } else if (red === 'facebook') {
+        embedHtml = `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&width=560" width="100%" height="230" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen class="rounded-xl"></iframe>`;
+    } else if (red === 'instagram') {
+        // Instagram: el embed solo funcionará si es público y tienes el script de instagram embebido (ver comentario)
+        embedHtml = `
+        <blockquote class="instagram-media" data-instgrm-permalink="${url}" data-instgrm-version="14" style="width:100%; min-width:200px; max-width:500px; margin:auto;">
+            <a href="${url}" target="_blank" rel="noopener">Ver en Instagram</a>
+        </blockquote>
+        `;
+        if (window.instgrm) setTimeout(() => window.instgrm.Embeds.process(), 100);
+    }
+    cont.innerHTML = embedHtml || '<span class="text-slate-400">No se pudo previsualizar el video</span>';
+}
+
+// Listeners para actualizar el preview en tiempo real
+document.getElementById('selectRedSocial').addEventListener('change', renderPrevisualizacionVideo);
+document.getElementById('inputUrlVideo').addEventListener('input', renderPrevisualizacionVideo);
+
+// Guardar la red y url elegida en el producto correspondiente en Firestore
+document.getElementById('formCompartir').onsubmit = async function (e) {
+    e.preventDefault();
+    const red = document.getElementById('selectRedSocial').value;
+    const url = document.getElementById('inputUrlVideo').value.trim();
+
+    if (!red || !url) return;
+
+    try {
+        await updateDoc(doc(db, "product", compartirProductoId), {
+            sharedVideo: { network: red, url: url }
+        });
+
+        mostrarModalExito("¡Enlace guardado!", `Video de ${red.charAt(0).toUpperCase() + red.slice(1)} guardado correctamente.`);
+
+        cerrarModalCompartir();
+
+        // Actualiza productos y la tabla sin recargar toda la página
+        productos = await cargarProductosFirebase();
+        renderizarTabla();
+
+    } catch (err) {
+        alert("Error guardando enlace: " + (err?.message ?? err));
+    }
+};
+
+// Exponer globalmente para los onclick del HTML
+window.abrirModalCompartir = abrirModalCompartir;
+window.cerrarModalCompartir = cerrarModalCompartir;
+
+/**FINALIZACION DE LAS FUNCIONES DE COMPARTIR */
+
 function renderizarTabla(datos = productos) {
     const tbody = document.getElementById('productTableBody');
     if (!tbody) return;
@@ -303,7 +412,7 @@ function renderizarTabla(datos = productos) {
                 <td class="px-6 py-4 text-slate-500 text-sm font-medium">${p.category}</td>
                 <td class="px-6 py-4">
                     <div class="font-bold text-slate-800">$ ${(typeof p.price === 'number' ? p.price : 0).toLocaleString('de-DE', { minimumFractionDigits: 2 })}</div>
-                    ${p.offer ? `<span class="text-[10px] font-bold text-emerald-500">-${p.offer}% Rebajado</span>` : ''}
+                    ${p.onOffer ? `<span class="text-[10px] font-bold text-emerald-500">-${p.discount}% Rebajado</span>` : ''}
                 </td>
                 <td class="px-6 py-4">
                     <span class="font-bold ${p.stock === 0 ? 'text-red-500' : 'text-slate-700'}">${p.stock} Und</span>
@@ -316,8 +425,14 @@ function renderizarTabla(datos = productos) {
                 <td class="px-6 py-4">
                     <div class="flex justify-center gap-2">
                         <button onclick="copyProductLink('${p.id}')" title="Copiar enlace" class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 hover:bg-indigo-500 hover:text-white transition-all"><i class="fas fa-link text-xs"></i></button>
-                        <button onclick="abrirModal('edit', '${p.id}')" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all"><i class="fas fa-pen text-xs"></i></button>
-                        <button onclick="suspender('${p.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all"><i class="fas fa-ban text-xs"></i></button>
+
+                        <button onclick="abrirModal('edit', '${p.id}')" class="admin-only w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all"><i class="fas fa-pen text-xs"></i></button>                        
+                        
+                        <button onclick="abrirModalCompartir('${p.id}')" class="admin-only w-8 h-8 rounded-lg bg-yellow-50 text-yellow-500 hover:bg-yellow-400 hover:text-white transition-all" title="Compartir producto">
+                            <i class="fas fa-share-alt text-xs"></i>
+                        </button>
+                        
+                        <button onclick="suspender('${p.id}')" class="admin-only w-8 h-8 rounded-lg bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all"><i class="fas fa-ban text-xs"></i></button>
                     </div>
                 </td>
             </tr>
@@ -387,14 +502,15 @@ function abrirModal(tipo, id = null) {
             form.sku.value = p.sku;
             form.price.value = p.price.toLocaleString('de-DE', { minimumFractionDigits: 2 });
             form.stock.value = p.stock;
-            if (p.offer > 0) {
-                form.isOffer.checked = true;
-                document.getElementById('offerInputContainer').style.display = 'block';
-                form.discount.value = p.offer;
+            form.isOffer.checked = !!p.onOffer;
+            if (p.onOffer) {
+                document.getElementById('offerInputContainer').classList.remove('hidden');
+                document.getElementById('discountInput').disabled = false;
+                document.getElementById('discountInput').value = p.discount || "0";
             } else {
-                form.isOffer.checked = false;
-                document.getElementById('offerInputContainer').style.display = 'none';
-                form.discount.value = '';
+                document.getElementById('offerInputContainer').classList.add('hidden');
+                document.getElementById('discountInput').disabled = true;
+                document.getElementById('discountInput').value = "0";
             }
             if (p.images && p.images.length > 0) {
                 for (let imgUrl of p.images) {
@@ -430,14 +546,15 @@ document.getElementById('productForm').onsubmit = async function (e) {
     // SKU SIEMPRE del input (así no se pierde)
     data.sku = document.getElementById('skuInput').value;
 
-    // Campo oferta
-    data.offer = form.isOffer?.checked ? parseInt(data.discount || "0") : 0;
-    delete data.isOffer;
-    delete data.discount;
+    // Oferta
+    data.onOffer = form.isOffer?.checked ? true : false;
+    data.discount = data.onOffer ? parseInt(data.discount || "0") : 0;
 
-    // Numéricos bien
-    data.stock = parseInt(data.stock || "0");
+    // El campo offer antiguo ya no se usa
+    delete data.isOffer;
+    // El campo price siempre debe ser float
     data.price = parseFloat((data.price || "0").replace(/\./g, "").replace(",", "."));
+    data.stock = parseInt(data.stock || "0");
 
     let productId = data.sku || (Math.random() + '').slice(2);
     let imageUrls = await subirTodasLasImagenes(productId);
@@ -509,7 +626,19 @@ function formatearPrecio(input) {
 }
 
 function toggleOferta(check) {
-    document.getElementById('offerInputContainer').style.display = check.checked ? 'block' : 'none';
+    const offerContainer = document.getElementById('offerInputContainer');
+    const discountInput = document.getElementById('discountInput');
+    if (check.checked) {
+        offerContainer.classList.remove('hidden');
+        offerContainer.style.display = 'block';
+        discountInput.disabled = false;
+        discountInput.focus();
+    } else {
+        offerContainer.classList.add('hidden');
+        offerContainer.style.display = '';
+        discountInput.value = "0";
+        discountInput.disabled = true;
+    }
 }
 
 function suspender(id) {
