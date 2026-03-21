@@ -100,6 +100,24 @@
     </div>
   </div>
 
+  <div id="vpnModal" class="product-modal" style="display: none;">
+    <div class="product-modal-panel" style="max-width: 500px; text-align: center;">
+      <div class="product-modal-body">
+        <div style="width: 100%;">
+          <span style="font-size: 3rem;">🌐</span>
+          <h2 style="margin-top: 1rem; color: var(--text);">VPN Detectado</h2>
+          <p style="color: var(--muted); margin-bottom: 1.5rem; line-height: 1.6;">
+            Hemos detectado que estás utilizando una conexión VPN o Proxy. Por motivos de seguridad y para procesar tu
+            compra correctamente, por favor <strong>desactiva el VPN</strong> y recarga la página.
+          </p>
+          <button onclick="window.location.reload()" class="btn-primary" style="width: 100%;">
+            Recargar Página
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Product modal (slider + detalles) -->
   <div id="productModal" class="product-modal hidden" role="dialog" aria-modal="true" aria-hidden="true"
     aria-labelledby="productModalTitle">
@@ -146,6 +164,7 @@
   <script type="module" src="assets/js/contact-layout.js"></script>
   <script type="module" src="assets/js/ui-animations.js"></script>
   <script type="module" src="assets/js/visits.js"></script>
+  <script type="module" src="assets/js/anti-vpn.js"></script>
   <script>
     const cartBtn = document.getElementById('openCartBtn');
     cartBtn.addEventListener('click', () => {

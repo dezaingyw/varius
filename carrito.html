@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tienda - Varius</title>  
+  <title>Tienda - Varius</title>
   <link rel="icon" type="image/png" href="assets/img/favicon.png">
   <link rel="stylesheet" href="assets/css/carrito.css">
   <!-- Meta Pixel Code -->
@@ -26,6 +26,29 @@
   <noscript><img height="1" width="1" style="display:none"
       src="https://www.facebook.com/tr?id=959500979748263&ev=PageView&noscript=1" /></noscript>
   <!-- End Meta Pixel Code -->
+  <style>
+    .field-inline-wrapper {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #cust_operator {
+      width: 90px;
+      min-width: 75px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #e6eef6;
+    }
+
+    #cust_phone {
+      flex: 1;
+      min-width: 110px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #e6eef6;
+    }
+  </style>
 </head>
 
 <body>
@@ -90,11 +113,16 @@
             <div id="cust_name_err" class="field-err" aria-live="polite"></div>
           </div>
 
-          <div class="form-row">
-            <label for="cust_phone">Teléfono <span class="req">*</span></label>
-            <input id="cust_phone" name="phone" type="text" placeholder="Ej: 1234567" required autocomplete="tel"
-              inputmode="numeric" pattern="\d*" maxlength="7">
-            <div id="cust_phone_err" class="field-err" aria-live="polite"></div>
+          <div class="field-inline-wrapper">
+            <select id="cust_operator" name="operator">
+              <option value="58414">0414</option>
+              <option value="58424">0424</option>
+              <option value="58412">0412</option>
+              <option value="58422">0422</option>
+              <option value="58416">0416</option>
+              <option value="58426">0426</option>
+            </select>
+            <input id="cust_phone" type="text" placeholder="Ej: 1234567" maxlength="7" />
           </div>
 
           <div class="form-row" style="position:relative;">
@@ -177,6 +205,24 @@
     </div>
   </div>
 
+  <div id="vpnModal" class="product-modal" style="display: none;">
+    <div class="product-modal-panel" style="max-width: 500px; text-align: center;">
+      <div class="product-modal-body">
+        <div style="width: 100%;">
+          <span style="font-size: 3rem;">🌐</span>
+          <h2 style="margin-top: 1rem; color: var(--text);">VPN Detectado</h2>
+          <p style="color: var(--muted); margin-bottom: 1.5rem; line-height: 1.6;">
+            Hemos detectado que estás utilizando una conexión VPN o Proxy. Por motivos de seguridad y para procesar tu
+            compra correctamente, por favor <strong>desactiva el VPN</strong> y recarga la página.
+          </p>
+          <button onclick="window.location.reload()" class="btn-primary" style="width: 100%;">
+            Recargar Página
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" aria-live="polite"></div>
 
   <footer class="site-footer">
@@ -186,9 +232,9 @@
   </footer>
 
   <script type="module" src="assets/js/pedidos-data.js"></script>
-  <script type="module" src="assets/js/contact-layout.js"></script>
   <script type="module" src="assets/js/ui-animations.js"></script>
   <script type="module" src="assets/js/visits.js"></script>
+  <script type="module" src="assets/js/anti-vpn.js"></script>
 </body>
 
 </html>

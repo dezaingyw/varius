@@ -118,4 +118,124 @@
     <script type="module" src="assets/js/auth.js"></script>
 </body>
 
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Iniciar sesión</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="icon" type="image/png" href="assets/img/favicon.png">
+    <style>
+        .input-row {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .input-alert {
+            color: #b71c1c;
+            font-size: 13px;
+            min-height: 18px;
+        }
+
+        /* Nuevo estilo para el logo en el login */
+        .login-logo {
+            display: block;
+            margin: 0 auto 12px auto;
+            width: 120px;
+            max-width: 40%;
+            height: auto;
+        }
+
+        /* Ajuste pequeño para centrar título y form */
+        .card .title {
+            text-align: center;
+        }
+    </style>
+    <!-- Meta Pixel Code -->
+    <script>
+        !function (f, b, e, v, n, t, s) {
+            if (f.fbq) return; n = f.fbq = function () {
+                n.callMethod ?
+                n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+            };
+            if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
+            n.queue = []; t = b.createElement(e); t.async = !0;
+            t.src = v; s = b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t, s)
+        }(window, document, 'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '959500979748263');
+        fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+            src="https://www.facebook.com/tr?id=959500979748263&ev=PageView&noscript=1" /></noscript>
+    <!-- End Meta Pixel Code -->
+</head>
+
+<body>
+    <main class="page-center">
+        <section class="card">
+            <!-- Logo agregado encima del título -->
+            <img src="admin/assets/img/logo.png" alt="Logo" class="login-logo" />
+
+            <h1 class="title">Iniciar sesión</h1>
+
+            <form id="login-form" novalidate>
+                <label class="form-label" for="login-email">Correo</label>
+                <div class="input-row">
+                    <input id="login-email" class="input-field" type="email" placeholder="ejemplo@correo.com" required
+                        aria-describedby="login-email-alert">
+                    <div id="login-email-alert" class="input-alert" aria-live="polite"></div>
+                </div>
+
+                <label class="form-label" for="login-password">Contraseña</label>
+                <div class="input-row" style="position:relative;">
+                    <input id="login-password" class="input-field" type="password" placeholder="Contraseña" required
+                        aria-describedby="login-password-alert">
+                    <button id="login-toggle-password" type="button" class="password-toggle"
+                        aria-label="Mostrar u ocultar contraseña">👁️</button>
+                    <div id="login-password-alert" class="input-alert" aria-live="polite"></div>
+                </div>
+
+                <div style="margin-top:12px; display:flex; gap:12px; flex-direction:column;">
+                    <button type="submit" class="btn btn-primary">Iniciar sesión</button>
+
+                </div>
+
+            </form>
+        </section>
+    </main>
+    <!-- Modal reutilizable para errores / éxito -->
+    <div id="app-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-card" role="document">
+            <div class="modal-header">
+                <strong id="modal-title">Aviso</strong>
+            </div>
+            <div id="modal-body" class="modal-body">
+                Mensaje...
+            </div>
+            <div class="modal-actions">
+                <button id="modal-ok" class="btn btn-primary">Aceptar</button>
+                <button id="modal-close" class="btn btn-ghost">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="assets/js/auth.js"></script>
+</body>
+
 </html>
